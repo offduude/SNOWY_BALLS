@@ -190,6 +190,38 @@ class MainScene extends Phaser.Scene {
     this.input.on("pointerdown", () => this.handleFreezeInput());
 
     this.showMessage("TAP to aim");
+    this.setupFpsReadout();
+  }
+
+  // Diagnostic only: open the game with ?fps on the URL to show live frame stats (helps track
+  // down phone-only jitter). Shows fps, the slowest frame in the last second, and the slowest
+  // frame seen during the most recent throw's flight.
+  setupFpsReadout() {
+    this.fpsEl = null;
+    if (window.location.search.indexOf("fps") === -1) return;
+    const el = document.createElement("div");
+    el.style.cssText =
+      "position:absolute;left:4px;bottom:4px;z-index:9;color:#0f0;background:rgba(0,0,0,.6);" +
+      "font:10px monospace;padding:2px 4px;pointer-events:none;white-space:pre";
+    document.getElementById("game-container").appendChild(el);
+    this.fpsEl = el;
+    this.fpsWorst = 0;
+    this.flightWorst = 0;
+    this.fpsWindowStart = 0;
+  }
+
+  updateFpsReadout(time, delta) {
+    if (!this.fpsEl) return;
+    this.fpsWorst = Math.max(this.fpsWorst, delta);
+    if (this.state === STATE.FLIGHT) this.flightWorst = Math.max(this.flightWorst, delta);
+    if (time - this.fpsWindowStart > 1000) {
+      this.fpsEl.textContent =
+        "fps " + this.game.loop.actualFps.toFixed(0) +
+        "\nworst frame " + this.fpsWorst.toFixed(0) + "ms" +
+        "\nworst in last flight " + this.flightWorst.toFixed(0) + "ms";
+      this.fpsWorst = 0;
+      this.fpsWindowStart = time;
+    }
   }
 
   // Top-left "rear view camera": a real second Phaser camera aimed at the W20/W21 patch of the
@@ -306,6 +338,7 @@ class MainScene extends Phaser.Scene {
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     this.cameraFollowing = true;
     this.ball.setVisible(true);
+    this.flightWorst = 0;
     this.sound.play("throw_whoosh", { volume: 0.6 });
   }
 
@@ -539,6 +572,7 @@ class MainScene extends Phaser.Scene {
     }
 
     this.updateCharacterPose();
+    this.updateFpsReadout(time, delta);
     this.drawAimBar();
   }
 }

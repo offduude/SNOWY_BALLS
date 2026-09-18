@@ -21,7 +21,7 @@ const GAME_HEIGHT = 243;
 const GRAVITY = 900; // px/s^2
 const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs to reach W21
 
-const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30 + 10; // 450 - nudged right of dead-center three times per user requests (+58, +30, +10)
+const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30 + 10 - 30; // 420 - nudged right of dead-center three times, then left once (+58, +30, +10, -30)
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
 const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
 

@@ -321,7 +321,10 @@ class MainScene extends Phaser.Scene {
 
     if (this.cameraFollowing) {
       const targetScrollY = y - GAME_HEIGHT * 0.6;
-      this.cameras.main.scrollY = Phaser.Math.Linear(this.cameras.main.scrollY, targetScrollY, 0.12);
+      // Frame-rate independent smoothing: a fixed per-frame fraction (the old 0.12) moves the
+      // camera by different amounts on uneven frames, which reads as the whole screen shaking.
+      const follow = 1 - Math.exp(-14 * dt);
+      this.cameras.main.scrollY = Phaser.Math.Linear(this.cameras.main.scrollY, targetScrollY, follow);
     }
 
     if (!reachedApex) return;
@@ -521,7 +524,9 @@ class MainScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    const dt = delta / 1000;
+    // Cap the step so one long frame (audio start, GC, a busy phone GPU) can't make the ball
+    // and the camera chasing it jump - time just runs slightly slow for that frame instead.
+    const dt = Math.min(delta / 1000, 1 / 30);
 
     if (this.state === STATE.AIM_ANGLE) {
       const elapsed = (time - this.aimStartTime) / 1000;

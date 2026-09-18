@@ -92,6 +92,7 @@ class MainScene extends Phaser.Scene {
     this.load.audio("theme", "assets/audio/theme.mp3");
     this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
+    this.load.audio("window_clink", "assets/audio/window_clink.mp3");
     this.load.audio("coin_sound", "assets/audio/coin_sound.mp3");
   }
 

@@ -17,6 +17,12 @@ being told to "check them out" seemed like an oversight:
   "always sticks somewhere" physics, so there's always exactly one impact per throw.
 - `coin_sound`: plays in `finishThrow()` only on an actual window hit, after `snowball_impact`.
 
+**`window_clink.mp3` added later the same day, briefly wired up to replace `snowball_impact`
+specifically on window hits, then reverted the same day** ("bring back the old sound for both
+window hits and regular wall hits") - `snowball_impact` plays for every stick again regardless
+of outcome. The file is still loaded in `preload()` but currently unused; a natural fit if a
+window-specific sound gets asked for again later.
+
 Verified via `scene.sound.get('theme')` (`loop: true`, `isPlaying: true`, correct duration) and
 by monkey-patching `scene.sound.play` during a scripted throw to confirm the exact call order:
 `throw_whoosh` -> `snowball_impact` -> `coin_sound` for a scoring hit.

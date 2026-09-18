@@ -75,6 +75,17 @@ Reference doc for values decided by trial-and-error, so we don't have to redisco
 - Head bonus hitbox sits directly above W20 only (not W21), `HEAD_CHANCE = 0.3` per throw,
   `HEAD_BONUS_COINS = 8` added on top of W20's base coins.
 
+## Phaser camera-bounds gotcha (2026-09-18)
+
+`camera.setBounds(x, y, width, height)` combined with `camera.setZoom(z)` will silently
+force-center `scrollX`/`scrollY` (ignoring any explicit value you set) once the bounds width/
+height gets close to the zoomed viewport size - happened here when bounds width was exactly
+`GAME_WIDTH` (704) at zoom 1.72 (zoomed viewport ~409px). Explicit `scrollX = 223` would read
+back as 223 immediately after the assignment, then silently snap to `(bounds.width -
+viewportWidth)/2` on the very next read/frame. Fix: keep bounds padded well beyond what you
+actually need to constrain (we don't horizontally follow the ball anyway, so the X bounds here
+are just `-GAME_WIDTH` to `GAME_WIDTH*3` - effectively unconstrained).
+
 ## Browser-pane testing gotcha (2026-09-18)
 
 Phaser's `requestAnimationFrame` loop can stall in the Claude Code Browser pane if the tab

@@ -8,9 +8,19 @@
 // (0 = ground, growing upward) derived from that image-y via IMG_GROUND_Y - imageY.
 const IMG_GROUND_Y = 660;
 const IMG_ROOF_Y = 17;
+const WORLD_WIDTH = 704; // background.png's own width, used for placing/bounding the image
 
-const GAME_WIDTH = 704; // matches background.png exactly - no scaling blur
-const GAME_HEIGHT = 420;
+// Canvas resolution IS the resting camera framing - the user marked a reference crop directly
+// on background.png (image x=215-641, y=435-678, the entrance-doors-and-ground area) and asked
+// for the default view to roughly match it, so the canvas is sized to that crop exactly rather
+// than showing the full building width. (We tried camera.zoom instead of this - Phaser 3.80's
+// WebGL renderer clips world content at the viewport edge when zoom != 1, cutting off a strip
+// of the image for no reason tied to scroll/bounds. Shrinking the actual canvas avoids that
+// renderer bug entirely and gets the identical framing.)
+const GAME_WIDTH = 426;
+const GAME_HEIGHT = 243;
+const INITIAL_SCROLL_X = 215; // left edge of the reference crop
+const INITIAL_SCROLL_Y = -(IMG_GROUND_Y - 435); // -225: top edge of the reference crop
 
 const GRAVITY = 900; // px/s^2
 const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs to reach W21
@@ -20,9 +30,8 @@ const MAX_POWER_SPEED = 1150; // px/s vertical launch speed at full power (apex 
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
 
-const ORIGIN_X = GAME_WIDTH / 2; // 352 - centered between the two entrance doors
+const ORIGIN_X = WORLD_WIDTH / 2; // 352 - centered between the two entrance doors (world position, not canvas-relative)
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
-const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 60); // keeps ground near the bottom of the frame
 const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
 
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
@@ -64,19 +73,23 @@ class MainScene extends Phaser.Scene {
     this.flightTime = 0;
     this.headPresent = false;
 
+    // Generous bounds so a fixed scrollX/scrollY never gets clamped/reinterpreted -
+    // we don't horizontally follow the ball, so there's nothing that actually needs
+    // constraining on the X axis.
     this.cameras.main.setBounds(
-      0,
+      -WORLD_WIDTH,
       -BUILDING_TOP_HEIGHT,
-      GAME_WIDTH,
+      WORLD_WIDTH * 3,
       BUILDING_TOP_HEIGHT + GAME_HEIGHT
     );
     this.cameras.main.setBackgroundColor("#65bfd5");
+    this.cameras.main.scrollX = INITIAL_SCROLL_X;
     this.cameras.main.scrollY = INITIAL_SCROLL_Y;
 
     // background.png's own row IMG_GROUND_Y lines up with world height 0 (the ground):
     // image pixel row r sits at Phaser y = -IMG_GROUND_Y + r, so placing the top-left origin
     // at y = -IMG_GROUND_Y puts row IMG_GROUND_Y exactly at y = 0.
-    this.add.image(0, -IMG_GROUND_Y, "background").setOrigin(0, 0);
+    this.bgImage = this.add.image(0, -IMG_GROUND_Y, "background").setOrigin(0, 0);
 
     this.worldGfx = this.add.graphics();
     this.drawCharacter();
@@ -87,13 +100,13 @@ class MainScene extends Phaser.Scene {
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.hudText = this.add
-      .text(8, 6, "", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
+      .text(6, 4, "", { fontFamily: "monospace", fontSize: "9px", color: "#ffffff" })
       .setScrollFactor(0)
       .setDepth(21);
     this.messageText = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "", {
         fontFamily: "monospace",
-        fontSize: "16px",
+        fontSize: "11px",
         color: "#ffffff",
         align: "center",
       })
@@ -256,10 +269,10 @@ class MainScene extends Phaser.Scene {
     g.clear();
     if (this.state !== STATE.AIM_ANGLE && this.state !== STATE.AIM_POWER) return;
 
-    const barX = 90;
-    const barY = GAME_HEIGHT - 30;
-    const barW = GAME_WIDTH - 180;
-    const barH = 10;
+    const barX = 20;
+    const barY = GAME_HEIGHT - 20;
+    const barW = GAME_WIDTH - 40;
+    const barH = 8;
 
     g.fillStyle(0x000000, 0.4);
     g.fillRect(barX, barY, barW, barH);

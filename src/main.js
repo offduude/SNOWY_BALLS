@@ -135,6 +135,10 @@ class MainScene extends Phaser.Scene {
 
     this.createTargetCamera();
 
+    // Master volume default - a single place to change the overall level later (e.g. once a
+    // volume slider exists), rather than every individual sound.play() call.
+    this.sound.volume = 0.5;
+
     // Loops forever so the theme doesn't just play once and go silent - it's a few minutes
     // long, not actually infinite on its own.
     this.sound.play("theme", { loop: true, volume: 0.5 });

@@ -353,3 +353,6 @@ not actual play.
 - `background.png` tweaked by the user (no coordinate changes).
 
 - Character/throw origin `ORIGIN_X` is now W20's center (410.5), replacing the earlier hand-nudged 420. Hit message is "HIT" then "+N coins" on its own line, then the streak line (no window name).
+
+- `manifest.json` orientation is now `landscape` (was a leftover `portrait` placeholder from the very first scaffold).
+- **Theme "not looping" report**: `loop:true` verified working on desktop (seeked to the last 1.5s, it wrapped), so the failure is environment-specific (likely phone audio-context suspend/interrupt). Fix is `startThemeMusic()`: one persistent `sound.add` object plus a 1s watchdog that resumes a suspended/interrupted context and replays the theme whenever it isn't playing (skips hidden tab / locked audio / Phaser-paused-on-blur). Verified by stopping the theme and by suspending the context: both recover within ~2s. Not verified on a real phone.

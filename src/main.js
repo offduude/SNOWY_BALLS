@@ -184,7 +184,7 @@ class MainScene extends Phaser.Scene {
 
     // Loops forever so the theme doesn't just play once and go silent - it's a few minutes
     // long, not actually infinite on its own.
-    this.sound.play("theme", { loop: true, volume: 0.5 });
+    this.startThemeMusic();
 
     // Mobile-only from here on - no keyboard control, tap is the only input.
     this.input.on("pointerdown", () => this.handleFreezeInput());
@@ -238,6 +238,27 @@ class MainScene extends Phaser.Scene {
     // screen-space HUD (which is scrollFactor(0), so it'd appear squeezed into this tiny
     // viewport too) and its own bezel (drawn by the main camera, one layer behind it).
     this.targetCam.ignore([this.aimGfx, bezel]);
+  }
+
+  // Theme music that never runs out. `loop: true` alone wasn't enough in practice - on phones
+  // the audio context can get suspended/interrupted (backgrounding, Safari) and a sound can end
+  // up stopped without ever "completing", so it just goes silent. So: keep one persistent sound
+  // object, and a 1s watchdog that resumes a suspended audio context and restarts the theme
+  // whenever it isn't playing (skipping the case where Phaser itself paused it on tab blur).
+  startThemeMusic() {
+    this.theme = this.sound.add("theme", { loop: true, volume: 0.5 });
+    this.theme.play();
+
+    const keepAlive = () => {
+      const ctx = this.sound.context;
+      if (ctx && (ctx.state === "suspended" || ctx.state === "interrupted")) ctx.resume().catch(() => {});
+      if (document.hidden || this.sound.locked) return;
+      if (!this.theme.isPlaying && !this.theme.isPaused) this.theme.play();
+    };
+    window.setInterval(keepAlive, 1000);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) keepAlive();
+    });
   }
 
   worldY(heightFromGround) {

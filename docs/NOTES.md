@@ -2,25 +2,34 @@
 
 Reference doc for values decided by trial-and-error, so we don't have to rediscover them later.
 
-## Page layout: HTML page, not a fullscreen canvas app (2026-09-19)
+## Page layout: HTML page, not a fullscreen canvas app (2026-09-19, revised twice same day)
 
-Restructured `index.html` away from the fixed/fullscreen/centered layout it started with.
-`body` is now normal document flow (`display:flex; flex-direction:column; align-items:center`),
-`#game-container` sits at the top of the page (`width:100%; max-width:640px; aspect-ratio: 426
-/ 243`) instead of being vertically centered in a fixed fullscreen box, and there's no more
-`overflow:hidden`/`touch-action:none` on `html,body` - the page can scroll normally now, which
-it couldn't before. The on-screen FREEZE button is gone entirely (removed by request) - tapping
-anywhere on the canvas still freezes via the existing `pointerdown` listener on the whole game,
-so mobile input isn't actually lost, just the redundant explicit button.
+Restructured `index.html` away from the original fixed/fullscreen/centered layout. There's no
+more `overflow:hidden`/`touch-action:none` on `html,body` - the page can scroll if it needs to,
+which it couldn't originally. The on-screen FREEZE button is gone entirely (removed by request)
+- tapping anywhere on the canvas still freezes via the existing `pointerdown` listener on the
+whole game, so mobile input isn't actually lost, just the redundant explicit button.
 
-**All in-game text moved out of Phaser into HTML** (`#message`, a plain `<div>` below the
-canvas, `white-space: pre-line` so `\n` in messages still breaks lines). Canvas-rendered Phaser
-`Text` objects at this game's small internal resolution (426x243) render as blurry upscaled
-bitmaps once the browser scales the canvas up to fill the page - an HTML element with a real
-web font doesn't have that problem, it's crisp at any size. `MainScene.showMessage(msg)` now
-just does `document.getElementById("message").textContent = msg` instead of touching a Phaser
-Text object; there is no `messageText` game object anymore. The aim bar itself is still a
-Phaser `Graphics` object (not text), so it's untouched.
+First pass put the game at the top of the page with text in normal flow below it; the very next
+request was to make the game **fill the entire page** instead (`#game-container` width is
+`min(100vw, calc(100vh * 426 / 243))`, i.e. as large as it can be without exceeding either the
+viewport width or height, aspect ratio always exactly preserved - `body` centers it with flex).
+
+**All in-game text moved out of Phaser into HTML** (`#message`, a `<div>` - `white-space:
+pre-line` so `\n` in messages still breaks lines). Canvas-rendered Phaser `Text` objects at this
+game's small internal resolution (426x243) render as blurry upscaled bitmaps once the browser
+scales the canvas up to fill the page; an HTML element with a real web font doesn't have that
+problem, it's crisp at any size. `MainScene.showMessage(msg)` just does
+`document.getElementById("message").textContent = msg`; there is no `messageText` game object
+anymore. The aim bar itself is still a Phaser `Graphics` object (not text), untouched.
+
+`#message` is positioned back at **screen center** (`position:absolute` inside
+`#game-container`, centered via `top/left:50%` + `transform`) - its original spot as a Phaser
+Text object, per a follow-up request; it had briefly lived below the canvas in normal flow in
+between. `pointer-events:none` is required here - without it, this overlay (now sitting
+directly on top of the interactive canvas) would swallow taps meant for the game underneath.
+Added a `text-shadow` for legibility since it now sits directly over busy building art instead
+of a plain background.
 
 **Font**: Google Fonts' "Press Start 2P" (loaded via `<link>` in `<head>`), applied via
 `font-family` on `html, body` plus explicitly on `#message`. This is a real pixel-styled *font*
@@ -163,7 +172,9 @@ break the mask. Verified via a renderer snapshot (`game.renderer.snapshot()`, de
 4x-upscaled with PIL) that the corners are genuinely rounded, not just visually implied by the
 bezel underneath. The bezel (`TARGET_CAM_BEZEL_PAD` larger than the camera rect, same radius)
 is still there behind it for the border/background - the mask and the bezel now agree on the
-same rounded shape instead of the bezel doing all the visual work alone.
+same rounded shape instead of the bezel doing all the visual work alone. Bezel outline is a
+single fully-opaque white 1px stroke ("monocolor thin outline" per request) - it started at
+0.5 alpha, which read as slightly muddy against the fill.
 
 The live ball sprite itself is hidden except during actual flight (`setVisible(false)` in
 `create()`/`finishThrow()`, `setVisible(true)` in `launchBall()`) - it used to sit visibly

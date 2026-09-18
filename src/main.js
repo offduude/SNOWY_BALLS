@@ -23,7 +23,7 @@ const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs
 
 const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30 + 10 - 30; // 420 - nudged right of dead-center three times, then left once (+58, +30, +10, -30)
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
-const CHARACTER_Y_OFFSET = 20; // 2026-09-19: nudges the drawn character down 20px (positive = down)
+const CHARACTER_Y_OFFSET = 20 - 5; // 15 - nudged down 20px, then up 5px, across separate requests (positive = down)
 const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
 
 // Resting camera framing: horizontally centered on the character. Vertically, true-centering
@@ -160,7 +160,7 @@ class MainScene extends Phaser.Scene {
       viewH + TARGET_CAM_BEZEL_PAD * 2,
       TARGET_CAM_RADIUS
     );
-    bezel.lineStyle(1, 0xffffff, 0.5);
+    bezel.lineStyle(1, 0xffffff, 1); // monocolor thin outline, full opacity for a crisp edge
     bezel.strokeRoundedRect(
       TARGET_CAM_X - TARGET_CAM_BEZEL_PAD,
       TARGET_CAM_Y - TARGET_CAM_BEZEL_PAD,

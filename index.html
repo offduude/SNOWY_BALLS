@@ -19,7 +19,7 @@
       margin: 0;
       padding: 0;
       width: 100%;
-      min-height: 100%;
+      height: 100%;
       background: #14192a;
       -webkit-user-select: none;
       user-select: none;
@@ -28,14 +28,15 @@
 
     body {
       display: flex;
-      flex-direction: column;
       align-items: center;
+      justify-content: center;
     }
 
-    /* Game sits at the top of the page - not vertically centered/fullscreen anymore. */
+    /* Fills the page - as wide as the viewport allows, capped so it never taller than the
+       viewport either (min() of both), aspect ratio always preserved. */
     #game-container {
-      width: 100%;
-      max-width: 640px;
+      position: relative;
+      width: min(100vw, calc(100vh * 426 / 243));
       aspect-ratio: 426 / 243;
       touch-action: manipulation;
     }
@@ -45,30 +46,35 @@
       display: block;
     }
 
-    /* All in-game text lives here now instead of as blurry upscaled Phaser canvas text -
-       a real web font at native resolution reads far more crisply than pixel-doubled bitmap
-       text does at this canvas's small internal resolution. */
+    /* All in-game text lives here now instead of as blurry upscaled Phaser canvas text - a
+       real web font at native resolution reads far more crisply than pixel-doubled bitmap text
+       does at this canvas's small internal resolution. Centered back over the game screen
+       (its original spot as a Phaser Text object) rather than living below the canvas. */
     #message {
-      width: 100%;
-      max-width: 640px;
-      box-sizing: border-box;
-      padding: 16px 20px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
       font-size: 12px;
       line-height: 1.8;
       text-align: center;
       white-space: pre-line;
-      min-height: 2.6em; /* reserves space so the page doesn't jump between messages */
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.85);
+      pointer-events: none; /* sits on top of the canvas - taps must still reach the game below */
+      z-index: 2;
     }
   </style>
 </head>
 <body>
-  <div id="game-container"></div>
-  <div id="message"></div>
+  <div id="game-container">
+    <div id="message"></div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=18"></script>
+  <script src="src/main.js?v=19"></script>
 </body>
 </html>

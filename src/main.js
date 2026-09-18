@@ -2,27 +2,37 @@
 // Two-phase aim: freeze the angle pointer, then freeze the power pointer, then the
 // snowball launches with those two frozen values driving its trajectory.
 
-const GAME_WIDTH = 480;
-const GAME_HEIGHT = 270;
+// background.png is 704x1000. Pixel-analysis pass (docs/background_annotated.png) found the
+// ground/sidewalk line at image-y=660 and the roofline at image-y=17, and gave exact boxes for
+// every window - see docs/NOTES.md for the full table. World space below uses "height climbed"
+// (0 = ground, growing upward) derived from that image-y via IMG_GROUND_Y - imageY.
+const IMG_GROUND_Y = 660;
+const IMG_ROOF_Y = 17;
+
+const GAME_WIDTH = 704; // matches background.png exactly - no scaling blur
+const GAME_HEIGHT = 420;
 
 const GRAVITY = 900; // px/s^2
-const MAX_SWING_SPEED = 110; // px/s horizontal drift at full left/right
-const MIN_POWER_SPEED = 500; // px/s vertical launch speed at 0 power (apex ~139px - a clear miss)
-const MAX_POWER_SPEED = 1300; // px/s vertical launch speed at full power (apex ~939px)
+const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs to reach W21
+const MIN_POWER_SPEED = 300; // px/s vertical launch speed at 0 power (apex ~50px - a clear miss)
+const MAX_POWER_SPEED = 1150; // px/s vertical launch speed at full power (apex ~735px, just above the roofline)
 
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
 
-const ORIGIN_X = GAME_WIDTH / 2;
+const ORIGIN_X = GAME_WIDTH / 2; // 352 - centered between the two entrance doors
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
-const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 40); // keeps ground near the bottom of the frame
+const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 60); // keeps ground near the bottom of the frame
+const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
 
-// Placeholder building/window layout - swap for real art-driven values later.
-const BUILDING = { x: 60, width: GAME_WIDTH - 120, topHeight: 1400 };
-const WINDOW_TARGET = { offsetX: 30, height: 500, width: 46, depth: 40 };
-const HEAD_CHANCE = 0.3;
+// W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
+// "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
+const WINDOWS = [
+  { name: "W20", xFrom: 385, xTo: 436, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 6 },
+  { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 3 },
+];
+const HEAD_CHANCE = 0.3; // chance a bonus head appears above W20 on a given throw
 const HEAD_BONUS_COINS = 8;
-const WINDOW_COINS = 3;
 
 const STATE = {
   IDLE: "idle",
@@ -42,6 +52,10 @@ class MainScene extends Phaser.Scene {
     super("main");
   }
 
+  preload() {
+    this.load.image("background", "assets/building/background.png");
+  }
+
   create() {
     this.state = STATE.IDLE;
     this.streak = 0;
@@ -50,13 +64,22 @@ class MainScene extends Phaser.Scene {
     this.flightTime = 0;
     this.headPresent = false;
 
-    this.cameras.main.setBounds(0, -BUILDING.topHeight, GAME_WIDTH, BUILDING.topHeight + GAME_HEIGHT);
-    this.cameras.main.setBackgroundColor("#2b3a55");
+    this.cameras.main.setBounds(
+      0,
+      -BUILDING_TOP_HEIGHT,
+      GAME_WIDTH,
+      BUILDING_TOP_HEIGHT + GAME_HEIGHT
+    );
+    this.cameras.main.setBackgroundColor("#65bfd5");
     this.cameras.main.scrollY = INITIAL_SCROLL_Y;
 
-    // Static world graphics: sky gradient stripe, building, window, character.
+    // background.png's own row IMG_GROUND_Y lines up with world height 0 (the ground):
+    // image pixel row r sits at Phaser y = -IMG_GROUND_Y + r, so placing the top-left origin
+    // at y = -IMG_GROUND_Y puts row IMG_GROUND_Y exactly at y = 0.
+    this.add.image(0, -IMG_GROUND_Y, "background").setOrigin(0, 0);
+
     this.worldGfx = this.add.graphics();
-    this.drawWorld();
+    this.drawCharacter();
 
     this.ball = this.add.circle(ORIGIN_X, this.worldY(ORIGIN_Y), 4, 0xffffff);
     this.ball.setDepth(10);
@@ -90,25 +113,10 @@ class MainScene extends Phaser.Scene {
     return -heightFromGround;
   }
 
-  drawWorld() {
+  drawCharacter() {
+    // Placeholder: back turned, facing the building. Swap for real character art later.
     const g = this.worldGfx;
     g.clear();
-
-    // Building face.
-    g.fillStyle(0x555b6e, 1);
-    g.fillRect(BUILDING.x, this.worldY(BUILDING.topHeight), BUILDING.width, BUILDING.topHeight + GAME_HEIGHT);
-
-    // Ground strip.
-    g.fillStyle(0xd8e6f0, 1);
-    g.fillRect(0, this.worldY(0), GAME_WIDTH, 20);
-
-    // Window target.
-    const wx = ORIGIN_X + WINDOW_TARGET.offsetX - WINDOW_TARGET.width / 2;
-    const wy = this.worldY(WINDOW_TARGET.height + WINDOW_TARGET.depth / 2) ;
-    g.fillStyle(0xffe08a, 1);
-    g.fillRect(wx, this.worldY(WINDOW_TARGET.height + WINDOW_TARGET.depth / 2), WINDOW_TARGET.width, WINDOW_TARGET.depth);
-
-    // Character placeholder: back turned, facing the building (up).
     g.fillStyle(0x2f2f3a, 1);
     g.fillRoundedRect(ORIGIN_X - 8, this.worldY(0) - 22, 16, 22, 3);
     g.fillCircle(ORIGIN_X, this.worldY(0) - 26, 7);
@@ -141,21 +149,15 @@ class MainScene extends Phaser.Scene {
     this.cameraFollowing = true;
   }
 
-  getWindowBounds() {
-    return {
-      x: ORIGIN_X + WINDOW_TARGET.offsetX - WINDOW_TARGET.width / 2,
-      width: WINDOW_TARGET.width,
-      heightFrom: WINDOW_TARGET.height - WINDOW_TARGET.depth / 2,
-      heightTo: WINDOW_TARGET.height + WINDOW_TARGET.depth / 2,
-    };
-  }
-
   getHeadBounds() {
+    // Sits just above W20 (the "main" window) - see WINDOWS[0].
+    const w20 = WINDOWS[0];
+    const centerX = (w20.xFrom + w20.xTo) / 2;
     return {
-      x: ORIGIN_X + WINDOW_TARGET.offsetX - 8,
-      width: 16,
-      heightFrom: WINDOW_TARGET.height + WINDOW_TARGET.depth / 2,
-      heightTo: WINDOW_TARGET.height + WINDOW_TARGET.depth / 2 + 14,
+      xFrom: centerX - 8,
+      xTo: centerX + 8,
+      heightFrom: w20.heightTo,
+      heightTo: w20.heightTo + 14,
     };
   }
 
@@ -175,47 +177,46 @@ class MainScene extends Phaser.Scene {
     if (this.headPresent) {
       const hb = this.getHeadBounds();
       if (
-        x >= hb.x &&
-        x <= hb.x + hb.width &&
+        x >= hb.xFrom &&
+        x <= hb.xTo &&
         heightClimbed >= hb.heightFrom &&
         heightClimbed <= hb.heightTo
       ) {
-        this.finishThrow(true, true);
+        this.finishThrow(true, WINDOWS[0], HEAD_BONUS_COINS);
         return;
       }
     }
 
-    const wb = this.getWindowBounds();
-    if (
-      x >= wb.x &&
-      x <= wb.x + wb.width &&
-      heightClimbed >= wb.heightFrom &&
-      heightClimbed <= wb.heightTo
-    ) {
-      this.finishThrow(true, false);
-      return;
+    for (const win of WINDOWS) {
+      if (
+        x >= win.xFrom &&
+        x <= win.xTo &&
+        heightClimbed >= win.heightFrom &&
+        heightClimbed <= win.heightTo
+      ) {
+        this.finishThrow(true, win, 0);
+        return;
+      }
     }
 
     if (heightClimbed < 0 && t > 0.2) {
-      this.finishThrow(false, false);
+      this.finishThrow(false, null, 0);
     }
   }
 
-  finishThrow(hit, headHit) {
+  finishThrow(hit, win, headBonus) {
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
 
     if (hit) {
       this.streak += 1;
-      let coins = WINDOW_COINS;
-      if (headHit) coins += HEAD_BONUS_COINS;
+      let coins = (win ? win.coins : 0) + headBonus;
       const streakBonus = Math.floor(coins * 0.15 * (this.streak - 1));
       coins += streakBonus;
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
-      this.showMessage(
-        (headHit ? "HEADSHOT! +" : "HIT! +") + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "")
-      );
+      const label = headBonus > 0 ? "HEADSHOT! +" : win.name + " HIT! +";
+      this.showMessage(label + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : ""));
     } else {
       this.streak = 0;
       this.showMessage("MISS\nstreak reset");

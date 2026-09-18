@@ -24,7 +24,9 @@ const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs
 const ORIGIN_X = (385 + 436) / 2; // 410.5 - centered on W20 (its xFrom/xTo; WINDOWS is defined below)
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
 const CHARACTER_Y_OFFSET = 20 - 5; // 15 - nudged down 20px, then up 5px, across separate requests (positive = down)
-const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
+// The top edge of background.png (image y = 0) is world height IMG_GROUND_Y. The camera never
+// scrolls past it, and a ball that reaches it has left the building (see updateFlight).
+const TOP_BOUNDARY_HEIGHT = IMG_GROUND_Y;
 
 // Resting camera framing: horizontally centered on the character. Vertically, true-centering
 // on the character wasted half the frame on plain sidewalk below - instead the ground sits
@@ -45,9 +47,11 @@ const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 20);
 // calibrated so a 0%/100% power throw's apex lands exactly on those two bounds -
 // vy0 = sqrt(2 * GRAVITY * height).
 const MIN_STICK_HEIGHT = IMG_GROUND_Y - 486 + 10; // 184
-const MAX_STICK_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y; // 643
+// Max power now throws PAST the top of the texture on purpose (2026-09-19) so a ball can escape the
+// building - later accessories may make that routine. Apex at full power:
+const MAX_APEX_HEIGHT = 800;
 const MIN_POWER_SPEED = Math.sqrt(2 * GRAVITY * MIN_STICK_HEIGHT); // ~575.6
-const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_STICK_HEIGHT); // ~1075.8
+const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_APEX_HEIGHT); // ~1200
 
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
@@ -145,9 +149,9 @@ class MainScene extends Phaser.Scene {
     // constraining on the X axis.
     this.cameras.main.setBounds(
       -WORLD_WIDTH,
-      -BUILDING_TOP_HEIGHT,
+      -TOP_BOUNDARY_HEIGHT,
       WORLD_WIDTH * 3,
-      BUILDING_TOP_HEIGHT + GAME_HEIGHT
+      TOP_BOUNDARY_HEIGHT + GAME_HEIGHT
     );
     this.cameras.main.setBackgroundColor("#65bfd5");
     this.cameras.main.scrollX = INITIAL_SCROLL_X;
@@ -361,7 +365,16 @@ class MainScene extends Phaser.Scene {
       // Frame-rate independent smoothing: a fixed per-frame fraction (the old 0.12) moves the
       // camera by different amounts on uneven frames, which reads as the whole screen shaking.
       const follow = 1 - Math.exp(-14 * dt);
-      this.cameras.main.scrollY = Phaser.Math.Linear(this.cameras.main.scrollY, targetScrollY, follow);
+      // Never show anything above the top of the texture.
+      const clampedTarget = Math.max(targetScrollY, -TOP_BOUNDARY_HEIGHT);
+      this.cameras.main.scrollY = Phaser.Math.Linear(this.cameras.main.scrollY, clampedTarget, follow);
+    }
+
+    // Flew out through the top of the building: no wall to stick to, so end the throw right
+    // here as if it had landed (camera goes back to the character via the normal result flow).
+    if (heightClimbed >= TOP_BOUNDARY_HEIGHT) {
+      this.finishThrow(false, null, x, heightClimbed, false, true);
+      return;
     }
 
     if (!reachedApex) return;
@@ -416,12 +429,13 @@ class MainScene extends Phaser.Scene {
     });
   }
 
-  finishThrow(hit, win, stickX, stickHeight, faceHit) {
+  finishThrow(hit, win, stickX, stickHeight, faceHit, escaped) {
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
     this.ball.setVisible(false); // the mark now represents where it stuck
-    const mark = this.addMark(stickX, stickHeight);
-    this.sound.play("snowball_impact", { volume: 0.3 }); // halved from 0.6
+    // An escaped ball never touched the wall: no mark, no impact sound.
+    const mark = escaped ? null : this.addMark(stickX, stickHeight);
+    if (!escaped) this.sound.play("snowball_impact", { volume: 0.3 }); // halved from 0.6
 
     if (hit) {
       this.streak += 1;

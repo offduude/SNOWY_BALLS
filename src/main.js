@@ -58,8 +58,8 @@ const TARGET_CAM_X = 6;
 const TARGET_CAM_Y = 6;
 const TARGET_CAM_MARGIN_X = 8; // world px of breathing room left/right of the windows
 const TARGET_CAM_MARGIN_Y = 8; // world px of breathing room above/below the windows
-const TARGET_CAM_RADIUS = 8; // corner radius of the decorative bezel behind it
-const TARGET_CAM_BEZEL_PAD = 0; // bezel matches the camera rect exactly - no visible gap/ring around the live feed
+const TARGET_CAM_RADIUS = 8; // corner radius of the live feed and its border
+const TARGET_CAM_BORDER_WIDTH = 2; // thickness of the solid-fill border ring around the live feed
 
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
 // "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
@@ -149,23 +149,18 @@ class MainScene extends Phaser.Scene {
     const viewW = worldXTo - worldXFrom;
     const viewH = heightTo - heightFrom;
 
-    // Decorative bezel behind the feed, slightly larger than the camera rect so its rounded
-    // corners show through around the (necessarily rectangular) live camera viewport.
+    // Border: a single solid white rounded rect, TARGET_CAM_BORDER_WIDTH bigger than the camera
+    // on every side. The camera (opaque, rendered on top, inset by that same width) covers
+    // everything except that ring, which reads as a clean solid border - no stroke involved.
+    // (A stroked rounded rect at this small a radius renders as a broken/dotted line in this
+    // Phaser version's WebGL renderer - two solid fills sidestep that entirely.)
     const bezel = this.add.graphics().setScrollFactor(0).setDepth(19);
-    bezel.fillStyle(0x14192a, 0.9);
+    bezel.fillStyle(0xffffff, 1);
     bezel.fillRoundedRect(
-      TARGET_CAM_X - TARGET_CAM_BEZEL_PAD,
-      TARGET_CAM_Y - TARGET_CAM_BEZEL_PAD,
-      viewW + TARGET_CAM_BEZEL_PAD * 2,
-      viewH + TARGET_CAM_BEZEL_PAD * 2,
-      TARGET_CAM_RADIUS
-    );
-    bezel.lineStyle(1, 0xffffff, 1); // monocolor thin outline, full opacity for a crisp edge
-    bezel.strokeRoundedRect(
-      TARGET_CAM_X - TARGET_CAM_BEZEL_PAD,
-      TARGET_CAM_Y - TARGET_CAM_BEZEL_PAD,
-      viewW + TARGET_CAM_BEZEL_PAD * 2,
-      viewH + TARGET_CAM_BEZEL_PAD * 2,
+      TARGET_CAM_X - TARGET_CAM_BORDER_WIDTH,
+      TARGET_CAM_Y - TARGET_CAM_BORDER_WIDTH,
+      viewW + TARGET_CAM_BORDER_WIDTH * 2,
+      viewH + TARGET_CAM_BORDER_WIDTH * 2,
       TARGET_CAM_RADIUS
     );
 
@@ -175,10 +170,10 @@ class MainScene extends Phaser.Scene {
     this.targetCam.scrollY = this.worldY(heightTo);
     this.targetCam.roundPixels = true;
 
-    // Real rounded corners on the live feed itself via a geometry mask (not just the bezel
-    // behind it faking it) - the mask graphics is never added to the display list (addToScene
-    // = false), it exists purely to supply the clip shape, redrawn from its command buffer
-    // each frame, so a reference has to be kept alive on `this` or it'd be garbage collected.
+    // Real rounded corners on the live feed itself via a geometry mask - the mask graphics is
+    // never added to the display list (addToScene = false), it exists purely to supply the clip
+    // shape, redrawn from its command buffer each frame, so a reference has to be kept alive on
+    // `this` or it'd be garbage collected.
     this.targetCamMaskShape = this.make.graphics({ x: 0, y: 0 }, false);
     this.targetCamMaskShape.fillStyle(0xffffff);
     this.targetCamMaskShape.fillRoundedRect(TARGET_CAM_X, TARGET_CAM_Y, viewW, viewH, TARGET_CAM_RADIUS);
@@ -376,7 +371,7 @@ const config = {
   height: GAME_HEIGHT,
   pixelArt: true,
   roundPixels: true,
-  backgroundColor: "#2b3a55",
+  backgroundColor: "#000000",
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

@@ -23,6 +23,13 @@ problem, it's crisp at any size. `MainScene.showMessage(msg)` just does
 `document.getElementById("message").textContent = msg`; there is no `messageText` game object
 anymore. The aim bar itself is still a Phaser `Graphics` object (not text), untouched.
 
+**Page/letterbox background is solid black** (`#000000`) - was `#14192a`/`#2b3a55` (dark navy),
+changed everywhere it appeared: `html,body` CSS background, the `<meta name="theme-color">`,
+`manifest.json`'s `background_color`/`theme_color`, and the Phaser game config's own
+`backgroundColor` fallback. The in-game sky color (`0x65bfd5`, set via
+`camera.setBackgroundColor` on both cameras) is unrelated and unchanged - that's actual art, not
+page chrome.
+
 `#message` is positioned back at **screen center** (`position:absolute` inside
 `#game-container`, centered via `top/left:50%` + `transform`) - its original spot as a Phaser
 Text object, per a follow-up request; it had briefly lived below the canvas in normal flow in
@@ -169,12 +176,24 @@ and `targetCam.setMask(maskShape.createGeometryMask())` clips the camera's actua
 content to that shape. The mask shape reference has to be kept alive on `this` since Phaser
 redraws the clip from its command buffer every frame - letting it get garbage collected would
 break the mask. Verified via a renderer snapshot (`game.renderer.snapshot()`, decoded and
-4x-upscaled with PIL) that the corners are genuinely rounded, not just visually implied by the
-bezel underneath. The bezel (`TARGET_CAM_BEZEL_PAD` larger than the camera rect, same radius)
-is still there behind it for the border/background - the mask and the bezel now agree on the
-same rounded shape instead of the bezel doing all the visual work alone. Bezel outline is a
-single fully-opaque white 1px stroke ("monocolor thin outline" per request) - it started at
-0.5 alpha, which read as slightly muddy against the fill.
+upscaled with PIL - the cheap way to actually inspect this canvas's real pixels instead of
+guessing from a screenshot) that the corners are genuinely rounded, not just visually implied.
+
+**Border went through three iterations the same day**, each verified with a fresh renderer
+snapshot before moving on:
+1. A `strokeRoundedRect` border on a bezel sized `TARGET_CAM_BEZEL_PAD` (3px) larger than the
+   camera rect. Left a visible 3px dark ring between the live feed and the border ("fill the
+   image to the brim" complaint).
+2. Set the pad to 0 to kill the ring - but a 1px `lineStyle` stroke on a rounded rect this small
+   renders as a **broken/dotted line** in this Phaser version's WebGL renderer, worst right at
+   the corners. Bumping the stroke to 2px didn't fix it either - still gapped at the tight
+   corner arcs. This looks like a fundamental issue with how this renderer tessellates thin
+   strokes on small-radius curves, not a width problem.
+3. **What actually shipped**: no stroke at all. `TARGET_CAM_BORDER_WIDTH = 2` sizes the white
+   bezel fill (a single `fillRoundedRect`, no inner cutout needed) that many px larger than the
+   camera rect on every side; the opaque camera (rendered after, on top, at its normal smaller
+   rect) covers everything except that ring, which reads as a clean solid border purely from two
+   solid fills overlapping - no path/stroke tessellation involved anywhere, so no gaps possible.
 
 The live ball sprite itself is hidden except during actual flight (`setVisible(false)` in
 `create()`/`finishThrow()`, `setVisible(true)` in `launchBall()`) - it used to sit visibly

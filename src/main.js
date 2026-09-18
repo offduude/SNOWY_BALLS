@@ -30,7 +30,11 @@ const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bou
 // on the character wasted half the frame on plain sidewalk below - instead the ground sits
 // near the bottom (small margin for the sidewalk underfoot), leaving most of the frame to show
 // the building above, same idea as looking up at it from where you're standing.
-const INITIAL_SCROLL_X = ORIGIN_X - GAME_WIDTH / 2;
+// Must be a whole number: a half-pixel camera x (it was 194.5) makes every pixel-snapping
+// decision a coin flip, and while the camera climbs, float noise flips it left/right each frame -
+// a side-to-side shake of everything the main camera draws (phone-visible, the whole-pixel
+// top-left camera was unaffected).
+const INITIAL_SCROLL_X = Math.round(ORIGIN_X - GAME_WIDTH / 2);
 const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 20);
 
 // The snowball must always stick somewhere between just above the restricted ground/doors zone
@@ -148,11 +152,6 @@ class MainScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#65bfd5");
     this.cameras.main.scrollX = INITIAL_SCROLL_X;
     this.cameras.main.scrollY = INITIAL_SCROLL_Y;
-
-    // Experiment switch (?smooth): let the main camera scroll in sub-pixel steps instead of
-    // snapping to whole pixels, to test whether the uneven integer steps are what looks like
-    // a shake on phones. Off by default.
-    if (window.location.search.indexOf("smooth") !== -1) this.cameras.main.roundPixels = false;
 
     // background.png's own row IMG_GROUND_Y lines up with world height 0 (the ground):
     // image pixel row r sits at Phaser y = -IMG_GROUND_Y + r, so placing the top-left origin
@@ -306,7 +305,7 @@ class MainScene extends Phaser.Scene {
   // updateCharacterPose().
   drawCharacter() {
     const baseY = this.worldY(0) + CHARACTER_Y_OFFSET;
-    this.character = this.add.image(ORIGIN_X, baseY + 1, "char_idle").setOrigin(0.5, 1);
+    this.character = this.add.image(Math.round(ORIGIN_X), baseY + 1, "char_idle").setOrigin(0.5, 1);
     this.character.setDepth(2);
   }
 

@@ -83,6 +83,8 @@
       background: transparent;
       cursor: pointer;
       z-index: 5; /* above the shop board (3) so mute stays usable in the shop */
+      will-change: transform; /* stable own layer - stops the icon shifting a pixel when the shop layer appears */
+      transform: translateZ(0);
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -113,6 +115,7 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.25s ease;
+      will-change: opacity; /* own layer from the start, so the fade doesn't create one mid-click */
       z-index: 3;
     }
 
@@ -157,7 +160,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=31"></script>
+  <script src="src/main.js?v=32"></script>
   <script>
     // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
     // before Phaser finishes booting on a slow load.

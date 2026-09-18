@@ -240,25 +240,24 @@ class MainScene extends Phaser.Scene {
     this.targetCam.ignore([this.aimGfx, bezel]);
   }
 
-  // Theme music that never runs out. `loop: true` alone wasn't enough in practice - on phones
-  // the audio context can get suspended/interrupted (backgrounding, Safari) and a sound can end
-  // up stopped without ever "completing", so it just goes silent. So: keep one persistent sound
-  // object, and a 1s watchdog that resumes a suspended audio context and restarts the theme
-  // whenever it isn't playing (skipping the case where Phaser itself paused it on tab blur).
+  // Theme music. `loop: true` handles the normal loop; on phones the audio context can get
+  // suspended (backgrounding, Safari) and leave the theme silent, so also resume it and replay
+  // if needed whenever the player returns to the tab or taps - event-driven, no polling.
   startThemeMusic() {
     this.theme = this.sound.add("theme", { loop: true, volume: 0.5 });
     this.theme.play();
 
-    const keepAlive = () => {
+    const ensurePlaying = () => {
       const ctx = this.sound.context;
       if (ctx && (ctx.state === "suspended" || ctx.state === "interrupted")) ctx.resume().catch(() => {});
-      if (document.hidden || this.sound.locked) return;
-      if (!this.theme.isPlaying && !this.theme.isPaused) this.theme.play();
+      if (!document.hidden && !this.sound.locked && !this.theme.isPlaying && !this.theme.isPaused) {
+        this.theme.play();
+      }
     };
-    window.setInterval(keepAlive, 1000);
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) keepAlive();
+      if (!document.hidden) ensurePlaying();
     });
+    this.input.on("pointerdown", ensurePlaying);
   }
 
   worldY(heightFromGround) {

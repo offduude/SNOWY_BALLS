@@ -56,9 +56,6 @@ const WINDOWS = [
   { name: "W20", xFrom: 385, xTo: 436, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 6 },
   { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 3 },
 ];
-const HEAD_CHANCE = 0.3; // chance a bonus head appears above W20 on a given throw
-const HEAD_BONUS_COINS = 8;
-
 const STATE = {
   IDLE: "idle",
   AIM_ANGLE: "aim_angle",
@@ -89,7 +86,6 @@ class MainScene extends Phaser.Scene {
     this.angleValue = 0.5;
     this.powerValue = 0.5;
     this.flightTime = 0;
-    this.headPresent = false;
 
     // Generous bounds so a fixed scrollX/scrollY never gets clamped/reinterpreted -
     // we don't horizontally follow the ball, so there's nothing that actually needs
@@ -176,7 +172,6 @@ class MainScene extends Phaser.Scene {
   launchBall() {
     this.state = STATE.FLIGHT;
     this.flightTime = 0;
-    this.headPresent = Math.random() < HEAD_CHANCE;
 
     const swing = (this.angleValue - 0.5) * 2; // -1..1
     this.ballVX = swing * MAX_SWING_SPEED;
@@ -185,18 +180,6 @@ class MainScene extends Phaser.Scene {
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     this.cameraFollowing = true;
     this.ball.setVisible(true);
-  }
-
-  getHeadBounds() {
-    // Sits just above W20 (the "main" window) - see WINDOWS[0].
-    const w20 = WINDOWS[0];
-    const centerX = (w20.xFrom + w20.xTo) / 2;
-    return {
-      xFrom: centerX - 8,
-      xTo: centerX + 8,
-      heightFrom: w20.heightTo,
-      heightTo: w20.heightTo + 14,
-    };
   }
 
   updateFlight(dt) {
@@ -217,23 +200,15 @@ class MainScene extends Phaser.Scene {
     if (!reachedApex) return;
 
     // The snowball always sticks to the wall at the top of its arc - a hit only counts if
-    // that exact point lands inside W20/W21 (or the bonus head zone above W20).
-    if (this.headPresent) {
-      const hb = this.getHeadBounds();
-      if (x >= hb.xFrom && x <= hb.xTo && heightClimbed >= hb.heightFrom && heightClimbed <= hb.heightTo) {
-        this.finishThrow(true, WINDOWS[0], HEAD_BONUS_COINS, x, heightClimbed);
-        return;
-      }
-    }
-
+    // that exact point lands inside W20 or W21.
     for (const win of WINDOWS) {
       if (x >= win.xFrom && x <= win.xTo && heightClimbed >= win.heightFrom && heightClimbed <= win.heightTo) {
-        this.finishThrow(true, win, 0, x, heightClimbed);
+        this.finishThrow(true, win, x, heightClimbed);
         return;
       }
     }
 
-    this.finishThrow(false, null, 0, x, heightClimbed);
+    this.finishThrow(false, null, x, heightClimbed);
   }
 
   addMark(x, heightClimbed) {
@@ -246,7 +221,7 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  finishThrow(hit, win, headBonus, stickX, stickHeight) {
+  finishThrow(hit, win, stickX, stickHeight) {
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
     this.ball.setVisible(false); // the mark now represents where it stuck
@@ -254,13 +229,14 @@ class MainScene extends Phaser.Scene {
 
     if (hit) {
       this.streak += 1;
-      let coins = (win ? win.coins : 0) + headBonus;
+      let coins = win.coins;
       const streakBonus = Math.floor(coins * 0.15 * (this.streak - 1));
       coins += streakBonus;
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
-      const label = headBonus > 0 ? "HEADSHOT! +" : win.name + " HIT! +";
-      this.showMessage(label + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : ""));
+      this.showMessage(
+        win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "")
+      );
     } else {
       this.streak = 0;
       this.showMessage("MISS\nstreak reset");

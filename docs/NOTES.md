@@ -67,8 +67,8 @@ just one point-in-box test at apex.
   needed. If `MIN_STICK_HEIGHT`/`MAX_STICK_HEIGHT` change, the power range updates itself.
 - `ANGLE_HZ = 0.85`, `POWER_HZ = 0.65` (aim pointer sweep speed, cycles/sec)
 - W20/W21's required power (to make their apex land in the window band) is `vy0` in roughly
-  [786, 835] out of the full [300, 1150] range - a real but learnable precision window, not a
-  hair's-width one.
+  [786, 835] out of the current [576, 1076] range - a real but learnable precision window, not
+  a hair's-width one.
 
 ## Real snowball + mark sprites (2026-09-18)
 
@@ -112,10 +112,14 @@ the stick point is the only lasting visual now.
   constant across the bar so difficulty doesn't cluster at the edges.
 - Camera scrollY only (no horizontal follow) - building stays horizontally fixed as a
   reference, camera just climbs with the ball's altitude.
-- Streak bonus: +15% of the base hit coins per streak level beyond the first, stacking
-  with (not replacing) the flat head-hit bonus.
-- Head bonus hitbox sits directly above W20 only (not W21), `HEAD_CHANCE = 0.3` per throw,
-  `HEAD_BONUS_COINS = 8` added on top of W20's base coins.
+- Streak bonus: +15% of the base hit coins per streak level beyond the first.
+- **Headshot mechanic removed (2026-09-19)**: there used to be a 30% chance per throw of an
+  invisible bonus zone spawning just above W20, worth W20's coins + 8 extra if the apex landed
+  there. It shipped with zero visual indicator - there was no head sprite anywhere - so from
+  the player's side it just looked like hitting near the top of the window randomly triggered
+  a "HEADSHOT" message. Removed entirely rather than left disabled; re-add properly (with an
+  actual visible head sprite that appears before the throw, so it's something to aim for, not
+  a coin flip) once real NPC/head art exists.
 - background.png's ground-detail update (textured sidewalk, 2026-09-18) was reverted the same
   day at the user's request - back to the flat-gray sidewalk version. Windows/doors/ground-roof
   lines were identical between the two versions either way (confirmed via pixel diff), so this

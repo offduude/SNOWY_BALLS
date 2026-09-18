@@ -25,9 +25,12 @@ const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30 + 10; // 450 - nudged right of dead-c
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
 const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
 
-// Resting camera framing: centered on the character (see task from 2026-09-18), not a fixed crop.
+// Resting camera framing: horizontally centered on the character. Vertically, true-centering
+// on the character wasted half the frame on plain sidewalk below - instead the ground sits
+// near the bottom (small margin for the sidewalk underfoot), leaving most of the frame to show
+// the building above, same idea as looking up at it from where you're standing.
 const INITIAL_SCROLL_X = ORIGIN_X - GAME_WIDTH / 2;
-const INITIAL_SCROLL_Y = -GAME_HEIGHT / 2; // centers world height 0 (the ground) vertically
+const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 20);
 
 // The snowball must always stick somewhere between just above the restricted ground/doors zone
 // and the roofline - never in the sky, never in the red-marked restricted area (+10px buffer

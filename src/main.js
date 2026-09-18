@@ -30,7 +30,7 @@ const MAX_POWER_SPEED = 1150; // px/s vertical launch speed at full power (apex 
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
 
-const ORIGIN_X = WORLD_WIDTH / 2; // 352 - centered between the two entrance doors (world position, not canvas-relative)
+const ORIGIN_X = WORLD_WIDTH / 2 + 58; // 410 - nudged 58px right of dead-center per user request
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
 const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
 

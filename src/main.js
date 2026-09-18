@@ -72,8 +72,8 @@ const TARGET_CAM_BORDER_WIDTH = 2; // thickness of the solid-fill border ring ar
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
 // "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
 const WINDOWS = [
-  { name: "W20", xFrom: 385, xTo: 436, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 6 },
-  { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 3 },
+  { name: "W20", xFrom: 385, xTo: 436, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273 },
+  { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273 },
 ];
 
 // "Banana window" streak bonus (2026-09-19). goal_window_face.png / goal_window_face_hit.png are
@@ -96,11 +96,7 @@ const BANANA_FACE_BOX = {
 };
 const BANANA_LEFT_SECTION_XTO = FACE_IMG_X + FACE_RAW_LEFT_DIVIDER_X;
 
-const BANANA_STREAK_TRIGGER = 3;
-const BANANA_DURATION_MS = 20000; // how long the banana texture stays before fading back
-const BANANA_HIT_REVERT_MS = 1000; // how long the _hit texture stays before fading back
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
-const BANANA_BONUS_COINS = 10;
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
 
 const STATE = {
@@ -130,6 +126,8 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_idle", "assets/character/character1_idle.png");
     this.load.image("char_aiming", "assets/character/character1_aiming.png");
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
+    // Timestamp so an edited economy.json is never served from a stale browser/CDN cache.
+    this.load.json("economy", "economy.json?t=" + Date.now());
     this.load.audio("theme", "assets/audio/theme.mp3?v=2");
     this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
@@ -138,6 +136,11 @@ class MainScene extends Phaser.Scene {
   }
 
   create() {
+    // Rewards/prices live in economy.json (edit that, not the code). A typo there would otherwise
+    // fail silently later, so say so loudly right away.
+    this.eco = this.cache.json.get("economy");
+    if (!this.eco) throw new Error("economy.json failed to load or has a JSON syntax error - check it.");
+
     this.state = STATE.IDLE;
     this.streak = 0;
     this.angleValue = 0.5;
@@ -439,15 +442,15 @@ class MainScene extends Phaser.Scene {
 
     if (hit) {
       this.streak += 1;
-      let coins = win.coins;
-      const streakBonus = Math.floor(coins * 0.15 * (this.streak - 1));
+      let coins = this.eco.rewards.windows[win.name];
+      const streakBonus = Math.floor(coins * this.eco.rewards.streakBonusPerLevel * (this.streak - 1));
       coins += streakBonus;
 
       if (faceHit) {
         this.bananaHitTriggered = true;
-        coins += BANANA_BONUS_COINS;
+        coins += this.eco.events.faceWindow.faceBonusCoins;
         this.triggerBananaHit(mark);
-      } else if (this.streak === BANANA_STREAK_TRIGGER && !this.bananaActive) {
+      } else if (this.streak === this.eco.events.faceWindow.streakTrigger && !this.bananaActive) {
         this.startBananaEvent();
       }
 
@@ -457,6 +460,7 @@ class MainScene extends Phaser.Scene {
       this.showMessage(message);
     } else {
       this.streak = 0;
+      if (this.eco.rewards.missCoins) Economy.addCoins(this.eco.rewards.missCoins);
       this.showMessage("MISS\nstreak reset");
     }
 
@@ -465,7 +469,7 @@ class MainScene extends Phaser.Scene {
     });
   }
 
-  // Streak-3 bonus: swaps W20's texture to the banana art for BANANA_DURATION_MS, then fades
+  // Streak-3 bonus: swaps W20's texture to the banana art for events.faceWindow.durationMs, then fades
   // back on its own. Any existing marks on W20's left section fade out quickly first, so they
   // don't look like they're stuck to a texture that's about to change out from under them.
   startBananaEvent() {
@@ -489,7 +493,7 @@ class MainScene extends Phaser.Scene {
     this.bananaOverlay.setVisible(true);
     this.tweens.add({ targets: this.bananaOverlay, alpha: 1, duration: BANANA_FADE_MS });
 
-    this.bananaEndTimer = this.time.delayedCall(BANANA_DURATION_MS, () => this.endBananaEvent());
+    this.bananaEndTimer = this.time.delayedCall(this.eco.events.faceWindow.durationMs, () => this.endBananaEvent());
   }
 
   // Normal 20s expiry - fades the banana texture back to nothing (the real W20 art underneath
@@ -505,7 +509,7 @@ class MainScene extends Phaser.Scene {
   }
 
   // Hitting the face: cancels the pending 20s revert, quickly swaps to goal_window_face_hit,
-  // then after BANANA_HIT_REVERT_MS fades both the texture and the mark that triggered it back
+  // then after events.faceWindow.hitRevertMs fades both the texture and the mark that triggered it back
   // to nothing together.
   triggerBananaHit(mark) {
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
@@ -514,7 +518,7 @@ class MainScene extends Phaser.Scene {
     this.bananaOverlay.setTexture("goal_window_face_hit");
     this.bananaOverlay.setAlpha(1);
 
-    this.time.delayedCall(BANANA_HIT_REVERT_MS, () => {
+    this.time.delayedCall(this.eco.events.faceWindow.hitRevertMs, () => {
       this.tweens.add({
         targets: [this.bananaOverlay, mark],
         alpha: 0,

@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "_readme": "Every reward, price and shop rule lives here. Edit numbers, save, reload the game. The game reads 'rewards' and 'events' TODAY; 'shop' is defined for the shop screen we build next (nothing reads it yet). All shop items below are PLACEHOLDER test data - names, prices and effects are just there so the shop has something to show. See docs/ECONOMY.md for what every field means, and run 'py tools/economy_report.py' for a quick balance table.",
+
+  "rewards": {
+    "windows": {
+      "W20": 6,
+      "W21": 3
+    },
+    "streakBonusPerLevel": 0.15,
+    "missCoins": 0
+  },
+
+  "events": {
+    "faceWindow": {
+      "streakTrigger": 3,
+      "durationMs": 20000,
+      "hitRevertMs": 1000,
+      "faceBonusCoins": 10
+    }
+  },
+
+  "shop": {
+    "slots": 6,
+
+    "refill": {
+      "mode": "random_from_eligible",
+      "excludeOwned": true,
+      "excludeCurrentlyShown": true,
+      "tierWeights": { "1": 60, "2": 30, "3": 10 },
+      "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
+    },
+
+    "tierUnlocks": {
+      "1": 0,
+      "2": 250,
+      "3": 1200
+    },
+
+    "items": [
+      {
+        "id": "lucky_gloves",
+        "name": "Lucky Gloves",
+        "category": "accessory",
+        "tier": 1,
+        "price": 60,
+        "kind": "permanent",
+        "effect": { "type": "coinMultiplier", "value": 1.1 },
+        "description": "+10% coins from every hit."
+      },
+      {
+        "id": "snow_goggles",
+        "name": "Snow Goggles",
+        "category": "accessory",
+        "tier": 1,
+        "price": 90,
+        "kind": "permanent",
+        "effect": { "type": "aimSpeedMultiplier", "value": 0.92 },
+        "description": "Aim pointers sweep 8% slower."
+      },
+      {
+        "id": "pocket_warmer",
+        "name": "Pocket Warmer",
+        "category": "accessory",
+        "tier": 1,
+        "price": 110,
+        "kind": "permanent",
+        "effect": { "type": "coinMultiplier", "value": 1.05 },
+        "description": "+5% coins from every hit."
+      },
+      {
+        "id": "lucky_penny",
+        "name": "Lucky Penny",
+        "category": "buff",
+        "tier": 1,
+        "price": 25,
+        "kind": "consumable",
+        "duration": { "throws": 2 },
+        "effect": { "type": "coinMultiplier", "value": 1.5 },
+        "description": "1.5x coins for your next 2 throws."
+      },
+      {
+        "id": "icy_snowball",
+        "name": "Icy Snowball",
+        "category": "projectile",
+        "tier": 1,
+        "price": 70,
+        "kind": "permanent",
+        "effect": { "type": "markLifetimeMultiplier", "value": 1.5 },
+        "description": "Marks stay on the wall 50% longer."
+      },
+      {
+        "id": "steady_hand",
+        "name": "Steady Hand",
+        "category": "accessory",
+        "tier": 2,
+        "price": 220,
+        "kind": "permanent",
+        "effect": { "type": "aimSpeedMultiplier", "value": 0.85 },
+        "description": "Aim pointers sweep 15% slower."
+      },
+      {
+        "id": "streak_scarf",
+        "name": "Streak Scarf",
+        "category": "accessory",
+        "tier": 2,
+        "price": 300,
+        "kind": "permanent",
+        "effect": { "type": "streakBonusPerLevelAdd", "value": 0.05 },
+        "description": "Streaks pay +5% more per level."
+      },
+      {
+        "id": "banana_charm",
+        "name": "Banana Charm",
+        "category": "accessory",
+        "tier": 3,
+        "price": 900,
+        "kind": "permanent",
+        "effect": { "type": "faceWindowDurationAddMs", "value": 10000 },
+        "description": "The face window stays 10s longer."
+      },
+
+      {
+        "id": "double_coins",
+        "name": "Double Coins",
+        "category": "buff",
+        "tier": 1,
+        "price": 40,
+        "kind": "consumable",
+        "duration": { "throws": 3 },
+        "effect": { "type": "coinMultiplier", "value": 2 },
+        "description": "2x coins for your next 3 throws."
+      },
+      {
+        "id": "slow_pointer",
+        "name": "Slow Pointer",
+        "category": "buff",
+        "tier": 1,
+        "price": 30,
+        "kind": "consumable",
+        "duration": { "throws": 5 },
+        "effect": { "type": "aimSpeedMultiplier", "value": 0.6 },
+        "description": "Pointers sweep much slower for 5 throws."
+      },
+      {
+        "id": "streak_shield",
+        "name": "Streak Shield",
+        "category": "buff",
+        "tier": 2,
+        "price": 180,
+        "kind": "consumable",
+        "duration": { "throws": 1 },
+        "effect": { "type": "streakShield", "value": 1 },
+        "description": "Your next miss won't reset your streak."
+      },
+      {
+        "id": "jackpot_hour",
+        "name": "Jackpot",
+        "category": "buff",
+        "tier": 3,
+        "price": 700,
+        "kind": "consumable",
+        "duration": { "throws": 10 },
+        "effect": { "type": "coinMultiplier", "value": 3 },
+        "description": "3x coins for your next 10 throws."
+      },
+
+      {
+        "id": "big_snowball",
+        "name": "Big Snowball",
+        "category": "projectile",
+        "tier": 1,
+        "price": 80,
+        "kind": "permanent",
+        "effect": { "type": "hitPaddingPx", "value": 3 },
+        "description": "Forgiving: counts as a hit up to 3px outside a window."
+      },
+      {
+        "id": "golden_snowball",
+        "name": "Golden Snowball",
+        "category": "projectile",
+        "tier": 2,
+        "price": 350,
+        "kind": "permanent",
+        "effect": { "type": "coinMultiplier", "value": 1.25 },
+        "description": "Every hit pays 25% more."
+      },
+      {
+        "id": "ice_ball",
+        "name": "Ice Ball",
+        "category": "projectile",
+        "tier": 2,
+        "price": 280,
+        "kind": "permanent",
+        "effect": { "type": "markLifetimeMultiplier", "value": 2 },
+        "description": "Marks stay on the wall twice as long."
+      },
+      {
+        "id": "rocket_snowball",
+        "name": "Rocket Snowball",
+        "category": "projectile",
+        "tier": 3,
+        "price": 1100,
+        "kind": "permanent",
+        "effect": { "type": "launchSpeedMultiplier", "value": 1.3 },
+        "description": "Flies 30% faster - careful, it can leave the building."
+      }
+    ]
+  }
+}

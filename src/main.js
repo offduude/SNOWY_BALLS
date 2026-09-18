@@ -325,6 +325,8 @@ class MainScene extends Phaser.Scene {
   }
 
   handleFreezeInput() {
+    // Belt and braces: never advance the throw while the shop screen covers the game.
+    if (document.getElementById("game-container").classList.contains("shop-open")) return;
     if (this.state === STATE.IDLE) {
       this.state = STATE.AIM_ANGLE;
       this.aimStartTime = this.time.now;

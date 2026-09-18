@@ -325,8 +325,20 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=4"></script>
   <script src="src/shop.js?v=4"></script>
-  <script src="src/main.js?v=44"></script>
+  <script src="src/main.js?v=45"></script>
   <script>
+    // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
+    // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
+    // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
+    // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
+    // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
+    ["shop-board", "shop-items", "shop-btn", "volume-btn"].forEach((id) => {
+      const el = document.getElementById(id);
+      ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
+        el.addEventListener(type, (e) => e.stopPropagation());
+      });
+    });
+
     // Live coin counter (above the SHOP/BACK button, visible in the game and in the shop).
     Economy.onCoinsChange((coins) => {
       document.getElementById("coin-count").textContent = coins;

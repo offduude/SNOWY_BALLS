@@ -51,6 +51,16 @@ const POWER_HZ = 0.65;
 const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
 const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed
 
+// Top-left "rear view camera" - a real second Phaser camera pointed at W20/W21, not a static
+// crop, so the live ball/marks show up in it too. Kept at zoom 1 (see the zoom-clipping gotcha
+// in docs/NOTES.md) - sized to exactly cover the world region instead of zooming into it.
+const TARGET_CAM_X = 6;
+const TARGET_CAM_Y = 6;
+const TARGET_CAM_MARGIN_X = 8; // world px of breathing room left/right of the windows
+const TARGET_CAM_MARGIN_Y = 8; // world px of breathing room above/below the windows
+const TARGET_CAM_RADIUS = 8; // corner radius of the decorative bezel behind it
+const TARGET_CAM_BEZEL_PAD = 3; // how far the bezel extends past the camera rect on each side
+
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
 // "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
 const WINDOWS = [
@@ -118,7 +128,6 @@ class MainScene extends Phaser.Scene {
 
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.createTargetPanel();
     this.messageText = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "", {
         fontFamily: "monospace",
@@ -130,77 +139,56 @@ class MainScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(21);
 
+    this.createTargetCamera();
+
     this.input.on("pointerdown", () => this.handleFreezeInput());
     this.input.keyboard.on("keydown-SPACE", () => this.handleFreezeInput());
 
     this.showMessage("TAP or SPACE to aim");
   }
 
-  // Top-left rounded panel showing what W20/W21 actually look like (cropped straight from the
-  // building texture, not redrawn), each with its coin value - replaces the old coins/streak/
-  // best text readout for now. Thumbnails briefly pop when their window gets hit (see
-  // flashWindowThumb) so the panel reacts live instead of being static reference art.
-  createTargetPanel() {
-    const PAD = 5;
-    const GAP = 6;
+  // Top-left "rear view camera": a real second Phaser camera aimed at the W20/W21 patch of the
+  // building, rendering the same live world (background, ball, marks) as the main camera - not
+  // a static crop, so a snowball flying past or a mark landing there actually shows up in it.
+  createTargetCamera() {
     const [w20, w21] = WINDOWS;
-    const w20W = w20.xTo - w20.xFrom;
-    const w20H = w20.heightTo - w20.heightFrom;
-    const w21W = w21.xTo - w21.xFrom;
-    const w21H = w21.heightTo - w21.heightFrom;
-    const thumbH = Math.max(w20H, w21H);
+    const worldXFrom = w20.xFrom - TARGET_CAM_MARGIN_X;
+    const worldXTo = w21.xTo + TARGET_CAM_MARGIN_X;
+    const heightFrom = w20.heightFrom - TARGET_CAM_MARGIN_Y;
+    const heightTo = w20.heightTo + TARGET_CAM_MARGIN_Y;
+    const viewW = worldXTo - worldXFrom;
+    const viewH = heightTo - heightFrom;
 
-    const panelX = 6;
-    const panelY = 6;
-    const panelW = PAD * 2 + w20W + GAP + w21W;
-    const panelH = PAD * 2 + thumbH + 12;
+    // Decorative bezel behind the feed, slightly larger than the camera rect so its rounded
+    // corners show through around the (necessarily rectangular) live camera viewport.
+    const bezel = this.add.graphics().setScrollFactor(0).setDepth(19);
+    bezel.fillStyle(0x14192a, 0.9);
+    bezel.fillRoundedRect(
+      TARGET_CAM_X - TARGET_CAM_BEZEL_PAD,
+      TARGET_CAM_Y - TARGET_CAM_BEZEL_PAD,
+      viewW + TARGET_CAM_BEZEL_PAD * 2,
+      viewH + TARGET_CAM_BEZEL_PAD * 2,
+      TARGET_CAM_RADIUS
+    );
+    bezel.lineStyle(1, 0xffffff, 0.5);
+    bezel.strokeRoundedRect(
+      TARGET_CAM_X - TARGET_CAM_BEZEL_PAD,
+      TARGET_CAM_Y - TARGET_CAM_BEZEL_PAD,
+      viewW + TARGET_CAM_BEZEL_PAD * 2,
+      viewH + TARGET_CAM_BEZEL_PAD * 2,
+      TARGET_CAM_RADIUS
+    );
 
-    const gfx = this.add.graphics().setScrollFactor(0).setDepth(20);
-    gfx.fillStyle(0x14192a, 0.88);
-    gfx.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
-    gfx.lineStyle(1, 0xffffff, 0.5);
-    gfx.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+    this.targetCam = this.cameras.add(TARGET_CAM_X, TARGET_CAM_Y, viewW, viewH);
+    this.targetCam.setBackgroundColor(0x65bfd5);
+    this.targetCam.scrollX = worldXFrom;
+    this.targetCam.scrollY = this.worldY(heightTo);
+    this.targetCam.roundPixels = true;
 
-    // Custom frames cropped straight from the loaded building texture - no separate art needed.
-    const bgTexture = this.textures.get("background");
-    const w20ImgY = IMG_GROUND_Y - w20.heightTo;
-    const w21ImgY = IMG_GROUND_Y - w21.heightTo;
-    bgTexture.add("thumb_w20", 0, w20.xFrom, w20ImgY, w20W, w20H);
-    bgTexture.add("thumb_w21", 0, w21.xFrom, w21ImgY, w21W, w21H);
-
-    const thumbY = panelY + PAD;
-    const w20CenterX = panelX + PAD + w20W / 2;
-    const w21CenterX = panelX + PAD + w20W + GAP + w21W / 2;
-
-    this.w20Thumb = this.add
-      .image(w20CenterX, thumbY + w20H / 2, "background", "thumb_w20")
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(21);
-    this.w21Thumb = this.add
-      .image(w21CenterX, thumbY + w21H / 2, "background", "thumb_w21")
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(21);
-
-    const labelStyle = { fontFamily: "monospace", fontSize: "8px", color: "#ffffff" };
-    this.add
-      .text(w20CenterX, thumbY + thumbH + 2, String(w20.coins), labelStyle)
-      .setOrigin(0.5, 0)
-      .setScrollFactor(0)
-      .setDepth(21);
-    this.add
-      .text(w21CenterX, thumbY + thumbH + 2, String(w21.coins), labelStyle)
-      .setOrigin(0.5, 0)
-      .setScrollFactor(0)
-      .setDepth(21);
-  }
-
-  flashWindowThumb(win) {
-    const thumb = win.name === "W20" ? this.w20Thumb : this.w21Thumb;
-    if (!thumb) return;
-    thumb.setScale(1.5);
-    this.tweens.add({ targets: thumb, scale: 1, duration: 300, ease: "Cubic.easeOut" });
+    // The PIP should only show world content - it'd otherwise also try to render the
+    // screen-space HUD (which is scrollFactor(0), so it'd appear squeezed into this tiny
+    // viewport too) and its own bezel (drawn by the main camera, one layer behind it).
+    this.targetCam.ignore([this.aimGfx, this.messageText, bezel]);
   }
 
   worldY(heightFromGround) {
@@ -310,7 +298,6 @@ class MainScene extends Phaser.Scene {
       coins += streakBonus;
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
-      this.flashWindowThumb(win);
       this.showMessage(
         win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "")
       );

@@ -95,19 +95,44 @@ actual elapsed wall time, and the Browser-pane rAF-stall gotcha below means scri
 `time.update()`/`tweens.update()` calls to fast-forward them are unreliable, so this needs a
 real `wait` with the tab actually rendering frames to trust the result).
 
-## Target panel replaces the coins/streak/best text (2026-09-19)
+## Target panel replaces the coins/streak/best text (2026-09-19, superseded same day - see below)
 
-`createTargetPanel()` builds a rounded-rect panel (`Graphics.fillRoundedRect`, dark navy
-`0x14192a` at 0.88 alpha, top-left at (6,6)) showing W20 and W21 exactly as they look in the
-real building texture - not redrawn art, but custom Phaser texture frames (`thumb_w20`/
-`thumb_w21`) cropped straight out of the loaded `background` texture via
-`texture.add(name, 0, x, y, w, h)`, using the same `WINDOWS` coordinates the hit-detection
-already relies on (so there's one source of truth, not two copies of the window geometry).
-Each thumbnail shows its coin value underneath. `flashWindowThumb(win)` briefly pops the
-matching thumbnail's scale (1.5 -> 1 over 300ms) when that window gets hit, so the panel reacts
-live instead of being static reference art. The old `hudText`/`updateHud()` (COINS/STREAK/BEST
-readout) is gone - the underlying `Economy` tracking is untouched, just not displayed right
-now; bring the readout back (or redesign it) whenever there's a reason to show it again.
+The old `hudText`/`updateHud()` (COINS/STREAK/BEST readout) is gone - the underlying `Economy`
+tracking is untouched, just not displayed right now; bring the readout back (or redesign it)
+whenever there's a reason to show it again.
+
+The first replacement was a static panel showing W20/W21 as cropped texture snippets with coin
+values underneath. The user didn't want a static crop or the coin numbers - see the PIP camera
+section below for what actually shipped.
+
+## Top-left "rear view camera" - a real second Phaser camera, not a static crop (2026-09-19)
+
+`createTargetCamera()` adds a genuine second `Camera` (`this.targetCam`, via `this.cameras.add`)
+with its own small viewport at `(TARGET_CAM_X, TARGET_CAM_Y)`, `scrollX`/`scrollY` centered on
+the W20/W21 patch of the world (`TARGET_CAM_MARGIN_X`/`_Y` add a little breathing room around
+both windows). It renders the *same live scene* as the main camera - background, ball, marks -
+so a snowball flying past or a mark landing there shows up in the PIP in real time, exactly like
+a car's backup camera. Confirmed live: stepped a throw to just-before-apex and screenshotted -
+the ball was visibly mid-air in the PIP, in front of W20, while the main (resting) camera didn't
+show that area at all.
+
+Deliberately **zoom 1** - the PIP's viewport size is set to exactly match the world region's
+pixel size instead of zooming a smaller region up to fill a bigger viewport. This sidesteps the
+same Phaser 3.80 WebGL zoom-clipping bug documented below (content getting cut off at the
+viewport edge when `camera.zoom != 1`) rather than re-fighting it for a second camera.
+
+`targetCam.ignore([...])` excludes the screen-space HUD (`aimGfx`, `messageText`) and the PIP's
+own decorative bezel - without this, those `scrollFactor(0)` objects would also try to render
+inside the PIP's own tiny viewport (screen-space objects are camera-relative, not global, so a
+second camera renders them at its own tiny scale unless told not to).
+
+Camera viewports are inherently rectangular in Phaser - there's no cheap way to give the live
+feed itself rounded corners without a geometry mask (skipped for now, extra complexity/risk on
+top of an already-quirky camera system in this Phaser version). Instead there's a **bezel**: a
+separate rounded-rect `Graphics` object, drawn by the main camera, slightly larger
+(`TARGET_CAM_BEZEL_PAD`) than the camera's rectangular viewport and positioned directly behind
+it - like a rounded phone body around a rectangular screen. Reads as a smooth-edged panel even
+though the live content inside is a plain rectangle.
 
 The live ball sprite itself is hidden except during actual flight (`setVisible(false)` in
 `create()`/`finishThrow()`, `setVisible(true)` in `launchBall()`) - it used to sit visibly

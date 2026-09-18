@@ -15,7 +15,7 @@ const Economy = (() => {
         stock: null, // array of item ids currently on sale, one per slot; null = not generated yet
         owned: [], // ids of permanent items bought
         consumables: {}, // id -> how many bought and not yet used
-        tierLevel: null, // highest tier unlocked the last time the shop filled its slots
+        catalog: null, // which item list the stock was generated from (see Shop.ensureStock)
       },
     };
   }
@@ -37,7 +37,7 @@ const Economy = (() => {
           stock: Array.isArray(shop.stock) ? shop.stock : null,
           owned: Array.isArray(shop.owned) ? shop.owned : [],
           consumables: shop.consumables && typeof shop.consumables === "object" ? shop.consumables : {},
-          tierLevel: typeof shop.tierLevel === "number" ? shop.tierLevel : null,
+          catalog: typeof shop.catalog === "string" ? shop.catalog : null,
         },
       };
     } catch (e) {
@@ -55,10 +55,21 @@ const Economy = (() => {
     }
   }
 
+  // Listeners are told the new balance whenever it changes (the on-screen coin counter).
+  const listeners = [];
+  function onCoinsChange(fn) {
+    listeners.push(fn);
+    fn(state.coins);
+  }
+  function notify() {
+    listeners.forEach((fn) => fn(state.coins));
+  }
+
   function addCoins(amount) {
     state.coins += amount;
     if (amount > 0) state.lifetimeCoins += amount;
     save();
+    notify();
     return state.coins;
   }
 
@@ -67,6 +78,7 @@ const Economy = (() => {
     if (amount > state.coins) return false;
     state.coins -= amount;
     save();
+    notify();
     return true;
   }
 
@@ -100,6 +112,7 @@ const Economy = (() => {
   }
 
   return {
+    onCoinsChange,
     addCoins,
     spendCoins,
     getCoins,

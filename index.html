@@ -158,11 +158,6 @@
       pointer-events: auto;
     }
 
-    .shop-head {
-      font-size: calc(var(--u) * 1.7);
-      text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35);
-    }
-
     .shop-grid {
       flex: 1;
       display: grid;
@@ -225,10 +220,21 @@
       letter-spacing: 0.05em;
     }
 
+    /* Space for the item's picture: takes whatever height is left between the category and the name. */
+    .shop-pic {
+      flex: 1;
+      align-self: stretch;
+      min-height: 0;
+      margin: calc(var(--u) * 0.5) 0;
+      background: rgba(122, 82, 48, 0.1);
+      border-radius: 2px;
+    }
+
     .shop-name {
       font-size: calc(var(--u) * 1.5);
       line-height: 1.35;
       overflow-wrap: anywhere;
+      margin-bottom: calc(var(--u) * 0.6);
     }
 
     .shop-price {
@@ -270,6 +276,38 @@
     #shop-btn:active {
       background: #74491f;
     }
+
+    /* Coin counter: sits right above the SHOP/BACK button and stays put when the shop opens. */
+    #coin-counter {
+      position: absolute;
+      right: 10px;
+      bottom: 48px; /* 10px margin + 32px button + 6px gap */
+      width: 84px;
+      height: 22px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 9px;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    #coin-counter .coin {
+      flex: none;
+      width: 9px;
+      height: 9px;
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
@@ -277,6 +315,7 @@
     <div id="message"></div>
     <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
     <div id="shop-items"></div>
+    <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
     <button id="shop-btn" type="button">SHOP</button>
     <button id="volume-btn" type="button" aria-label="Mute">
       <img src="assets/ui/volume_icon.png" alt="" />
@@ -284,10 +323,15 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=3"></script>
-  <script src="src/shop.js?v=3"></script>
+  <script src="src/economy.js?v=4"></script>
+  <script src="src/shop.js?v=4"></script>
   <script src="src/main.js?v=44"></script>
   <script>
+    // Live coin counter (above the SHOP/BACK button, visible in the game and in the shop).
+    Economy.onCoinsChange((coins) => {
+      document.getElementById("coin-count").textContent = coins;
+    });
+
     // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
     // before Phaser finishes booting on a slow load.
     document.getElementById("volume-btn").addEventListener("click", () => {

@@ -2,8 +2,7 @@
 
 Everything tunable lives in [`economy.json`](../economy.json). Edit, save, reload the game.
 Run `py tools/economy_report.py` after editing - it prints a balance table (how many hits/throws
-each item costs) and catches mistakes (missing fields, duplicate ids, a starter pool too small for
-the shop).
+each item costs) and catches mistakes (missing fields, duplicate ids, unknown categories).
 
 **What the game reads today:** `rewards`, `events` and `shop` (the shop screen is built - 6 items
 pinned on the cork board, tap to buy). **Not applied yet:** item `effect`s - buying spends coins and
@@ -47,16 +46,11 @@ The shop always shows `slots` items. Buying one replaces it with another one fro
 - `excludeOwned` - permanent items already bought never come back
 - (always on, not a setting) the same item is never on sale in two slots at once
 - when no eligible item is left for a slot it shows SOLD OUT, and it **stays** SOLD OUT when the
-  shop is closed and reopened. Empty slots only refill when a new tier unlocks (the last unlocked
-  tier is saved as `tierLevel`)
-- `tierWeights` - relative odds of each tier (60/30/10 means tier 1 comes up most)
+  shop is closed and reopened. Empty slots only refill when the list of items in `economy.json`
+  changes (the game saves which list the stock came from as `catalog`)
 - `guaranteeCheapItem` - after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop
   filling up with things the player can't afford.
-
-**`tierUnlocks`** - lifetime coins *earned* (not current balance, so spending never locks a tier
-again) before that tier can appear. This is the main progression gate: expensive items can't show
-up before the player could plausibly have earned toward them.
 
 **items** - one entry each:
 
@@ -65,7 +59,6 @@ up before the player could plausibly have earned toward them.
 | `id` | unique, never change it once players own it (saves refer to it) |
 | `name`, `description` | shown in the shop |
 | `category` | `accessory`, `buff` or `projectile` |
-| `tier` | 1-3, must exist in `tierUnlocks` |
 | `price` | coins |
 | `kind` | `permanent` (bought once, kept) or `consumable` (used up) |
 | `duration` | consumables only: `{ "throws": N }` |
@@ -86,13 +79,10 @@ up before the player could plausibly have earned toward them.
 
 ## Balancing notes
 
-- Average base reward is ~4.5 coins per hit (W20 6 / W21 3). A tier-1 item at ~30-110 coins is
-  7-25 hits: a short first session. Tier 2 (180-350) is 40-80 hits, tier 3 (700-1100) is 150-250.
+- Average base reward is ~4.5 coins per hit (W20 6 / W21 3); `tools/economy_report.py` prints how many
+  hits and throws each item costs. There are no tiers right now: every item can appear from the start.
 - Multiplier effects stack, so keep `coinMultiplier` values modest or a few purchases make the
   prices meaningless. Effects that make the *game itself* easier (`aimSpeedMultiplier`,
   `hitPaddingPx`) compound with that - watch total hit rate, not just coin rate.
-- Bought permanent items leave the pool, so the starter tier can run dry: if it does, slots show
-  SOLD OUT until the next tier unlocks. `tools/economy_report.py` simulates this (a player spending
-  everything they earn before tier 2 on the cheapest permanents) and fails if that would leave fewer
-  items than slots. Consumables never leave the pool, so they are the fix - the starter pool needs
-  plenty of them.
+- Permanent items leave the pool once bought; consumables never do. If the pool can't fill every
+  slot, the extra slots show SOLD OUT.

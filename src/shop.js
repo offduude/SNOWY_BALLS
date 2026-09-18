@@ -21,16 +21,12 @@ const Shop = (() => {
     return eco.shop.items.find((it) => it.id === id) || null;
   }
 
-  function tierUnlocked(item) {
-    return Economy.getLifetimeCoins() >= eco.shop.tierUnlocks[String(item.tier)];
-  }
-
   function isOwnedPermanent(item) {
     return item.kind === "permanent" && Economy.getShopState().owned.includes(item.id);
   }
 
   function eligible(excludeIds) {
-    return eco.shop.items.filter((it) => tierUnlocked(it) && !isOwnedPermanent(it) && !excludeIds.includes(it.id));
+    return eco.shop.items.filter((it) => !isOwnedPermanent(it) && !excludeIds.includes(it.id));
   }
 
   function averageHitCoins() {
@@ -42,15 +38,8 @@ const Shop = (() => {
     return price(item) <= cfg.maxPriceInAverageHits * averageHitCoins();
   }
 
-  function pickWeighted(list) {
-    const weights = eco.shop.refill.tierWeights;
-    const w = list.map((it) => weights[String(it.tier)] || 1);
-    let roll = Math.random() * w.reduce((a, b) => a + b, 0);
-    for (let i = 0; i < list.length; i++) {
-      roll -= w[i];
-      if (roll < 0) return list[i];
-    }
-    return list[list.length - 1];
+  function pickRandom(list) {
+    return list[Math.floor(Math.random() * list.length)];
   }
 
   // Choose an item for one slot. `shownOthers` = ids in the OTHER slots; `justBought` never
@@ -63,7 +52,7 @@ const Shop = (() => {
     const pool = eligible(exclude);
     if (!pool.length) return null;
 
-    let candidate = pickWeighted(pool);
+    let candidate = pickRandom(pool);
 
     // Safety net: never let the shop end up with nothing the player could reasonably afford.
     const g = refill.guaranteeCheapItem;
@@ -71,24 +60,21 @@ const Shop = (() => {
       const othersHaveCheap = shownOthers.some((id) => id && itemById(id) && isCheap(itemById(id), g));
       if (!othersHaveCheap && !isCheap(candidate, g)) {
         const cheap = pool.filter((it) => isCheap(it, g));
-        if (cheap.length) candidate = pickWeighted(cheap);
+        if (cheap.length) candidate = pickRandom(cheap);
       }
     }
     return candidate.id;
   }
 
-  function highestUnlockedTier() {
-    let top = 0;
-    for (const [tier, need] of Object.entries(eco.shop.tierUnlocks)) {
-      if (Economy.getLifetimeCoins() >= need) top = Math.max(top, Number(tier));
-    }
-    return top;
+  // Identifies the item list in economy.json; changes when items are added or removed.
+  function catalogKey() {
+    return eco.shop.items.map((it) => it.id).sort().join(",");
   }
 
   // Make the saved stock valid (right length, real items, nothing owned, no duplicates) and fill
   // gaps. A slot that is empty because the pool ran dry ("SOLD OUT") is NOT refilled just because
   // the shop was reopened - otherwise the item you just bought (consumables never leave the pool)
-  // would pop straight back. Empty slots only refill when a new tier unlocks.
+  // would pop straight back. Empty slots only refill when the item list in economy.json changes.
   function ensureStock() {
     const st = Economy.getShopState();
     const slots = eco.shop.slots;
@@ -97,8 +83,8 @@ const Shop = (() => {
     while (stock.length < slots) stock.push(null);
 
     const wasEmpty = stock.map((id) => id === null); // sold out on purpose
-    const tier = highestUnlockedTier();
-    const tierIncreased = st.tierLevel !== null && tier > st.tierLevel;
+    const catalog = catalogKey();
+    const catalogChanged = st.catalog !== catalog;
 
     // Invalid entries (item removed from economy.json, already owned, duplicate) become gaps that DO get refilled.
     stock = stock.map((id) => {
@@ -109,12 +95,12 @@ const Shop = (() => {
 
     for (let i = 0; i < slots; i++) {
       if (stock[i] !== null) continue;
-      if (wasEmpty[i] && !fresh && !tierIncreased) continue; // stays SOLD OUT
+      if (wasEmpty[i] && !fresh && !catalogChanged) continue; // stays SOLD OUT
       const others = stock.filter((id, j) => j !== i && id);
       stock[i] = pickFor(others, null);
     }
     st.stock = stock;
-    st.tierLevel = tier;
+    st.catalog = catalog;
     Economy.saveShop();
     return stock;
   }
@@ -151,6 +137,7 @@ const Shop = (() => {
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
       `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>` +
+      `<span class="shop-pic"></span>` + // reserved for the item's picture
       `<span class="shop-name">${esc(item.name)}</span>` +
       `<span class="shop-price"><i class="coin"></i>${p}</span>` +
       `</button>`
@@ -160,9 +147,7 @@ const Shop = (() => {
   function render() {
     if (!root) return;
     const stock = Economy.getShopState().stock || [];
-    root.innerHTML =
-      `<div class="shop-head"><span>COINS ${Economy.getCoins()}</span></div>` +
-      `<div class="shop-grid">${stock.map(cardHtml).join("")}</div>`;
+    root.innerHTML = `<div class="shop-grid">${stock.map(cardHtml).join("")}</div>`;
   }
 
   function onClick(e) {

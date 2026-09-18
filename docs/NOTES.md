@@ -404,3 +404,12 @@ not actual play.
 - **Duplicates**: `pickFor` now always excludes every item shown in the other slots (was a config flag `excludeCurrentlyShown`; removed the flag, it is an invariant). `ensureStock` also nulls and refills any duplicate found in a saved stock.
 - **Reopen bug**: a slot left empty (pool ran dry) was refilled on every `onOpen`, and since consumables never leave the pool the item you had just bought came straight back. Now `ensureStock` remembers which slots were empty and leaves them SOLD OUT; they refill only when a new tier unlocks. The last unlocked tier is saved as `shop.tierLevel` (`economy.js`).
 - **Verified** with a randomized soak in the browser (random coin grants, random slot taps, close/reopen after every step): 140 steps, 0 duplicates, 0 owned permanents on sale, stock unchanged on every reopen except the one where lifetime coins crossed 250 (tier 2 unlocking, which is correct). `economy_report.py` still "all good".
+
+## Tiers removed, coin counter, card picture space (2026-09-19)
+
+- The user will design the economy themselves, so **tiers are gone**: no `tier` on items, no `tierUnlocks`, no `tierWeights` (refill is a uniform random pick). Every item can appear from the start. `economy.json` numbers were otherwise left alone.
+- SOLD OUT slots used to refill on tier unlock; now they refill when the item list in `economy.json` changes (`shop.catalog` in the save = the sorted item ids the stock came from). Old saves with `tierLevel` load fine (the stale field is ignored and the stock is kept/repaired).
+- `tools/economy_report.py`: dropped the tier column, tier table and the starter-pool simulation. Still validates fields/duplicates/categories and prints the hits-to-afford table.
+- **Coin counter** `#coin-counter` (index.html): brown box with a coin icon, right above the SHOP/BACK button (same 84px width, 6px gap), z-index 4 so it stays visible over the shop board. It replaces the "COINS n" line that used to sit inside the shop. It is fed by `Economy.onCoinsChange(fn)` (called on add/spend and once on registration), so it updates live in the game and while buying.
+- **Shop cards**: new `.shop-pic` block between the category and the name (takes the leftover height, faint tint so the space is visible); the name and price now sit at the bottom. Nothing is drawn in it yet - waiting for the item textures.
+- Verified in the browser: counter shows the saved balance in game and in the shop, drops by exactly 1 per purchase (spied `spendCoins`: 1 call, 1 slot changed), no duplicates.

@@ -20,6 +20,7 @@
       padding: 0;
       width: 100%;
       height: 100%;
+      overflow: hidden;
       background: #000000;
       -webkit-user-select: none;
       user-select: none;
@@ -36,8 +37,10 @@
        viewport either (min() of both), aspect ratio always preserved. */
     #game-container {
       position: relative;
-      width: min(100vw, calc(100vh * 426 / 243));
-      aspect-ratio: 426 / 243;
+      width: min(100vw, calc(100vh * 16 / 9));
+      width: min(100vw, calc(100dvh * 16 / 9)); /* dvh: mobile browser bars don't push it off-screen */
+      aspect-ratio: 16 / 9;
+      overflow: hidden; /* nothing (buttons included) can poke outside the display */
       touch-action: manipulation;
     }
 
@@ -154,7 +157,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=28"></script>
+  <script src="src/main.js?v=29"></script>
   <script>
     // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
     // before Phaser finishes booting on a slow load.

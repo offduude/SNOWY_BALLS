@@ -15,7 +15,7 @@ const WORLD_WIDTH = 704; // background.png's own width, used for placing/boundin
 // 3.80's WebGL renderer clips world content at the viewport edge when zoom != 1, cutting off a
 // strip of the image for no reason tied to scroll/bounds. Shrinking the actual canvas avoids
 // that renderer bug entirely.)
-const GAME_WIDTH = 426;
+const GAME_WIDTH = 432; // exactly 16:9 (432/243)
 const GAME_HEIGHT = 243;
 
 const GRAVITY = 900; // px/s^2
@@ -68,30 +68,25 @@ const WINDOWS = [
   { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 3 },
 ];
 
-// "Banana window" streak bonus (2026-09-19). goal_window_banana.png is a draft PSD export
-// (58x50 native) - a full replacement for W20's double-pane art where the left pane shows a
-// person peeking out and the right pane matches the original plain curtain. It gets scaled to
-// exactly fill W20's own box (51x43) so it seamlessly replaces the window in place. The face
-// hitbox and the "left section" divider below were both found by flood-filling the raw texture
-// for non-curtain/non-border pixels (see docs/NOTES.md) - not hand-guessed.
+// "Banana window" streak bonus (2026-09-19). goal_window_face.png / goal_window_face_hit.png are
+// 54x46 (cropped from the 58x50 exports - the outer 2px grey padding would otherwise paint over
+// the wall). They map 1:1 onto the building with NO scaling: the glass area is 52x44 px, exactly
+// W20's 52x44 pixel box, and the white frame edge sits 1px outside it, so the image's top-left
+// lands 1px up/left of W20 (image-x 384, image-y 272). The face box and left-pane divider were
+// found by flood-filling the texture for non-curtain pixels, in cropped-texture pixels.
 const W20 = WINDOWS[0];
-const BANANA_RAW_W = 58;
-const BANANA_RAW_H = 50;
-const BANANA_SCALE_X = (W20.xTo - W20.xFrom) / BANANA_RAW_W;
-const BANANA_SCALE_Y = (W20.heightTo - W20.heightFrom) / BANANA_RAW_H;
-const BANANA_RAW_FACE = { xFrom: 3, xTo: 19, yFrom: 30, yTo: 46 }; // raw-texture pixels
-const BANANA_RAW_LEFT_DIVIDER_X = 22; // raw-texture pixels - where the left pane ends
+const FACE_IMG_X = W20.xFrom - 1; // world x of the texture's left edge
+const FACE_IMG_TOP_HEIGHT = W20.heightTo + 1; // heightClimbed of the texture's top edge
+const FACE_RAW = { xFrom: 1, xTo: 18, yFrom: 28, yTo: 45 }; // face+collar, cropped-texture px
+const FACE_RAW_LEFT_DIVIDER_X = 20; // cropped-texture px - where the left pane ends
 
-// Face hitbox in world space, scaled from the raw texture onto W20's actual box. Raw image-y
-// grows downward same as background.png, so it inverts against heightClimbed the same way
-// (see IMG_GROUND_Y comment above) - here relative to W20's own top edge (heightTo) instead.
 const BANANA_FACE_BOX = {
-  xFrom: W20.xFrom + BANANA_RAW_FACE.xFrom * BANANA_SCALE_X,
-  xTo: W20.xFrom + BANANA_RAW_FACE.xTo * BANANA_SCALE_X,
-  heightFrom: W20.heightTo - BANANA_RAW_FACE.yTo * BANANA_SCALE_Y,
-  heightTo: W20.heightTo - BANANA_RAW_FACE.yFrom * BANANA_SCALE_Y,
+  xFrom: FACE_IMG_X + FACE_RAW.xFrom,
+  xTo: FACE_IMG_X + FACE_RAW.xTo,
+  heightFrom: FACE_IMG_TOP_HEIGHT - FACE_RAW.yTo,
+  heightTo: FACE_IMG_TOP_HEIGHT - FACE_RAW.yFrom,
 };
-const BANANA_LEFT_SECTION_XTO = W20.xFrom + BANANA_RAW_LEFT_DIVIDER_X * BANANA_SCALE_X;
+const BANANA_LEFT_SECTION_XTO = FACE_IMG_X + FACE_RAW_LEFT_DIVIDER_X;
 
 const BANANA_STREAK_TRIGGER = 3;
 const BANANA_DURATION_MS = 20000; // how long the banana texture stays before fading back
@@ -122,11 +117,11 @@ class MainScene extends Phaser.Scene {
     this.load.image("background", "assets/building/background.png?v=2");
     this.load.image("snowball", "assets/snowball/snowball.png");
     this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
-    this.load.image("goal_window_banana", "assets/building/goal_window_banana.png");
-    // Doesn't exist yet (2026-09-19) - a missing file just 404s and Phaser skips it, so
-    // this.textures.exists("goal_window_banana_hit") reads false later and triggerBananaHit()
-    // falls back to a tint flash on the same texture. Drop the real PNG in once it's ready.
-    this.load.image("goal_window_banana_hit", "assets/building/goal_window_banana_hit.png");
+    this.load.image("goal_window_face", "assets/building/goal_window_face.png");
+    this.load.image("goal_window_face_hit", "assets/building/goal_window_face_hit.png");
+    this.load.image("char_idle", "assets/character/character1_idle.png");
+    this.load.image("char_aiming", "assets/character/character1_aiming.png");
+    this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.audio("theme", "assets/audio/theme.mp3?v=2");
     this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
@@ -159,16 +154,14 @@ class MainScene extends Phaser.Scene {
     // at y = -IMG_GROUND_Y puts row IMG_GROUND_Y exactly at y = 0.
     this.bgImage = this.add.image(0, -IMG_GROUND_Y, "background").setOrigin(0, 0);
 
-    this.worldGfx = this.add.graphics();
     this.drawCharacter();
 
     this.marks = []; // stuck-snowball sprites; each one schedules its own fade-out in addMark()
 
     // Sits over W20, invisible until the banana streak bonus triggers - see startBananaEvent().
     this.bananaOverlay = this.add
-      .image(W20.xFrom, this.worldY(W20.heightTo), "goal_window_banana")
-      .setOrigin(0, 0);
-    this.bananaOverlay.setDisplaySize(W20.xTo - W20.xFrom, W20.heightTo - W20.heightFrom);
+      .image(FACE_IMG_X, this.worldY(FACE_IMG_TOP_HEIGHT), "goal_window_face")
+      .setOrigin(0, 0); // native size, 1:1 with the wall - no scaling
     this.bananaOverlay.setDepth(1); // above the building, below marks/ball
     this.bananaOverlay.setAlpha(0);
     this.bananaOverlay.setVisible(false);
@@ -252,14 +245,19 @@ class MainScene extends Phaser.Scene {
     return -heightFromGround;
   }
 
+  // Character sprite (64x64 frames, feet at the bottom edge). Pose follows game state - see
+  // updateCharacterPose().
   drawCharacter() {
-    // Placeholder: back turned, facing the building. Swap for real character art later.
-    const g = this.worldGfx;
-    g.clear();
     const baseY = this.worldY(0) + CHARACTER_Y_OFFSET;
-    g.fillStyle(0x2f2f3a, 1);
-    g.fillRoundedRect(ORIGIN_X - 8, baseY - 22, 16, 22, 3);
-    g.fillCircle(ORIGIN_X, baseY - 26, 7);
+    this.character = this.add.image(ORIGIN_X, baseY + 1, "char_idle").setOrigin(0.5, 1);
+    this.character.setDepth(2);
+  }
+
+  updateCharacterPose() {
+    let key = "char_idle";
+    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) key = "char_aiming";
+    else if (this.state === STATE.FLIGHT && this.flightTime < 0.35) key = "char_throwing";
+    if (this.character.texture.key !== key) this.character.setTexture(key);
   }
 
   handleFreezeInput() {
@@ -363,7 +361,7 @@ class MainScene extends Phaser.Scene {
     this.cameraFollowing = false;
     this.ball.setVisible(false); // the mark now represents where it stuck
     const mark = this.addMark(stickX, stickHeight);
-    this.sound.play("snowball_impact", { volume: 0.6 });
+    this.sound.play("snowball_impact", { volume: 0.3 }); // halved from 0.6
 
     if (hit) {
       this.streak += 1;
@@ -371,17 +369,15 @@ class MainScene extends Phaser.Scene {
       const streakBonus = Math.floor(coins * 0.15 * (this.streak - 1));
       coins += streakBonus;
 
-      let message = win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
-
       if (faceHit) {
         this.bananaHitTriggered = true;
         coins += BANANA_BONUS_COINS;
         this.triggerBananaHit(mark);
-        message = "BANANA BONUS! +" + coins + " coins";
       } else if (this.streak === BANANA_STREAK_TRIGGER && !this.bananaActive) {
         this.startBananaEvent();
       }
 
+      const message = win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
       this.showMessage(message);
@@ -415,8 +411,7 @@ class MainScene extends Phaser.Scene {
       }
     }
 
-    this.bananaOverlay.setTexture("goal_window_banana");
-    this.bananaOverlay.clearTint();
+    this.bananaOverlay.setTexture("goal_window_face");
     this.bananaOverlay.setVisible(true);
     this.tweens.add({ targets: this.bananaOverlay, alpha: 1, duration: BANANA_FADE_MS });
 
@@ -435,17 +430,14 @@ class MainScene extends Phaser.Scene {
     });
   }
 
-  // Hitting the face: cancels the pending 20s revert, quickly swaps to the _hit texture (a tint
-  // flash on the same art if goal_window_banana_hit.png hasn't been exported yet - see
-  // preload()), then after BANANA_HIT_REVERT_MS fades both the texture and the mark that
-  // triggered it back to nothing together.
+  // Hitting the face: cancels the pending 20s revert, quickly swaps to goal_window_face_hit,
+  // then after BANANA_HIT_REVERT_MS fades both the texture and the mark that triggered it back
+  // to nothing together.
   triggerBananaHit(mark) {
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
     if (mark.fadeTimer) mark.fadeTimer.remove();
 
-    const hasHitArt = this.textures.exists("goal_window_banana_hit");
-    this.bananaOverlay.setTexture(hasHitArt ? "goal_window_banana_hit" : "goal_window_banana");
-    if (!hasHitArt) this.bananaOverlay.setTint(0xfff3b0);
+    this.bananaOverlay.setTexture("goal_window_face_hit");
     this.bananaOverlay.setAlpha(1);
 
     this.time.delayedCall(BANANA_HIT_REVERT_MS, () => {
@@ -454,7 +446,6 @@ class MainScene extends Phaser.Scene {
         alpha: 0,
         duration: BANANA_FADE_MS,
         onComplete: () => {
-          this.bananaOverlay.clearTint();
           this.bananaOverlay.setVisible(false);
           this.bananaActive = false;
           if (mark.active) {
@@ -522,6 +513,7 @@ class MainScene extends Phaser.Scene {
       this.updateFlight(dt);
     }
 
+    this.updateCharacterPose();
     this.drawAimBar();
   }
 }

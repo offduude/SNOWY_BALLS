@@ -343,3 +343,11 @@ directly in a loop from `javascript_exec` to step the simulation manually instea
 real elapsed time. A real click-driven sequence (click to freeze angle, click to freeze power,
 then `wait`) played through fine in real time, so this only affects scripted/automated testing,
 not actual play.
+
+## 2026-09-19 (late) - face window, character sprites, 16:9, misc
+
+- **Face window textures**: `goal_window_face.png` / `goal_window_face_hit.png` (the user's real exports, replacing the banana draft + tint placeholder) are cropped to 54x46 (outer 2px grey padding removed - it painted over the wall). Glass area is 52x44 = W20's exact pixel box, so they place **1:1, no scaling**, image top-left at (W20.xFrom-1, height W20.heightTo+1). Face box `(385..402, 343..360)` and left divider (x=404) are in cropped-texture pixels. Hit swap uses the real hit art, no tint; the "BANANA BONUS" message is gone (normal "W20 HIT! +N coins", N includes the +10).
+- **Character**: `assets/character/character1_{idle,aiming,throwing}.png` (64x64) replace the placeholder shapes. Pose: aiming during AIM_ANGLE/AIM_POWER, throwing for the first 0.35s of flight, idle otherwise (`updateCharacterPose`). Feet at the ground line + CHARACTER_Y_OFFSET.
+- **Display is exactly 16:9**: canvas 432x243 (was 426x243), container `aspect-ratio: 16/9`, width `min(100vw, 100dvh*16/9)` (dvh so mobile browser bars don't push it off-screen). `#game-container` and `html,body` are `overflow:hidden`, so the volume/shop buttons can never sit outside the display. Verified on a 375x812 phone viewport.
+- Snowball impact volume halved (0.6 -> 0.3).
+- `background.png` tweaked by the user (no coordinate changes).

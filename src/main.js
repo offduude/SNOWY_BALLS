@@ -48,7 +48,7 @@ const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_STICK_HEIGHT); // ~1075.8
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
 
-const MAX_MARKS = 5; // oldest snowball mark is removed once a throw would add a 6th
+const MAX_MARKS = 10; // oldest marks are culled once the camera settles back on the player - see pruneMarks()
 
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
 // "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
@@ -108,7 +108,7 @@ class MainScene extends Phaser.Scene {
     this.worldGfx = this.add.graphics();
     this.drawCharacter();
 
-    this.marks = []; // FIFO queue of stuck-snowball sprites, oldest culled past MAX_MARKS
+    this.marks = []; // FIFO queue of stuck-snowball sprites, culled past MAX_MARKS in pruneMarks()
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
     this.ball.setDisplaySize(16, 16);
@@ -216,7 +216,12 @@ class MainScene extends Phaser.Scene {
     mark.setDisplaySize(20, 20);
     mark.setDepth(5); // above the building, below the live ball (depth 10)
     this.marks.push(mark);
-    if (this.marks.length > MAX_MARKS) {
+    // Culling past MAX_MARKS happens later, once the camera settles back on the player
+    // (see resetForNextThrow) - not here, so a mark never vanishes while it's on screen.
+  }
+
+  pruneMarks() {
+    while (this.marks.length > MAX_MARKS) {
       this.marks.shift().destroy();
     }
   }
@@ -257,6 +262,7 @@ class MainScene extends Phaser.Scene {
       scrollY: INITIAL_SCROLL_Y,
       duration: 500,
       ease: "Sine.easeInOut",
+      onComplete: () => this.pruneMarks(), // camera is back on the player now - safe to cull
     });
     this.showMessage("TAP or SPACE to aim");
   }

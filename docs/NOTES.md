@@ -80,9 +80,16 @@ just one point-in-box test at apex.
 
 Every throw leaves a mark exactly where the snowball sticks (see the apex-physics section
 above) - hit or miss, since the ball always sticks somewhere now. Marks are a FIFO queue
-(`this.marks` in `MainScene`) capped at `MAX_MARKS = 5`: adding a 6th destroys and removes the
-oldest, so the wall never gets fully covered. `addMark()` is called from `finishThrow()`, which
-now also receives the exact stick coordinates from `updateFlight()`.
+(`this.marks` in `MainScene`) capped at `MAX_MARKS = 10`. `addMark()` is called from
+`finishThrow()`, which receives the exact stick coordinates from `updateFlight()`.
+
+**Culling is deferred until the camera is back on the player (2026-09-19)**: `addMark()` no
+longer prunes on the spot - it can push the queue past `MAX_MARKS` and just leave it there.
+`pruneMarks()` (removes+destroys oldest down to the cap) only runs from the `onComplete`
+callback of the camera-reset tween in `resetForNextThrow()`, i.e. once the resting framing has
+fully settled. The user specifically didn't want a mark to vanish while they could still see
+it (during the flight/result camera position up near the building) - only once they've looked
+away back to the resting view.
 
 The live ball sprite itself is hidden except during actual flight (`setVisible(false)` in
 `create()`/`finishThrow()`, `setVisible(true)` in `launchBall()`) - it used to sit visibly

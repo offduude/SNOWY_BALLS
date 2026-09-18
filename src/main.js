@@ -48,7 +48,8 @@ const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_STICK_HEIGHT); // ~1075.8
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
 
-const MAX_MARKS = 10; // oldest marks are culled once the camera settles back on the player - see pruneMarks()
+const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
+const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed
 
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
 // "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
@@ -108,7 +109,7 @@ class MainScene extends Phaser.Scene {
     this.worldGfx = this.add.graphics();
     this.drawCharacter();
 
-    this.marks = []; // FIFO queue of stuck-snowball sprites, culled past MAX_MARKS in pruneMarks()
+    this.marks = []; // stuck-snowball sprites; each one schedules its own fade-out in addMark()
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
     this.ball.setDisplaySize(16, 16);
@@ -117,10 +118,7 @@ class MainScene extends Phaser.Scene {
 
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.hudText = this.add
-      .text(6, 4, "", { fontFamily: "monospace", fontSize: "9px", color: "#ffffff" })
-      .setScrollFactor(0)
-      .setDepth(21);
+    this.createTargetPanel();
     this.messageText = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "", {
         fontFamily: "monospace",
@@ -135,8 +133,74 @@ class MainScene extends Phaser.Scene {
     this.input.on("pointerdown", () => this.handleFreezeInput());
     this.input.keyboard.on("keydown-SPACE", () => this.handleFreezeInput());
 
-    this.updateHud();
     this.showMessage("TAP or SPACE to aim");
+  }
+
+  // Top-left rounded panel showing what W20/W21 actually look like (cropped straight from the
+  // building texture, not redrawn), each with its coin value - replaces the old coins/streak/
+  // best text readout for now. Thumbnails briefly pop when their window gets hit (see
+  // flashWindowThumb) so the panel reacts live instead of being static reference art.
+  createTargetPanel() {
+    const PAD = 5;
+    const GAP = 6;
+    const [w20, w21] = WINDOWS;
+    const w20W = w20.xTo - w20.xFrom;
+    const w20H = w20.heightTo - w20.heightFrom;
+    const w21W = w21.xTo - w21.xFrom;
+    const w21H = w21.heightTo - w21.heightFrom;
+    const thumbH = Math.max(w20H, w21H);
+
+    const panelX = 6;
+    const panelY = 6;
+    const panelW = PAD * 2 + w20W + GAP + w21W;
+    const panelH = PAD * 2 + thumbH + 12;
+
+    const gfx = this.add.graphics().setScrollFactor(0).setDepth(20);
+    gfx.fillStyle(0x14192a, 0.88);
+    gfx.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+    gfx.lineStyle(1, 0xffffff, 0.5);
+    gfx.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+
+    // Custom frames cropped straight from the loaded building texture - no separate art needed.
+    const bgTexture = this.textures.get("background");
+    const w20ImgY = IMG_GROUND_Y - w20.heightTo;
+    const w21ImgY = IMG_GROUND_Y - w21.heightTo;
+    bgTexture.add("thumb_w20", 0, w20.xFrom, w20ImgY, w20W, w20H);
+    bgTexture.add("thumb_w21", 0, w21.xFrom, w21ImgY, w21W, w21H);
+
+    const thumbY = panelY + PAD;
+    const w20CenterX = panelX + PAD + w20W / 2;
+    const w21CenterX = panelX + PAD + w20W + GAP + w21W / 2;
+
+    this.w20Thumb = this.add
+      .image(w20CenterX, thumbY + w20H / 2, "background", "thumb_w20")
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(21);
+    this.w21Thumb = this.add
+      .image(w21CenterX, thumbY + w21H / 2, "background", "thumb_w21")
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(21);
+
+    const labelStyle = { fontFamily: "monospace", fontSize: "8px", color: "#ffffff" };
+    this.add
+      .text(w20CenterX, thumbY + thumbH + 2, String(w20.coins), labelStyle)
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(21);
+    this.add
+      .text(w21CenterX, thumbY + thumbH + 2, String(w21.coins), labelStyle)
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(21);
+  }
+
+  flashWindowThumb(win) {
+    const thumb = win.name === "W20" ? this.w20Thumb : this.w21Thumb;
+    if (!thumb) return;
+    thumb.setScale(1.5);
+    this.tweens.add({ targets: thumb, scale: 1, duration: 300, ease: "Cubic.easeOut" });
   }
 
   worldY(heightFromGround) {
@@ -216,14 +280,21 @@ class MainScene extends Phaser.Scene {
     mark.setDisplaySize(20, 20);
     mark.setDepth(5); // above the building, below the live ball (depth 10)
     this.marks.push(mark);
-    // Culling past MAX_MARKS happens later, once the camera settles back on the player
-    // (see resetForNextThrow) - not here, so a mark never vanishes while it's on screen.
-  }
 
-  pruneMarks() {
-    while (this.marks.length > MAX_MARKS) {
-      this.marks.shift().destroy();
-    }
+    // Starts fading MARK_LIFETIME_MS after it's placed, regardless of what the camera's doing -
+    // a smooth fade doesn't have the "vanished while I was looking" problem a hard cull did.
+    this.time.delayedCall(MARK_LIFETIME_MS, () => {
+      this.tweens.add({
+        targets: mark,
+        alpha: 0,
+        duration: MARK_FADE_MS,
+        onComplete: () => {
+          mark.destroy();
+          const idx = this.marks.indexOf(mark);
+          if (idx !== -1) this.marks.splice(idx, 1);
+        },
+      });
+    });
   }
 
   finishThrow(hit, win, stickX, stickHeight) {
@@ -239,6 +310,7 @@ class MainScene extends Phaser.Scene {
       coins += streakBonus;
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
+      this.flashWindowThumb(win);
       this.showMessage(
         win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "")
       );
@@ -246,8 +318,6 @@ class MainScene extends Phaser.Scene {
       this.streak = 0;
       this.showMessage("MISS\nstreak reset");
     }
-
-    this.updateHud();
 
     this.time.delayedCall(1400, () => {
       if (this.state === STATE.RESULT) this.resetForNextThrow();
@@ -262,19 +332,12 @@ class MainScene extends Phaser.Scene {
       scrollY: INITIAL_SCROLL_Y,
       duration: 500,
       ease: "Sine.easeInOut",
-      onComplete: () => this.pruneMarks(), // camera is back on the player now - safe to cull
     });
     this.showMessage("TAP or SPACE to aim");
   }
 
   showMessage(msg) {
     this.messageText.setText(msg);
-  }
-
-  updateHud() {
-    this.hudText.setText(
-      "COINS " + Economy.getCoins() + "   STREAK " + this.streak + "   BEST " + Economy.getBestStreak()
-    );
   }
 
   drawAimBar() {

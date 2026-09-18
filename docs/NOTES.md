@@ -79,17 +79,35 @@ just one point-in-box test at apex.
 (above the building, below the live ball at depth 10).
 
 Every throw leaves a mark exactly where the snowball sticks (see the apex-physics section
-above) - hit or miss, since the ball always sticks somewhere now. Marks are a FIFO queue
-(`this.marks` in `MainScene`) capped at `MAX_MARKS = 10`. `addMark()` is called from
+above) - hit or miss, since the ball always sticks somewhere now. `addMark()` is called from
 `finishThrow()`, which receives the exact stick coordinates from `updateFlight()`.
 
-**Culling is deferred until the camera is back on the player (2026-09-19)**: `addMark()` no
-longer prunes on the spot - it can push the queue past `MAX_MARKS` and just leave it there.
-`pruneMarks()` (removes+destroys oldest down to the cap) only runs from the `onComplete`
-callback of the camera-reset tween in `resetForNextThrow()`, i.e. once the resting framing has
-fully settled. The user specifically didn't want a mark to vanish while they could still see
-it (during the flight/result camera position up near the building) - only once they've looked
-away back to the resting view.
+**Marks fade out on a per-mark timer, not a count cap (2026-09-19, superseding the
+"culling deferred until camera returns" approach from the same day)**: the count-based
+FIFO/`MAX_MARKS`/`pruneMarks()` system was replaced entirely. Each mark now gets its own
+`this.time.delayedCall(MARK_LIFETIME_MS, ...)` when placed - `MARK_LIFETIME_MS = 10000`, so it
+starts fading exactly 10s after it stuck, independent of throw count or camera position - then
+tweens `alpha` to 0 over `MARK_FADE_MS = 1500` and destroys itself, splicing out of
+`this.marks`. A smooth fade doesn't have the "vanished while I was looking" problem an instant
+cull did, so there was no need to keep gating it on the camera being back on the player.
+Verified end-to-end in real browser time (not scripted stepping - Phaser's timers/tweens need
+actual elapsed wall time, and the Browser-pane rAF-stall gotcha below means scripted
+`time.update()`/`tweens.update()` calls to fast-forward them are unreliable, so this needs a
+real `wait` with the tab actually rendering frames to trust the result).
+
+## Target panel replaces the coins/streak/best text (2026-09-19)
+
+`createTargetPanel()` builds a rounded-rect panel (`Graphics.fillRoundedRect`, dark navy
+`0x14192a` at 0.88 alpha, top-left at (6,6)) showing W20 and W21 exactly as they look in the
+real building texture - not redrawn art, but custom Phaser texture frames (`thumb_w20`/
+`thumb_w21`) cropped straight out of the loaded `background` texture via
+`texture.add(name, 0, x, y, w, h)`, using the same `WINDOWS` coordinates the hit-detection
+already relies on (so there's one source of truth, not two copies of the window geometry).
+Each thumbnail shows its coin value underneath. `flashWindowThumb(win)` briefly pops the
+matching thumbnail's scale (1.5 -> 1 over 300ms) when that window gets hit, so the panel reacts
+live instead of being static reference art. The old `hudText`/`updateHud()` (COINS/STREAK/BEST
+readout) is gone - the underlying `Economy` tracking is untouched, just not displayed right
+now; bring the readout back (or redesign it) whenever there's a reason to show it again.
 
 The live ball sprite itself is hidden except during actual flight (`setVisible(false)` in
 `create()`/`finishThrow()`, `setVisible(true)` in `launchBall()`) - it used to sit visibly

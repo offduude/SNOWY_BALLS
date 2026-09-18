@@ -546,10 +546,10 @@ const config = {
   pixelArt: true,
   roundPixels: true,
   backgroundColor: "#000000",
-  // Canvas size is handled by CSS (#game-container is exactly 16:9 and the canvas fills it).
-  // Phaser's FIT measures the container's bounding box, which is wrong once the container is
-  // CSS-rotated on portrait phones - see index.html.
-  scale: { mode: Phaser.Scale.NONE },
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
   scene: [MainScene],
 };
 

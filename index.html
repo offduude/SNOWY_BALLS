@@ -44,27 +44,9 @@
       touch-action: manipulation;
     }
 
-    /* iOS home-screen apps ignore the manifest's "orientation", so a phone held upright would
-       show the game as a thin strip. On touch devices in portrait, rotate the whole display 90deg
-       so it fills the tall screen sideways. Safe because input is tap-anywhere (no pointer
-       coordinates are used). Layout size below is the pre-rotation size: W wide x W*9/16 tall,
-       which after rotating is W tall x W*9/16 wide, so W = min(screen height, screen width*16/9). */
-    @media (orientation: portrait) and (pointer: coarse) {
-      #game-container {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        width: min(100vh, calc(100vw * 16 / 9));
-        width: min(100dvh, calc(100vw * 16 / 9));
-        transform: translate(-50%, -50%) rotate(90deg);
-      }
-    }
-
     #game-container canvas {
       image-rendering: pixelated;
       display: block;
-      width: 100% !important; /* overrides any inline size - the container defines the 16:9 box */
-      height: 100% !important;
     }
 
     /* All in-game text lives here now instead of as blurry upscaled Phaser canvas text - a
@@ -178,7 +160,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=34"></script>
+  <script src="src/main.js?v=32"></script>
   <script>
     // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
     // before Phaser finishes booting on a slow load.

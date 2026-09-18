@@ -149,6 +149,11 @@ class MainScene extends Phaser.Scene {
     this.cameras.main.scrollX = INITIAL_SCROLL_X;
     this.cameras.main.scrollY = INITIAL_SCROLL_Y;
 
+    // Experiment switch (?smooth): let the main camera scroll in sub-pixel steps instead of
+    // snapping to whole pixels, to test whether the uneven integer steps are what looks like
+    // a shake on phones. Off by default.
+    if (window.location.search.indexOf("smooth") !== -1) this.cameras.main.roundPixels = false;
+
     // background.png's own row IMG_GROUND_Y lines up with world height 0 (the ground):
     // image pixel row r sits at Phaser y = -IMG_GROUND_Y + r, so placing the top-left origin
     // at y = -IMG_GROUND_Y puts row IMG_GROUND_Y exactly at y = 0.

@@ -62,7 +62,7 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("background", "assets/building/background.png");
+    this.load.image("background", "assets/building/background.png?v=2");
   }
 
   create() {

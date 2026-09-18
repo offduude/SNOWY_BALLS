@@ -30,9 +30,11 @@ const MAX_POWER_SPEED = 1150; // px/s vertical launch speed at full power (apex 
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
 
-const ORIGIN_X = WORLD_WIDTH / 2 + 58; // 410 - nudged 58px right of dead-center per user request
+const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30; // 440 - nudged right of dead-center twice per user request (+58, then +30)
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
 const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
+
+const MAX_MARKS = 5; // oldest snowball mark is removed once a throw would add a 6th
 
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
 // "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
@@ -63,6 +65,8 @@ class MainScene extends Phaser.Scene {
 
   preload() {
     this.load.image("background", "assets/building/background.png?v=2");
+    this.load.image("snowball", "assets/snowball/snowball.png");
+    this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
   }
 
   create() {
@@ -94,7 +98,10 @@ class MainScene extends Phaser.Scene {
     this.worldGfx = this.add.graphics();
     this.drawCharacter();
 
-    this.ball = this.add.circle(ORIGIN_X, this.worldY(ORIGIN_Y), 4, 0xffffff);
+    this.marks = []; // FIFO queue of stuck-snowball sprites, oldest culled past MAX_MARKS
+
+    this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
+    this.ball.setDisplaySize(16, 16);
     this.ball.setDepth(10);
 
     // Aim HUD (screen-space, ignores camera scroll).
@@ -197,24 +204,35 @@ class MainScene extends Phaser.Scene {
     if (this.headPresent) {
       const hb = this.getHeadBounds();
       if (x >= hb.xFrom && x <= hb.xTo && heightClimbed >= hb.heightFrom && heightClimbed <= hb.heightTo) {
-        this.finishThrow(true, WINDOWS[0], HEAD_BONUS_COINS);
+        this.finishThrow(true, WINDOWS[0], HEAD_BONUS_COINS, x, heightClimbed);
         return;
       }
     }
 
     for (const win of WINDOWS) {
       if (x >= win.xFrom && x <= win.xTo && heightClimbed >= win.heightFrom && heightClimbed <= win.heightTo) {
-        this.finishThrow(true, win, 0);
+        this.finishThrow(true, win, 0, x, heightClimbed);
         return;
       }
     }
 
-    this.finishThrow(false, null, 0);
+    this.finishThrow(false, null, 0, x, heightClimbed);
   }
 
-  finishThrow(hit, win, headBonus) {
+  addMark(x, heightClimbed) {
+    const mark = this.add.image(x, this.worldY(heightClimbed), "snowball_mark");
+    mark.setDisplaySize(20, 20);
+    mark.setDepth(5); // above the building, below the live ball (depth 10)
+    this.marks.push(mark);
+    if (this.marks.length > MAX_MARKS) {
+      this.marks.shift().destroy();
+    }
+  }
+
+  finishThrow(hit, win, headBonus, stickX, stickHeight) {
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
+    this.addMark(stickX, stickHeight);
 
     if (hit) {
       this.streak += 1;

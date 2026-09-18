@@ -29,9 +29,9 @@ Reference doc for values decided by trial-and-error, so we don't have to redisco
   sized to match a reference crop the user marked directly on the art (right entrance door +
   ground). See the camera-bounds/zoom gotcha below for why this is done via canvas size
   instead of `camera.zoom`.
-- `ORIGIN_X = 410` (WORLD_WIDTH/2 + 58) - nudged 58px right of dead-center per user request
-  (2026-09-18); this moves the character, the ball's launch point, and ends up landing almost
-  exactly under W20.
+- `ORIGIN_X = 440` (WORLD_WIDTH/2 + 58 + 30) - nudged right of dead-center twice per user
+  request (+58, then +30 later the same day); moves the character and the ball's launch point
+  together. W20 now needs a slight *left* swing to hit (character stands slightly right of it).
 
 ## Physics: snowball sticks at apex (redesigned 2026-09-18)
 
@@ -59,6 +59,20 @@ just one point-in-box test at apex.
 - W20/W21's required power (to make their apex land in the window band) is `vy0` in roughly
   [786, 835] out of the full [300, 1150] range - a real but learnable precision window, not a
   hair's-width one.
+
+## Real snowball + mark sprites (2026-09-18)
+
+`assets/snowball/snowball.png` and `snowball_mark.png` (exported from the user's
+`snowball.psd`/`snowball_mark.psd` in the "snowy-balls photoshop assets" folder, both native
+32x32) replace the placeholder white circle. Ball renders at 16x16 display size, marks at
+20x20 (slightly bigger than the ball, like a real impact splat). Marks render at depth 5
+(above the building, below the live ball at depth 10).
+
+Every throw leaves a mark exactly where the snowball sticks (see the apex-physics section
+above) - hit or miss, since the ball always sticks somewhere now. Marks are a FIFO queue
+(`this.marks` in `MainScene`) capped at `MAX_MARKS = 5`: adding a 6th destroys and removes the
+oldest, so the wall never gets fully covered. `addMark()` is called from `finishThrow()`, which
+now also receives the exact stick coordinates from `updateFlight()`.
 
 ## Known TODO / not-yet-real
 

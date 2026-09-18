@@ -89,6 +89,10 @@ class MainScene extends Phaser.Scene {
     this.load.image("background", "assets/building/background.png?v=2");
     this.load.image("snowball", "assets/snowball/snowball.png");
     this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
+    this.load.audio("theme", "assets/audio/theme.mp3");
+    this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");
+    this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
+    this.load.audio("coin_sound", "assets/audio/coin_sound.mp3");
   }
 
   create() {
@@ -130,6 +134,10 @@ class MainScene extends Phaser.Scene {
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
 
     this.createTargetCamera();
+
+    // Loops forever so the theme doesn't just play once and go silent - it's a few minutes
+    // long, not actually infinite on its own.
+    this.sound.play("theme", { loop: true, volume: 0.5 });
 
     this.input.on("pointerdown", () => this.handleFreezeInput());
     this.input.keyboard.on("keydown-SPACE", () => this.handleFreezeInput());
@@ -226,6 +234,7 @@ class MainScene extends Phaser.Scene {
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     this.cameraFollowing = true;
     this.ball.setVisible(true);
+    this.sound.play("throw_whoosh", { volume: 0.6 });
   }
 
   updateFlight(dt) {
@@ -284,6 +293,7 @@ class MainScene extends Phaser.Scene {
     this.cameraFollowing = false;
     this.ball.setVisible(false); // the mark now represents where it stuck
     this.addMark(stickX, stickHeight);
+    this.sound.play("snowball_impact", { volume: 0.6 });
 
     if (hit) {
       this.streak += 1;
@@ -292,6 +302,7 @@ class MainScene extends Phaser.Scene {
       coins += streakBonus;
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
+      this.sound.play("coin_sound", { volume: 0.7 });
       this.showMessage(
         win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "")
       );

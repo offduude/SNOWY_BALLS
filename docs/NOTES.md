@@ -2,6 +2,25 @@
 
 Reference doc for values decided by trial-and-error, so we don't have to rediscover them later.
 
+## Audio (2026-09-19)
+
+Four files dropped at the project root (`theme.mp3`, `throw_whoosh.mp3`, `snowball_impact.mp3`,
+`coin_sound.mp3`) moved into `assets/audio/`. Loaded in `preload()`, wired to the obvious game
+events since only the theme's looping was explicitly requested but leaving the rest silent after
+being told to "check them out" seemed like an oversight:
+
+- `theme`: starts in `create()` via `this.sound.play("theme", { loop: true, volume: 0.5 })`.
+  `loop: true` is the actual fix for "don't run out of it" - the file itself is a real ~3:33
+  track (212.8s), not something that was ever going to fill a play session on its own.
+- `throw_whoosh`: plays in `launchBall()`, i.e. the moment a throw is released.
+- `snowball_impact`: plays in `finishThrow()` for every throw, hit or miss - matches the
+  "always sticks somewhere" physics, so there's always exactly one impact per throw.
+- `coin_sound`: plays in `finishThrow()` only on an actual window hit, after `snowball_impact`.
+
+Verified via `scene.sound.get('theme')` (`loop: true`, `isPlaying: true`, correct duration) and
+by monkey-patching `scene.sound.play` during a scripted throw to confirm the exact call order:
+`throw_whoosh` -> `snowball_impact` -> `coin_sound` for a scoring hit.
+
 ## Page layout: HTML page, not a fullscreen canvas app (2026-09-19, revised twice same day)
 
 Restructured `index.html` away from the original fixed/fullscreen/centered layout. There's no

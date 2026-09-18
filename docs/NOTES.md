@@ -25,13 +25,18 @@ Reference doc for values decided by trial-and-error, so we don't have to redisco
 
 - `WORLD_WIDTH = 704` - background.png's own width; the image and all world-space x
   coordinates (windows, ORIGIN_X) are relative to this, independent of canvas size.
-- `GAME_WIDTH = 426` / `GAME_HEIGHT = 243` - canvas resolution IS the resting camera framing,
-  sized to match a reference crop the user marked directly on the art (right entrance door +
-  ground). See the camera-bounds/zoom gotcha below for why this is done via canvas size
-  instead of `camera.zoom`.
-- `ORIGIN_X = 440` (WORLD_WIDTH/2 + 58 + 30) - nudged right of dead-center twice per user
-  request (+58, then +30 later the same day); moves the character and the ball's launch point
-  together. W20 now needs a slight *left* swing to hit (character stands slightly right of it).
+- `GAME_WIDTH = 426` / `GAME_HEIGHT = 243` - canvas resolution, originally sized to match a
+  reference crop the user marked on the art (right entrance door + ground). See the camera-
+  bounds/zoom gotcha below for why this is done via canvas size instead of `camera.zoom`.
+- `ORIGIN_X = 450` (WORLD_WIDTH/2 + 58 + 30 + 10) - nudged right of dead-center three times
+  across separate requests (+58, +30, +10); moves the character and the ball's launch point
+  together. W20 now needs a slight *left* swing to hit (character stands right of it).
+- **Resting camera is centered on the character** (2026-09-18 request), not a fixed crop:
+  `INITIAL_SCROLL_X = ORIGIN_X - GAME_WIDTH/2`, `INITIAL_SCROLL_Y = -GAME_HEIGHT/2` (centers
+  world height 0, the ground, vertically). This means the resting view shows a fair amount of
+  plain sidewalk below the character and doesn't show W20/W21 at rest (only during the
+  camera's flight-follow) - a real tradeoff of true centering worth knowing about if the
+  framing ever feels off; revisit if the user wants the old bottom-anchored framing back.
 
 ## Physics: snowball sticks at apex (redesigned 2026-09-18)
 
@@ -52,9 +57,14 @@ just one point-in-box test at apex.
 - `MAX_SWING_SPEED = 180` - had to raise this from an earlier placeholder (110) because W21
   sits far enough right of center that a weaker max drift couldn't physically reach it by the
   time the ball reaches apex height.
-- `MIN_POWER_SPEED = 300` / `MAX_POWER_SPEED = 1150` - max apex is ~735 world px, just above
-  the roofline (643), so a full-power throw sticks near the roof (an intentional miss/edge
-  case) rather than overshooting into undefined space.
+- `MIN_POWER_SPEED`/`MAX_POWER_SPEED` are **derived, not hand-picked** (2026-09-18 redesign):
+  `MIN_STICK_HEIGHT = 184` and `MAX_STICK_HEIGHT = 643` (the roofline) come from a restricted-
+  zone reference image the user marked (red zone's top edge was image-y=486, plus a 10px
+  buffer they asked for, converted via `IMG_GROUND_Y - imageY`), and `MIN/MAX_POWER_SPEED` are
+  back-computed from those via `vy0 = sqrt(2 * GRAVITY * height)` so a 0%/100% power throw's
+  apex lands exactly on those two bounds. This guarantees the snowball can never stick in the
+  sky or in the restricted ground/doors area, by construction - no extra runtime clamping
+  needed. If `MIN_STICK_HEIGHT`/`MAX_STICK_HEIGHT` change, the power range updates itself.
 - `ANGLE_HZ = 0.85`, `POWER_HZ = 0.65` (aim pointer sweep speed, cycles/sec)
 - W20/W21's required power (to make their apex land in the window band) is `vy0` in roughly
   [786, 835] out of the full [300, 1150] range - a real but learnable precision window, not a
@@ -73,6 +83,11 @@ above) - hit or miss, since the ball always sticks somewhere now. Marks are a FI
 (`this.marks` in `MainScene`) capped at `MAX_MARKS = 5`: adding a 6th destroys and removes the
 oldest, so the wall never gets fully covered. `addMark()` is called from `finishThrow()`, which
 now also receives the exact stick coordinates from `updateFlight()`.
+
+The live ball sprite itself is hidden except during actual flight (`setVisible(false)` in
+`create()`/`finishThrow()`, `setVisible(true)` in `launchBall()`) - it used to sit visibly
+above the character's head at rest, which the user asked to remove; the mark left behind at
+the stick point is the only lasting visual now.
 
 ## Known TODO / not-yet-real
 

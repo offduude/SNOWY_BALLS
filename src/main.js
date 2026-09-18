@@ -10,29 +10,39 @@ const IMG_GROUND_Y = 660;
 const IMG_ROOF_Y = 17;
 const WORLD_WIDTH = 704; // background.png's own width, used for placing/bounding the image
 
-// Canvas resolution IS the resting camera framing - the user marked a reference crop directly
-// on background.png (image x=215-641, y=435-678, the entrance-doors-and-ground area) and asked
-// for the default view to roughly match it, so the canvas is sized to that crop exactly rather
-// than showing the full building width. (We tried camera.zoom instead of this - Phaser 3.80's
-// WebGL renderer clips world content at the viewport edge when zoom != 1, cutting off a strip
-// of the image for no reason tied to scroll/bounds. Shrinking the actual canvas avoids that
-// renderer bug entirely and gets the identical framing.)
+// Canvas resolution stays sized to roughly the frame the user originally asked for (the
+// entrance-doors-and-ground crop). (We tried camera.zoom instead of a smaller canvas - Phaser
+// 3.80's WebGL renderer clips world content at the viewport edge when zoom != 1, cutting off a
+// strip of the image for no reason tied to scroll/bounds. Shrinking the actual canvas avoids
+// that renderer bug entirely.)
 const GAME_WIDTH = 426;
 const GAME_HEIGHT = 243;
-const INITIAL_SCROLL_X = 215; // left edge of the reference crop
-const INITIAL_SCROLL_Y = -(IMG_GROUND_Y - 435); // -225: top edge of the reference crop
 
 const GRAVITY = 900; // px/s^2
 const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs to reach W21
-const MIN_POWER_SPEED = 300; // px/s vertical launch speed at 0 power (apex ~50px - a clear miss)
-const MAX_POWER_SPEED = 1150; // px/s vertical launch speed at full power (apex ~735px, just above the roofline)
+
+const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30 + 10; // 450 - nudged right of dead-center three times per user requests (+58, +30, +10)
+const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
+const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
+
+// Resting camera framing: centered on the character (see task from 2026-09-18), not a fixed crop.
+const INITIAL_SCROLL_X = ORIGIN_X - GAME_WIDTH / 2;
+const INITIAL_SCROLL_Y = -GAME_HEIGHT / 2; // centers world height 0 (the ground) vertically
+
+// The snowball must always stick somewhere between just above the restricted ground/doors zone
+// and the roofline - never in the sky, never in the red-marked restricted area (+10px buffer
+// above it) from the user's reference image. Restricted zone's top edge was image-y=486;
+// converted via IMG_GROUND_Y - imageY, plus the 10px buffer, that's a minimum stick height of
+// 184. The roofline (IMG_GROUND_Y - IMG_ROOF_Y = 643) is the maximum. MIN/MAX_POWER_SPEED are
+// calibrated so a 0%/100% power throw's apex lands exactly on those two bounds -
+// vy0 = sqrt(2 * GRAVITY * height).
+const MIN_STICK_HEIGHT = IMG_GROUND_Y - 486 + 10; // 184
+const MAX_STICK_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y; // 643
+const MIN_POWER_SPEED = Math.sqrt(2 * GRAVITY * MIN_STICK_HEIGHT); // ~575.6
+const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_STICK_HEIGHT); // ~1075.8
 
 const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
 const POWER_HZ = 0.65;
-
-const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30; // 440 - nudged right of dead-center twice per user request (+58, then +30)
-const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
-const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
 
 const MAX_MARKS = 5; // oldest snowball mark is removed once a throw would add a 6th
 
@@ -103,6 +113,7 @@ class MainScene extends Phaser.Scene {
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
     this.ball.setDisplaySize(16, 16);
     this.ball.setDepth(10);
+    this.ball.setVisible(false); // only shown mid-flight - see launchBall/finishThrow
 
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
@@ -168,6 +179,7 @@ class MainScene extends Phaser.Scene {
     this.ballStartX = ORIGIN_X;
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     this.cameraFollowing = true;
+    this.ball.setVisible(true);
   }
 
   getHeadBounds() {
@@ -232,6 +244,7 @@ class MainScene extends Phaser.Scene {
   finishThrow(hit, win, headBonus, stickX, stickHeight) {
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
+    this.ball.setVisible(false); // the mark now represents where it stuck
     this.addMark(stickX, stickHeight);
 
     if (hit) {

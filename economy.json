@@ -28,7 +28,6 @@
     "refill": {
       "mode": "random_from_eligible",
       "excludeOwned": true,
-      "excludeCurrentlyShown": true,
       "tierWeights": { "1": 60, "2": 30, "3": 10 },
       "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
     },

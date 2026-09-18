@@ -15,6 +15,7 @@ const Economy = (() => {
         stock: null, // array of item ids currently on sale, one per slot; null = not generated yet
         owned: [], // ids of permanent items bought
         consumables: {}, // id -> how many bought and not yet used
+        tierLevel: null, // highest tier unlocked the last time the shop filled its slots
       },
     };
   }
@@ -36,6 +37,7 @@ const Economy = (() => {
           stock: Array.isArray(shop.stock) ? shop.stock : null,
           owned: Array.isArray(shop.owned) ? shop.owned : [],
           consumables: shop.consumables && typeof shop.consumables === "object" ? shop.consumables : {},
+          tierLevel: typeof shop.tierLevel === "number" ? shop.tierLevel : null,
         },
       };
     } catch (e) {

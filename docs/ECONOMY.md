@@ -45,7 +45,10 @@ The shop always shows `slots` items. Buying one replaces it with another one fro
 **`refill`** - how a replacement is chosen:
 - `mode: random_from_eligible` - random pick among items the player is allowed to see
 - `excludeOwned` - permanent items already bought never come back
-- `excludeCurrentlyShown` - never duplicates one of the other slots
+- (always on, not a setting) the same item is never on sale in two slots at once
+- when no eligible item is left for a slot it shows SOLD OUT, and it **stays** SOLD OUT when the
+  shop is closed and reopened. Empty slots only refill when a new tier unlocks (the last unlocked
+  tier is saved as `tierLevel`)
 - `tierWeights` - relative odds of each tier (60/30/10 means tier 1 comes up most)
 - `guaranteeCheapItem` - after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop

@@ -57,8 +57,8 @@ const Shop = (() => {
   // comes straight back into the slot it left.
   function pickFor(shownOthers, justBought) {
     const refill = eco.shop.refill;
-    const exclude = [];
-    if (refill.excludeCurrentlyShown) exclude.push(...shownOthers);
+    // The same item must never be on sale in two slots at once - not configurable, it's an invariant.
+    const exclude = [...shownOthers];
     if (justBought) exclude.push(justBought);
     const pool = eligible(exclude);
     if (!pool.length) return null;
@@ -77,27 +77,44 @@ const Shop = (() => {
     return candidate.id;
   }
 
-  // Make the saved stock valid (right length, real items, nothing already owned) and fill gaps.
+  function highestUnlockedTier() {
+    let top = 0;
+    for (const [tier, need] of Object.entries(eco.shop.tierUnlocks)) {
+      if (Economy.getLifetimeCoins() >= need) top = Math.max(top, Number(tier));
+    }
+    return top;
+  }
+
+  // Make the saved stock valid (right length, real items, nothing owned, no duplicates) and fill
+  // gaps. A slot that is empty because the pool ran dry ("SOLD OUT") is NOT refilled just because
+  // the shop was reopened - otherwise the item you just bought (consumables never leave the pool)
+  // would pop straight back. Empty slots only refill when a new tier unlocks.
   function ensureStock() {
     const st = Economy.getShopState();
     const slots = eco.shop.slots;
-    let stock = Array.isArray(st.stock) ? st.stock.slice(0, slots) : [];
+    const fresh = !Array.isArray(st.stock);
+    let stock = fresh ? [] : st.stock.slice(0, slots);
     while (stock.length < slots) stock.push(null);
 
+    const wasEmpty = stock.map((id) => id === null); // sold out on purpose
+    const tier = highestUnlockedTier();
+    const tierIncreased = st.tierLevel !== null && tier > st.tierLevel;
+
+    // Invalid entries (item removed from economy.json, already owned, duplicate) become gaps that DO get refilled.
     stock = stock.map((id) => {
       const it = id && itemById(id);
       return it && !isOwnedPermanent(it) ? id : null;
     });
-    // Two slots can't hold the same item.
     stock = stock.map((id, i) => (id && stock.indexOf(id) !== i ? null : id));
 
     for (let i = 0; i < slots; i++) {
-      if (stock[i] === null) {
-        const others = stock.filter((id, j) => j !== i && id);
-        stock[i] = pickFor(others, null);
-      }
+      if (stock[i] !== null) continue;
+      if (wasEmpty[i] && !fresh && !tierIncreased) continue; // stays SOLD OUT
+      const others = stock.filter((id, j) => j !== i && id);
+      stock[i] = pickFor(others, null);
     }
     st.stock = stock;
+    st.tierLevel = tier;
     Economy.saveShop();
     return stock;
   }

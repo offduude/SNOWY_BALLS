@@ -397,3 +397,10 @@ not actual play.
 - **Design finding**: with 1-coin placeholder prices you can drain the tier-1 pool within minutes and get SOLD OUT slots. Same thing would happen with real prices before tier 2 (250 earned coins) if the starter tier were small, so `tools/economy_report.py` now simulates it; fixed by adding tier-1 consumables (10 starter items).
 - Unexplained: an earlier test run showed 9 purchases / 9 lifetime coins that my scripted actions don't account for. A clean re-run with spies on `spendCoins`/`addCoins` showed exactly the expected numbers, so I'm treating it as a test-harness artifact - but if the shop ever seems to spend coins by itself on a real device, that's the thing to look for.
 - Effects still not applied; characters excluded (achievement unlocks later).
+
+## Shop fixes: no duplicates, SOLD OUT stays sold out (2026-09-19)
+
+- **Unexplained purchases**: the user confirmed they were clicking in the shared preview pane while I tested, so that's the explanation - no bug.
+- **Duplicates**: `pickFor` now always excludes every item shown in the other slots (was a config flag `excludeCurrentlyShown`; removed the flag, it is an invariant). `ensureStock` also nulls and refills any duplicate found in a saved stock.
+- **Reopen bug**: a slot left empty (pool ran dry) was refilled on every `onOpen`, and since consumables never leave the pool the item you had just bought came straight back. Now `ensureStock` remembers which slots were empty and leaves them SOLD OUT; they refill only when a new tier unlocks. The last unlocked tier is saved as `shop.tierLevel` (`economy.js`).
+- **Verified** with a randomized soak in the browser (random coin grants, random slot taps, close/reopen after every step): 140 steps, 0 duplicates, 0 owned permanents on sale, stock unchanged on every reopen except the one where lifetime coins crossed 250 (tier 2 unlocking, which is correct). `economy_report.py` still "all good".

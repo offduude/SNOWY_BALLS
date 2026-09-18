@@ -421,3 +421,13 @@ not actual play.
 - **Fix**: `index.html` stops `touchstart/touchend/touchcancel/mousedown/mouseup` from bubbling out of `#shop-board`, `#shop-items`, `#shop-btn`, `#volume-btn`, so Phaser never sees UI touches. Plus a guard in `handleFreezeInput()` that ignores input while `#game-container` has `shop-open`. `main.js?v=45`.
 - **Verified** (mobile preset, synthetic touches): the lost-touchend case leaves no active pointer; 70 spam taps across all cards leave the game `idle`; a canvas tap afterwards goes to `aim_angle`.
 - Side effect worth knowing: before this, tapping the mute button or SHOP on a phone could also advance the throw underneath; that no longer happens.
+
+## PROJECTILES / CHARACTERS lists (2026-09-19)
+
+- Two brown buttons (same look as SHOP, 108x32, 8px font because "PROJECTILES" doesn't fit in 84px) stacked in the middle of the left edge (`#side-buttons`). They fade out and stop being tappable while the shop is open; opening the shop also closes any open list.
+- `src/collection.js` (`Collection`): one shared panel `#list-panel` (24% left, 12% top, 52% x 76%, so both lists are identical in size, centered, clear of the edges). Pressing the other button swaps lists; pressing the open list's own button, or tapping the dimmed area outside, closes it. Each row: picture, name, description, EQUIP button (becomes a greyed EQUIPPED for the current one).
+- The list scrolls with the finger (`overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain`), scrollbar hidden - no slider.
+- **Entries live in the `CATALOG` object at the top of `src/collection.js`** (not economy.json - they aren't priced). Two so far: projectile `snowball` and character `default` (shown as "Character 1"; `default` is the id already used by `unlockedCharacters` in saves). Descriptions are placeholders I wrote.
+- Equipped choice is saved (`Economy.getEquipped/setEquipped`, save field `equipped`). **It is not applied to gameplay yet** - with one entry per list there's nothing to swap. Wiring it means picking the texture keys from the equipped id in `main.js`.
+- While a list is open the game ignores input (`handleFreezeInput` checks `list-open` as well as `shop-open`), and the panel/buttons are on the list of elements whose touches never reach Phaser (see the shop-spam bug above).
+- Verified in an 812x375 landscape viewport: both lists have identical rects, switching/toggling/backdrop-close work, the game stays `idle` while a list is open, buttons hidden and untappable in the shop and back after, 9 dummy rows overflow and are scrollable. Real finger-scrolling not tested on a phone.

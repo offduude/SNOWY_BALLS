@@ -11,6 +11,7 @@ const Economy = (() => {
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
       unlockedCharacters: ["default"],
+      equipped: { character: "default", projectile: "snowball" }, // what the player currently uses
       shop: {
         stock: null, // array of item ids currently on sale, one per slot; null = not generated yet
         owned: [], // ids of permanent items bought
@@ -33,6 +34,7 @@ const Economy = (() => {
         lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
         bestStreak: p.bestStreak || 0,
         unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
+        equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
         shop: {
           stock: Array.isArray(shop.stock) ? shop.stock : null,
           owned: Array.isArray(shop.owned) ? shop.owned : [],
@@ -102,6 +104,16 @@ const Economy = (() => {
     return state.bestStreak;
   }
 
+  // kind: "character" | "projectile"
+  function getEquipped(kind) {
+    return state.equipped[kind];
+  }
+
+  function setEquipped(kind, id) {
+    state.equipped[kind] = id;
+    save();
+  }
+
   // The shop mutates this object directly and then calls saveShop().
   function getShopState() {
     return state.shop;
@@ -119,6 +131,8 @@ const Economy = (() => {
     getLifetimeCoins,
     reportStreak,
     getBestStreak,
+    getEquipped,
+    setEquipped,
     getShopState,
     saveShop,
   };

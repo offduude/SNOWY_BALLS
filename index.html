@@ -273,9 +273,173 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    #shop-btn:active {
+    #shop-btn:active,
+    .side-btn:active {
       background: #74491f;
     }
+
+    /* PROJECTILES / CHARACTERS buttons: middle of the left edge, same look as the SHOP button.
+       Hidden (and untappable) while the shop is open. */
+    #side-buttons {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 5; /* above the list panel, so both stay usable when a list is open */
+      transition: opacity 0.25s ease;
+    }
+
+    #game-container.shop-open #side-buttons {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .side-btn {
+      width: 108px;
+      height: 32px;
+      padding: 0;
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 8px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .side-btn.active {
+      background: #74491f;
+    }
+
+    /* The list: centered, same size for both lists, clear of the screen edges. */
+    #list-backdrop,
+    #list-panel {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    #list-backdrop {
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 3;
+    }
+
+    #list-panel {
+      left: 24%;
+      top: 12%;
+      width: 52%;
+      height: 76%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+      font-family: "Press Start 2P", monospace;
+      color: #3b2412;
+      z-index: 4;
+    }
+
+    #game-container.list-open #list-backdrop,
+    #game-container.list-open #list-panel {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #game-container.shop-open #list-backdrop,
+    #game-container.shop-open #list-panel {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #list-title {
+      flex: none;
+      padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6);
+      color: #ffffff;
+      font-size: calc(var(--u) * 1.5);
+      text-align: center;
+    }
+
+    /* Scrolled with the finger - no scrollbar/slider. */
+    #list-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      scrollbar-width: none;
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--u) * 1.2);
+      padding: 0 calc(var(--u) * 1.2) calc(var(--u) * 1.2);
+    }
+
+    #list-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .pick-row {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: calc(var(--u) * 1.4);
+      padding: calc(var(--u) * 1.2);
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+    }
+
+    .pick-pic {
+      flex: none;
+      width: calc(var(--u) * 9);
+      height: calc(var(--u) * 9);
+      object-fit: contain;
+      image-rendering: pixelated;
+      background: rgba(122, 82, 48, 0.12);
+      border-radius: 2px;
+    }
+
+    .pick-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pick-name {
+      font-size: calc(var(--u) * 1.6);
+      line-height: 1.3;
+      margin-bottom: calc(var(--u) * 0.8);
+    }
+
+    .pick-desc {
+      font-size: calc(var(--u) * 1.1);
+      line-height: 1.6;
+      color: #6b4a2a;
+    }
+
+    .pick-equip {
+      flex: none;
+      padding: calc(var(--u) * 1) calc(var(--u) * 1.2);
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: calc(var(--u) * 1.2);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .pick-equip:active { background: #74491f; }
+    .pick-equip.on { background: #b9a88f; border-color: #8a7a62; color: #f4ead0; cursor: default; }
 
     /* Coin counter: sits right above the SHOP/BACK button and stays put when the shop opens. */
     #coin-counter {
@@ -315,6 +479,15 @@
     <div id="message"></div>
     <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
     <div id="shop-items"></div>
+    <div id="list-backdrop"></div>
+    <div id="list-panel">
+      <div id="list-title"></div>
+      <div id="list-scroll"></div>
+    </div>
+    <div id="side-buttons">
+      <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
+      <button id="characters-btn" class="side-btn" type="button">CHARACTERS</button>
+    </div>
     <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
     <button id="shop-btn" type="button">SHOP</button>
     <button id="volume-btn" type="button" aria-label="Mute">
@@ -325,19 +498,22 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=4"></script>
   <script src="src/shop.js?v=4"></script>
-  <script src="src/main.js?v=45"></script>
+  <script src="src/collection.js?v=1"></script>
+  <script src="src/main.js?v=46"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-btn", "volume-btn"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-btn", "volume-btn", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());
       });
     });
+
+    Collection.init();
 
     // Live coin counter (above the SHOP/BACK button, visible in the game and in the shop).
     Economy.onCoinsChange((coins) => {
@@ -362,6 +538,7 @@
       const container = document.getElementById("game-container");
       const open = container.classList.toggle("shop-open");
       document.getElementById("shop-btn").textContent = open ? "BACK" : "SHOP";
+      if (open) Collection.close();
       if (open && typeof Shop !== "undefined") Shop.onOpen();
     });
   </script>

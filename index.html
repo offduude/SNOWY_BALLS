@@ -11,66 +11,64 @@
   <meta name="apple-mobile-web-app-title" content="SNOWY BALLS" />
   <link rel="manifest" href="manifest.json" />
   <!-- TODO: real icons from the assets/ui texture pass - see docs/NOTES.md -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
-      height: 100%;
+      min-height: 100%;
       background: #14192a;
-      overflow: hidden;
-      touch-action: none;
       -webkit-user-select: none;
       user-select: none;
+      font-family: "Press Start 2P", monospace;
     }
 
-    #game-container {
-      position: fixed;
-      inset: 0;
+    body {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
+    }
+
+    /* Game sits at the top of the page - not vertically centered/fullscreen anymore. */
+    #game-container {
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 426 / 243;
+      touch-action: manipulation;
     }
 
     #game-container canvas {
       image-rendering: pixelated;
+      display: block;
     }
 
-    #freeze-button {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      width: 84px;
-      height: 84px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.15);
-      border: 2px solid rgba(255, 255, 255, 0.6);
-      color: #fff;
-      font-family: monospace;
+    /* All in-game text lives here now instead of as blurry upscaled Phaser canvas text -
+       a real web font at native resolution reads far more crisply than pixel-doubled bitmap
+       text does at this canvas's small internal resolution. */
+    #message {
+      width: 100%;
+      max-width: 640px;
+      box-sizing: border-box;
+      padding: 16px 20px;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
       font-size: 12px;
-      letter-spacing: 1px;
-      z-index: 5;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #freeze-button:active {
-      background: rgba(255, 255, 255, 0.3);
+      line-height: 1.8;
+      text-align: center;
+      white-space: pre-line;
+      min-height: 2.6em; /* reserves space so the page doesn't jump between messages */
     }
   </style>
 </head>
 <body>
   <div id="game-container"></div>
-  <button id="freeze-button" type="button">FREEZE</button>
+  <div id="message"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=17"></script>
-  <script>
-    // Explicit on-screen button for mobile, in addition to spacebar and tap-anywhere-on-canvas.
-    document.getElementById("freeze-button").addEventListener("click", (e) => {
-      e.preventDefault();
-      if (window.snowyBallsFreeze) window.snowyBallsFreeze();
-    });
-  </script>
+  <script src="src/main.js?v=18"></script>
 </body>
 </html>

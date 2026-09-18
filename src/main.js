@@ -128,16 +128,6 @@ class MainScene extends Phaser.Scene {
 
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
-    this.messageText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "", {
-        fontFamily: "monospace",
-        fontSize: "11px",
-        color: "#ffffff",
-        align: "center",
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(21);
 
     this.createTargetCamera();
 
@@ -185,10 +175,19 @@ class MainScene extends Phaser.Scene {
     this.targetCam.scrollY = this.worldY(heightTo);
     this.targetCam.roundPixels = true;
 
+    // Real rounded corners on the live feed itself via a geometry mask (not just the bezel
+    // behind it faking it) - the mask graphics is never added to the display list (addToScene
+    // = false), it exists purely to supply the clip shape, redrawn from its command buffer
+    // each frame, so a reference has to be kept alive on `this` or it'd be garbage collected.
+    this.targetCamMaskShape = this.make.graphics({ x: 0, y: 0 }, false);
+    this.targetCamMaskShape.fillStyle(0xffffff);
+    this.targetCamMaskShape.fillRoundedRect(TARGET_CAM_X, TARGET_CAM_Y, viewW, viewH, TARGET_CAM_RADIUS);
+    this.targetCam.setMask(this.targetCamMaskShape.createGeometryMask());
+
     // The PIP should only show world content - it'd otherwise also try to render the
     // screen-space HUD (which is scrollFactor(0), so it'd appear squeezed into this tiny
     // viewport too) and its own bezel (drawn by the main camera, one layer behind it).
-    this.targetCam.ignore([this.aimGfx, this.messageText, bezel]);
+    this.targetCam.ignore([this.aimGfx, bezel]);
   }
 
   worldY(heightFromGround) {
@@ -324,7 +323,10 @@ class MainScene extends Phaser.Scene {
   }
 
   showMessage(msg) {
-    this.messageText.setText(msg);
+    // Text lives in HTML now (see index.html #message), not as a Phaser Text object - canvas
+    // text at this resolution renders as blurry upscaled pixels, an HTML element with a real
+    // web font doesn't.
+    document.getElementById("message").textContent = msg;
   }
 
   drawAimBar() {

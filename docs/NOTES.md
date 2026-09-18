@@ -351,3 +351,5 @@ not actual play.
 - **Display is exactly 16:9**: canvas 432x243 (was 426x243), container `aspect-ratio: 16/9`, width `min(100vw, 100dvh*16/9)` (dvh so mobile browser bars don't push it off-screen). `#game-container` and `html,body` are `overflow:hidden`, so the volume/shop buttons can never sit outside the display. Verified on a 375x812 phone viewport.
 - Snowball impact volume halved (0.6 -> 0.3).
 - `background.png` tweaked by the user (no coordinate changes).
+
+- Character/throw origin `ORIGIN_X` is now W20's center (410.5), replacing the earlier hand-nudged 420. Hit message is "HIT" then "+N coins" on its own line, then the streak line (no window name).

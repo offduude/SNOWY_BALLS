@@ -21,7 +21,7 @@ const GAME_HEIGHT = 243;
 const GRAVITY = 900; // px/s^2
 const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs to reach W21
 
-const ORIGIN_X = WORLD_WIDTH / 2 + 58 + 30 + 10 - 30; // 420 - nudged right of dead-center three times, then left once (+58, +30, +10, -30)
+const ORIGIN_X = (385 + 436) / 2; // 410.5 - centered on W20 (its xFrom/xTo; WINDOWS is defined below)
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
 const CHARACTER_Y_OFFSET = 20 - 5; // 15 - nudged down 20px, then up 5px, across separate requests (positive = down)
 const BUILDING_TOP_HEIGHT = IMG_GROUND_Y - IMG_ROOF_Y + 100; // camera/world bounds, with headroom above the roofline
@@ -377,7 +377,7 @@ class MainScene extends Phaser.Scene {
         this.startBananaEvent();
       }
 
-      const message = win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
+      const message = "HIT\n+" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
       this.showMessage(message);

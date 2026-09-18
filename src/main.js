@@ -603,10 +603,10 @@ const config = {
   pixelArt: true,
   roundPixels: true,
   backgroundColor: "#000000",
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-  },
+  // Canvas size is done in CSS: #game-container is an exact 16:9 box and the canvas fills it.
+  // Phaser's FIT measured the container once at launch, and in an iPhone home-screen app that
+  // measurement can be wrong (canvas came out ~2.3x too big, cropping the picture) - CSS can't be.
+  scale: { mode: Phaser.Scale.NONE },
   scene: [MainScene],
 };
 

@@ -66,15 +66,60 @@
       pointer-events: none; /* sits on top of the canvas - taps must still reach the game below */
       z-index: 2;
     }
+
+    /* Mute toggle, top-right of the game. Plain <img>-as-button since it's just an icon, no
+       label needed. */
+    #volume-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      z-index: 3;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #volume-btn img {
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      display: block;
+      filter: none;
+      opacity: 1;
+      transition: filter 0.15s ease, opacity 0.15s ease;
+    }
+
+    #volume-btn.muted img {
+      filter: grayscale(100%);
+      opacity: 0.45;
+    }
   </style>
 </head>
 <body>
   <div id="game-container">
     <div id="message"></div>
+    <button id="volume-btn" type="button" aria-label="Mute">
+      <img src="assets/ui/volume_icon.png" alt="" />
+    </button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=25"></script>
+  <script src="src/main.js?v=26"></script>
+  <script>
+    // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
+    // before Phaser finishes booting on a slow load.
+    document.getElementById("volume-btn").addEventListener("click", () => {
+      const game = window.snowyBallsGame;
+      if (!game) return;
+      const nowMuted = !game.sound.mute;
+      game.sound.mute = nowMuted;
+      document.getElementById("volume-btn").classList.toggle("muted", nowMuted);
+    });
+  </script>
 </body>
 </html>

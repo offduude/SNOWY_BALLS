@@ -10,12 +10,11 @@ events since only the theme's looping was explicitly requested but leaving the r
 being told to "check them out" seemed like an oversight:
 
 - `theme`: starts in `create()` via `this.sound.play("theme", { loop: true, volume: 0.5 })`.
-  `loop: true` is the actual fix for "don't run out of it" - the file itself is a real ~3:33
-  track (212.8s), not something that was ever going to fill a play session on its own.
+  `loop: true` is the actual fix for "don't run out of it" - it's a real multi-minute track,
+  not something that was ever going to fill a play session on its own.
 - `throw_whoosh`: plays in `launchBall()`, i.e. the moment a throw is released.
 - `snowball_impact`: plays in `finishThrow()` for every throw, hit or miss - matches the
   "always sticks somewhere" physics, so there's always exactly one impact per throw.
-- `coin_sound`: plays in `finishThrow()` only on an actual window hit, after `snowball_impact`.
 
 **`window_clink.mp3` added later the same day, briefly wired up to replace `snowball_impact`
 specifically on window hits, then reverted the same day** ("bring back the old sound for both
@@ -23,9 +22,50 @@ window hits and regular wall hits") - `snowball_impact` plays for every stick ag
 of outcome. The file is still loaded in `preload()` but currently unused; a natural fit if a
 window-specific sound gets asked for again later.
 
-Verified via `scene.sound.get('theme')` (`loop: true`, `isPlaying: true`, correct duration) and
-by monkey-patching `scene.sound.play` during a scripted throw to confirm the exact call order:
-`throw_whoosh` -> `snowball_impact` -> `coin_sound` for a scoring hit.
+**`coin_sound.mp3` removed entirely** (2026-09-19, later the same day, by request) - both the
+`preload()` call and the asset file itself are gone, not just the `finishThrow()` play call.
+Unlike `window_clink` above, this wasn't "revert to a prior state," it was a direct "remove the
+coin sound" - so nothing was kept around for a hypothetical later reuse.
+
+**`theme.mp3` swapped for a different track** (2026-09-19, later the same day) -
+`new_theme_music.mp3` dropped at the project root replaced `assets/audio/theme.mp3` outright
+(same filename/key, so no code changes needed beyond a `?v=2` cache-buster on the load path,
+since http.server sends no cache headers and the old bytes could otherwise stick around in a
+browser cache). New track is ~2:13 (133.4s) vs. the original's ~3:33. Still loops.
+
+Verified via `scene.sound.get('theme')` (`loop: true`, `isPlaying: true`, new duration) and by
+monkey-patching `scene.sound.play` during a scripted throw to confirm the call order:
+`throw_whoosh` -> `snowball_impact` for a stick, with nothing else added.
+
+## Mute button (2026-09-19)
+
+Top-right, HTML (`#volume-btn` in `index.html`), not Phaser - it's persistent UI chrome rather
+than gameplay content, same reasoning as moving text out to HTML earlier. Icon
+(`assets/ui/volume_icon.png`) came from a huge (2291x1343) source file that turned out to be
+almost entirely transparent padding around one real 947x1183 speaker-silhouette shape - had to
+flood-fill on **alpha**, not just near-white RGB, to find the real content (an earlier RGB-only
+pass falsely treated a huge fully-transparent region as "content" because PIL flattens
+transparent pixels to black when you `.convert('RGB')` without dropping alpha first). Cropped
+tight to that shape and downscaled to 48x59 with NEAREST resampling to preserve the blocky
+pixel-art look rather than blurring it.
+
+No separate "muted" icon variant exists in the source art, which works out fine since the user's
+spec was to grey out the button on click, not swap the icon: `.muted` CSS class drops opacity to
+0.45 and applies `grayscale(100%)`. Click handler toggles Phaser's global `game.sound.mute`
+(`window.snowyBallsGame`, exposed for exactly this - also still handy for driven tests) and
+syncs the `.muted` class to match. Verified via computed styles
+(`getComputedStyle(...).opacity`/`.filter`) that both the mute state and the visual both flip
+correctly on click, in both directions.
+
+`window.snowyBallsFreeze` (a leftover global from the FREEZE button removed earlier) was dead
+code with zero remaining references anywhere - deleted while touching this same
+`window.addEventListener("load", ...)` block.
+
+## Mobile-only from here on (2026-09-19)
+
+Keyboard control (`keydown-SPACE`) removed entirely - tap/click is the only input now. Message
+text changed from "TAP or SPACE to aim" to "TAP to aim" in both places it's set (`create()` and
+`resetForNextThrow()`).
 
 ## Page layout: HTML page, not a fullscreen canvas app (2026-09-19, revised twice same day)
 

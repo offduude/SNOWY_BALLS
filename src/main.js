@@ -89,11 +89,10 @@ class MainScene extends Phaser.Scene {
     this.load.image("background", "assets/building/background.png?v=2");
     this.load.image("snowball", "assets/snowball/snowball.png");
     this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
-    this.load.audio("theme", "assets/audio/theme.mp3");
+    this.load.audio("theme", "assets/audio/theme.mp3?v=2");
     this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
     this.load.audio("window_clink", "assets/audio/window_clink.mp3");
-    this.load.audio("coin_sound", "assets/audio/coin_sound.mp3");
   }
 
   create() {
@@ -144,10 +143,10 @@ class MainScene extends Phaser.Scene {
     // long, not actually infinite on its own.
     this.sound.play("theme", { loop: true, volume: 0.5 });
 
+    // Mobile-only from here on - no keyboard control, tap is the only input.
     this.input.on("pointerdown", () => this.handleFreezeInput());
-    this.input.keyboard.on("keydown-SPACE", () => this.handleFreezeInput());
 
-    this.showMessage("TAP or SPACE to aim");
+    this.showMessage("TAP to aim");
   }
 
   // Top-left "rear view camera": a real second Phaser camera aimed at the W20/W21 patch of the
@@ -307,7 +306,6 @@ class MainScene extends Phaser.Scene {
       coins += streakBonus;
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
-      this.sound.play("coin_sound", { volume: 0.7 });
       this.showMessage(
         win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "")
       );
@@ -330,7 +328,7 @@ class MainScene extends Phaser.Scene {
       duration: 500,
       ease: "Sine.easeInOut",
     });
-    this.showMessage("TAP or SPACE to aim");
+    this.showMessage("TAP to aim");
   }
 
   showMessage(msg) {
@@ -397,9 +395,5 @@ const config = {
 
 window.addEventListener("load", () => {
   const game = new Phaser.Game(config);
-  window.snowyBallsGame = game; // exposed for debugging/driven tests, not used by gameplay code
-  window.snowyBallsFreeze = () => {
-    const scene = game.scene.getScene("main");
-    if (scene) scene.handleFreezeInput();
-  };
+  window.snowyBallsGame = game; // used by the HTML mute button (index.html) and driven tests
 });

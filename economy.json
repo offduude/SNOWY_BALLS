@@ -22,6 +22,8 @@
 
   "shop": {
     "slots": 6,
+    "_priceOverrideNote": "PLACEHOLDER: while priceOverride is a number, EVERY item costs that many coins in the shop (so we can test buying). Set it to null to use each item's real 'price' below.",
+    "priceOverride": 1,
 
     "refill": {
       "mode": "random_from_eligible",
@@ -88,6 +90,28 @@
         "kind": "permanent",
         "effect": { "type": "markLifetimeMultiplier", "value": 1.5 },
         "description": "Marks stay on the wall 50% longer."
+      },
+      {
+        "id": "hot_cocoa",
+        "name": "Hot Cocoa",
+        "category": "buff",
+        "tier": 1,
+        "price": 35,
+        "kind": "consumable",
+        "duration": { "throws": 3 },
+        "effect": { "type": "aimSpeedMultiplier", "value": 0.8 },
+        "description": "Pointers sweep 20% slower for 3 throws."
+      },
+      {
+        "id": "snack_break",
+        "name": "Snack Break",
+        "category": "buff",
+        "tier": 1,
+        "price": 45,
+        "kind": "consumable",
+        "duration": { "throws": 4 },
+        "effect": { "type": "coinMultiplier", "value": 1.25 },
+        "description": "1.25x coins for your next 4 throws."
       },
       {
         "id": "steady_hand",

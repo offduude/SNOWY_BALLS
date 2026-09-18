@@ -5,8 +5,16 @@ Run `py tools/economy_report.py` after editing - it prints a balance table (how 
 each item costs) and catches mistakes (missing fields, duplicate ids, a starter pool too small for
 the shop).
 
-**What the game reads today:** `rewards` and `events`. **What it doesn't read yet:** `shop` - that
-is the design for the shop screen we build next. All shop items are placeholder test data.
+**What the game reads today:** `rewards`, `events` and `shop` (the shop screen is built - 6 items
+pinned on the cork board, tap to buy). **Not applied yet:** item `effect`s - buying spends coins and
+records the purchase, but nothing changes in gameplay yet. All shop items are placeholder test data.
+
+**Placeholder pricing:** `shop.priceOverride` is `1`, so every item costs 1 coin while we test
+buying. Set it to `null` and each item's own `price` is used again.
+
+**What's saved (localStorage `snowyBallsSave`):** coins, lifetime coins earned, best streak, the
+shop's *current stock* (so leaving and re-entering can't reroll it), owned permanent items, and
+consumable counts. Item `id`s are stored in saves, so never rename one once players own it.
 
 If `economy.json` has a JSON syntax error (a missing comma is the usual one) the game stops at
 start with "economy.json failed to load or has a JSON syntax error".
@@ -30,7 +38,7 @@ start with "economy.json failed to load or has a JSON syntax error".
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceBonusCoins` | extra coins for hitting the face, on top of the normal hit reward |
 
-## shop (design - not read by the game yet)
+## shop
 
 The shop always shows `slots` items. Buying one replaces it with another one from the pool.
 
@@ -80,6 +88,8 @@ up before the player could plausibly have earned toward them.
 - Multiplier effects stack, so keep `coinMultiplier` values modest or a few purchases make the
   prices meaningless. Effects that make the *game itself* easier (`aimSpeedMultiplier`,
   `hitPaddingPx`) compound with that - watch total hit rate, not just coin rate.
-- Because bought permanent items leave the pool, the starter pool must stay larger than `slots`
-  (the checker enforces `slots + 2`). Consumables stay in the pool - they're the shop's
-  never-ending sink.
+- Bought permanent items leave the pool, so the starter tier can run dry: if it does, slots show
+  SOLD OUT until the next tier unlocks. `tools/economy_report.py` simulates this (a player spending
+  everything they earn before tier 2 on the cheapest permanents) and fails if that would leave fewer
+  items than slots. Consumables never leave the pool, so they are the fix - the starter pool needs
+  plenty of them.

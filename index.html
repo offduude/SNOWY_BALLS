@@ -126,6 +126,128 @@
       pointer-events: auto; /* swallows taps so they can't reach the game underneath */
     }
 
+    /* --u = 1% of the display width, so shop text scales with the game on any screen. */
+    #game-container {
+      --u: calc(min(100vw, 100vh * 16 / 9) / 100);
+      --u: calc(min(100vw, 100dvh * 16 / 9) / 100);
+    }
+
+    /* Items pinned on the cork part of shop_board.png (cork is ~9%-91% across, ~9%-90% down). */
+    #shop-items {
+      position: absolute;
+      left: 9%;
+      top: 9%;
+      width: 82%;
+      height: 81%;
+      box-sizing: border-box;
+      padding: calc(var(--u) * 1.2);
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--u) * 1.6);
+      font-family: "Press Start 2P", monospace;
+      color: #3b2412;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      will-change: opacity;
+      z-index: 3;
+    }
+
+    #game-container.shop-open #shop-items {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .shop-head {
+      font-size: calc(var(--u) * 1.7);
+      text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    .shop-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: calc(var(--u) * 2.4) calc(var(--u) * 2);
+      min-height: 0;
+    }
+
+    .shop-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-start;
+      min-width: 0;
+      min-height: 0;
+      padding: calc(var(--u) * 1.4) calc(var(--u) * 1.2) calc(var(--u) * 1);
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35);
+      color: #3b2412;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.08s ease, opacity 0.2s ease;
+    }
+
+    /* the pin */
+    .shop-card::before {
+      content: "";
+      position: absolute;
+      top: calc(var(--u) * -0.9);
+      left: 50%;
+      width: calc(var(--u) * 1.4);
+      height: calc(var(--u) * 1.4);
+      transform: translateX(-50%);
+      background: #c0392b;
+      border-radius: 50%;
+      box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.4);
+    }
+
+    .shop-card:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+    .shop-card.empty { opacity: 0.55; cursor: default; justify-content: center; }
+    .shop-card.cant { opacity: 0.7; }
+    .shop-card.cant .shop-price { color: #a3261c; }
+    .shop-card.bought { opacity: 0; transform: scale(0.9); }
+    .shop-card.shake { animation: shop-shake 0.3s linear; }
+
+    @keyframes shop-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(calc(var(--u) * -0.6)); }
+      75% { transform: translateX(calc(var(--u) * 0.6)); }
+    }
+
+    .shop-cat {
+      font-size: calc(var(--u) * 0.95);
+      color: #8a6a44;
+      letter-spacing: 0.05em;
+    }
+
+    .shop-name {
+      font-size: calc(var(--u) * 1.5);
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .shop-price {
+      display: flex;
+      align-items: center;
+      gap: calc(var(--u) * 0.7);
+      font-size: calc(var(--u) * 1.8);
+    }
+
+    .shop-price .coin {
+      display: inline-block;
+      width: calc(var(--u) * 1.6);
+      height: calc(var(--u) * 1.6);
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
+
     /* One button, label swaps SHOP <-> BACK, so position and size are identical by construction. */
     #shop-btn {
       position: absolute;
@@ -154,6 +276,7 @@
   <div id="game-container">
     <div id="message"></div>
     <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
+    <div id="shop-items"></div>
     <button id="shop-btn" type="button">SHOP</button>
     <button id="volume-btn" type="button" aria-label="Mute">
       <img src="assets/ui/volume_icon.png" alt="" />
@@ -161,8 +284,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=41"></script>
+  <script src="src/economy.js?v=2"></script>
+  <script src="src/shop.js?v=2"></script>
+  <script src="src/main.js?v=43"></script>
   <script>
     // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
     // before Phaser finishes booting on a slow load.
@@ -182,6 +306,7 @@
       const container = document.getElementById("game-container");
       const open = container.classList.toggle("shop-open");
       document.getElementById("shop-btn").textContent = open ? "BACK" : "SHOP";
+      if (open && typeof Shop !== "undefined") Shop.onOpen();
     });
   </script>
 </body>

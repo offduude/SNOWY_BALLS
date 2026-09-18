@@ -44,14 +44,27 @@ def check(eco):
             problems.append(f"{it.get('id')}: tier {it.get('tier')} has no entry in tierUnlocks")
         if it.get("kind") == "consumable" and "duration" not in it:
             problems.append(f"{it.get('id')}: consumable needs a 'duration'")
-    # Day one only the tiers unlocked at 0 coins can appear, and permanent items leave the pool once
-    # bought - so that starting pool must comfortably outnumber the slots or the shop shows gaps.
+    # Before the next tier unlocks, the player can only buy from the starter tiers, and every
+    # permanent item they buy leaves the pool. Worst case: they spend everything they earn on the
+    # cheapest permanents. If the leftover pool can't fill every slot, the shop shows SOLD OUT
+    # slots for a long stretch of early game - exactly when it matters most.
     starter = [i for i in shop["items"] if shop["tierUnlocks"].get(str(i["tier"])) == 0]
-    if len(starter) < shop["slots"] + 2:
-        problems.append(
-            f"only {len(starter)} items are available from the start but the shop has {shop['slots']} slots "
-            f"- want at least {shop['slots'] + 2} so buying a few permanent items doesn't leave empty slots"
-        )
+    later = sorted(v for v in shop["tierUnlocks"].values() if v > 0)
+    if later:
+        budget = later[0]  # lifetime coins earned by the time the next tier appears
+        spent, bought = 0, 0
+        for it in sorted((i for i in starter if i["kind"] == "permanent"), key=lambda i: i["price"]):
+            if spent + it["price"] > budget:
+                break
+            spent += it["price"]
+            bought += 1
+        left = len(starter) - bought
+        if left < shop["slots"]:
+            problems.append(
+                f"early-game shop runs dry: {len(starter)} starter items, but a player can buy {bought} "
+                f"permanent ones with the {budget} coins they earn before tier 2 - leaving {left} for "
+                f"{shop['slots']} slots. Add more starter items (consumables never leave the pool)."
+            )
     if len(shop["items"]) < shop["slots"] * 2:
         problems.append(f"only {len(shop['items'])} items for {shop['slots']} slots - the shop will run dry fast")
     return problems

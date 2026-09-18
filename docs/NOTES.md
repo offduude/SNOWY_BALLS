@@ -23,29 +23,42 @@ Reference doc for values decided by trial-and-error, so we don't have to redisco
 
 ## Canvas / camera
 
-- `GAME_WIDTH = 704` - matches background.png exactly, no upscale/downscale blur.
-- `GAME_HEIGHT = 420` - a landscape-ish viewport chosen so the camera has real headroom to
-  scroll as the ball climbs (a portrait viewport nearly as tall as the 1000px asset would leave
-  almost nothing to scroll through). Easy to revisit once more art exists.
-- `ORIGIN_X = 352` (GAME_WIDTH/2) - dead center between the two entrance doors, matches the
-  art's own symmetry.
+- `WORLD_WIDTH = 704` - background.png's own width; the image and all world-space x
+  coordinates (windows, ORIGIN_X) are relative to this, independent of canvas size.
+- `GAME_WIDTH = 426` / `GAME_HEIGHT = 243` - canvas resolution IS the resting camera framing,
+  sized to match a reference crop the user marked directly on the art (right entrance door +
+  ground). See the camera-bounds/zoom gotcha below for why this is done via canvas size
+  instead of `camera.zoom`.
+- `ORIGIN_X = 410` (WORLD_WIDTH/2 + 58) - nudged 58px right of dead-center per user request
+  (2026-09-18); this moves the character, the ball's launch point, and ends up landing almost
+  exactly under W20.
+
+## Physics: snowball sticks at apex (redesigned 2026-09-18)
+
+The snowball no longer falls back down or gets checked frame-by-frame along its whole arc -
+it flies up along the usual parabola and **sticks to the wall exactly at the top of its arc**
+(apex), full stop. A throw only counts as a hit if that one point (apex height + horizontal
+drift at that instant) lands inside W20, W21, or the bonus head zone; everything else is a
+miss, no matter how close the ball's path came to a window on the way up. `launchBall()`
+computes `apexTime = ballVY0 / GRAVITY` up front; `updateFlight()` clamps `t` to `apexTime`
+once reached, and resolves the hit/miss check only at that point (see `updateFlight` in
+src/main.js). This also retired the old "possible tunneling through a thin target" caveat
+that applied to continuous per-frame collision checking - there's no continuous check anymore,
+just one point-in-box test at apex.
 
 ## Physics constants (tune here first before touching game logic)
 
 - `GRAVITY = 900`
 - `MAX_SWING_SPEED = 180` - had to raise this from an earlier placeholder (110) because W21
-  sits far enough right of center that a weaker max drift couldn't physically reach it in the
-  time it takes to reach apex height.
+  sits far enough right of center that a weaker max drift couldn't physically reach it by the
+  time the ball reaches apex height.
 - `MIN_POWER_SPEED = 300` / `MAX_POWER_SPEED = 1150` - max apex is ~735 world px, just above
-  the roofline (643), so a full-power throw can sail over the building (intentional miss
-  condition) but can't wildly overshoot into undefined space.
+  the roofline (643), so a full-power throw sticks near the roof (an intentional miss/edge
+  case) rather than overshooting into undefined space.
 - `ANGLE_HZ = 0.85`, `POWER_HZ = 0.65` (aim pointer sweep speed, cycles/sec)
-- Both W20 and W21's required power sits close to the arc's apex (very narrow vertical
-  velocity there), which is a deliberate side effect worth keeping in mind for future windows
-  placed lower on the building - those would need continuous (sub-frame) collision checks
-  instead of the current per-frame AABB test, since a fast-moving ball could tunnel through a
-  thin target between two rendered frames. Not an issue yet because both real targets sit near
-  max reachable height.
+- W20/W21's required power (to make their apex land in the window band) is `vy0` in roughly
+  [786, 835] out of the full [300, 1150] range - a real but learnable precision window, not a
+  hair's-width one.
 
 ## Known TODO / not-yet-real
 
@@ -74,6 +87,10 @@ Reference doc for values decided by trial-and-error, so we don't have to redisco
   with (not replacing) the flat head-hit bonus.
 - Head bonus hitbox sits directly above W20 only (not W21), `HEAD_CHANCE = 0.3` per throw,
   `HEAD_BONUS_COINS = 8` added on top of W20's base coins.
+- background.png's ground-detail update (textured sidewalk, 2026-09-18) was reverted the same
+  day at the user's request - back to the flat-gray sidewalk version. Windows/doors/ground-roof
+  lines were identical between the two versions either way (confirmed via pixel diff), so this
+  is a pure art choice with no gameplay-constant impact if it comes back later.
 
 ## Phaser camera-bounds gotcha (2026-09-18)
 

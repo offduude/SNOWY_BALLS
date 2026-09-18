@@ -159,6 +159,7 @@ class MainScene extends Phaser.Scene {
     this.ballVX = swing * MAX_SWING_SPEED;
     this.ballVY0 = MIN_POWER_SPEED + this.powerValue * (MAX_POWER_SPEED - MIN_POWER_SPEED);
     this.ballStartX = ORIGIN_X;
+    this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     this.cameraFollowing = true;
   }
 
@@ -176,7 +177,9 @@ class MainScene extends Phaser.Scene {
 
   updateFlight(dt) {
     this.flightTime += dt;
-    const t = this.flightTime;
+    const reachedApex = this.flightTime >= this.apexTime;
+    const t = reachedApex ? this.apexTime : this.flightTime;
+
     const x = this.ballStartX + this.ballVX * t;
     const heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
     const y = this.worldY(heightClimbed);
@@ -187,34 +190,26 @@ class MainScene extends Phaser.Scene {
       this.cameras.main.scrollY = Phaser.Math.Linear(this.cameras.main.scrollY, targetScrollY, 0.12);
     }
 
+    if (!reachedApex) return;
+
+    // The snowball always sticks to the wall at the top of its arc - a hit only counts if
+    // that exact point lands inside W20/W21 (or the bonus head zone above W20).
     if (this.headPresent) {
       const hb = this.getHeadBounds();
-      if (
-        x >= hb.xFrom &&
-        x <= hb.xTo &&
-        heightClimbed >= hb.heightFrom &&
-        heightClimbed <= hb.heightTo
-      ) {
+      if (x >= hb.xFrom && x <= hb.xTo && heightClimbed >= hb.heightFrom && heightClimbed <= hb.heightTo) {
         this.finishThrow(true, WINDOWS[0], HEAD_BONUS_COINS);
         return;
       }
     }
 
     for (const win of WINDOWS) {
-      if (
-        x >= win.xFrom &&
-        x <= win.xTo &&
-        heightClimbed >= win.heightFrom &&
-        heightClimbed <= win.heightTo
-      ) {
+      if (x >= win.xFrom && x <= win.xTo && heightClimbed >= win.heightFrom && heightClimbed <= win.heightTo) {
         this.finishThrow(true, win, 0);
         return;
       }
     }
 
-    if (heightClimbed < 0 && t > 0.2) {
-      this.finishThrow(false, null, 0);
-    }
+    this.finishThrow(false, null, 0);
   }
 
   finishThrow(hit, win, headBonus) {

@@ -59,7 +59,7 @@ const TARGET_CAM_Y = 6;
 const TARGET_CAM_MARGIN_X = 8; // world px of breathing room left/right of the windows
 const TARGET_CAM_MARGIN_Y = 8; // world px of breathing room above/below the windows
 const TARGET_CAM_RADIUS = 8; // corner radius of the decorative bezel behind it
-const TARGET_CAM_BEZEL_PAD = 3; // how far the bezel extends past the camera rect on each side
+const TARGET_CAM_BEZEL_PAD = 0; // bezel matches the camera rect exactly - no visible gap/ring around the live feed
 
 // W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
 // "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).

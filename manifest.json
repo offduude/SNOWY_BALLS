@@ -1,0 +1,10 @@
+{
+  "name": "SNOWY BALLS",
+  "short_name": "SNOWY BALLS",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#14192a",
+  "theme_color": "#2b3a55",
+  "orientation": "portrait",
+  "icons": []
+}

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>SNOWY BALLS</title>
+  <meta name="theme-color" content="#2b3a55" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SNOWY BALLS" />
+  <link rel="manifest" href="manifest.json" />
+  <!-- TODO: real icons from the assets/ui texture pass - see docs/NOTES.md -->
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #14192a;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #game-container {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #game-container canvas {
+      image-rendering: pixelated;
+    }
+
+    #freeze-button {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      color: #fff;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      z-index: 5;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #freeze-button:active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+  <button id="freeze-button" type="button">FREEZE</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="src/economy.js?v=1"></script>
+  <script src="src/main.js?v=1"></script>
+  <script>
+    // Explicit on-screen button for mobile, in addition to spacebar and tap-anywhere-on-canvas.
+    document.getElementById("freeze-button").addEventListener("click", (e) => {
+      e.preventDefault();
+      if (window.snowyBallsFreeze) window.snowyBallsFreeze();
+    });
+  </script>
+</body>
+</html>

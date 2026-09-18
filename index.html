@@ -79,7 +79,7 @@
       border: none;
       background: transparent;
       cursor: pointer;
-      z-index: 3;
+      z-index: 5; /* above the shop board (3) so mute stays usable in the shop */
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -97,11 +97,56 @@
       filter: grayscale(100%);
       opacity: 0.45;
     }
+
+    /* Shop screen: shop_board.png stretched over the whole game display (canvas + message),
+       faded in/out. Sits under the volume button (z 5) and the SHOP/BACK button (z 4). */
+    #shop-board {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      image-rendering: pixelated;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 3;
+    }
+
+    #game-container.shop-open #shop-board {
+      opacity: 1;
+      pointer-events: auto; /* swallows taps so they can't reach the game underneath */
+    }
+
+    /* One button, label swaps SHOP <-> BACK, so position and size are identical by construction. */
+    #shop-btn {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      width: 84px;
+      height: 32px;
+      padding: 0;
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 10px;
+      cursor: pointer;
+      z-index: 4;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #shop-btn:active {
+      background: #74491f;
+    }
   </style>
 </head>
 <body>
   <div id="game-container">
     <div id="message"></div>
+    <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
+    <button id="shop-btn" type="button">SHOP</button>
     <button id="volume-btn" type="button" aria-label="Mute">
       <img src="assets/ui/volume_icon.png" alt="" />
     </button>
@@ -109,7 +154,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=1"></script>
-  <script src="src/main.js?v=26"></script>
+  <script src="src/main.js?v=28"></script>
   <script>
     // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
     // before Phaser finishes booting on a slow load.
@@ -119,6 +164,16 @@
       const nowMuted = !game.sound.mute;
       game.sound.mute = nowMuted;
       document.getElementById("volume-btn").classList.toggle("muted", nowMuted);
+    });
+
+    // SHOP <-> BACK: same button, label swaps. Click sound goes through Phaser so the mute
+    // button and master volume apply to it too.
+    document.getElementById("shop-btn").addEventListener("click", () => {
+      const game = window.snowyBallsGame;
+      if (game) game.sound.play("click", { volume: 0.8 });
+      const container = document.getElementById("game-container");
+      const open = container.classList.toggle("shop-open");
+      document.getElementById("shop-btn").textContent = open ? "BACK" : "SHOP";
     });
   </script>
 </body>

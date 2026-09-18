@@ -67,6 +67,39 @@ const WINDOWS = [
   { name: "W20", xFrom: 385, xTo: 436, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 6 },
   { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273, coins: 3 },
 ];
+
+// "Banana window" streak bonus (2026-09-19). goal_window_banana.png is a draft PSD export
+// (58x50 native) - a full replacement for W20's double-pane art where the left pane shows a
+// person peeking out and the right pane matches the original plain curtain. It gets scaled to
+// exactly fill W20's own box (51x43) so it seamlessly replaces the window in place. The face
+// hitbox and the "left section" divider below were both found by flood-filling the raw texture
+// for non-curtain/non-border pixels (see docs/NOTES.md) - not hand-guessed.
+const W20 = WINDOWS[0];
+const BANANA_RAW_W = 58;
+const BANANA_RAW_H = 50;
+const BANANA_SCALE_X = (W20.xTo - W20.xFrom) / BANANA_RAW_W;
+const BANANA_SCALE_Y = (W20.heightTo - W20.heightFrom) / BANANA_RAW_H;
+const BANANA_RAW_FACE = { xFrom: 3, xTo: 19, yFrom: 30, yTo: 46 }; // raw-texture pixels
+const BANANA_RAW_LEFT_DIVIDER_X = 22; // raw-texture pixels - where the left pane ends
+
+// Face hitbox in world space, scaled from the raw texture onto W20's actual box. Raw image-y
+// grows downward same as background.png, so it inverts against heightClimbed the same way
+// (see IMG_GROUND_Y comment above) - here relative to W20's own top edge (heightTo) instead.
+const BANANA_FACE_BOX = {
+  xFrom: W20.xFrom + BANANA_RAW_FACE.xFrom * BANANA_SCALE_X,
+  xTo: W20.xFrom + BANANA_RAW_FACE.xTo * BANANA_SCALE_X,
+  heightFrom: W20.heightTo - BANANA_RAW_FACE.yTo * BANANA_SCALE_Y,
+  heightTo: W20.heightTo - BANANA_RAW_FACE.yFrom * BANANA_SCALE_Y,
+};
+const BANANA_LEFT_SECTION_XTO = W20.xFrom + BANANA_RAW_LEFT_DIVIDER_X * BANANA_SCALE_X;
+
+const BANANA_STREAK_TRIGGER = 3;
+const BANANA_DURATION_MS = 20000; // how long the banana texture stays before fading back
+const BANANA_HIT_REVERT_MS = 1000; // how long the _hit texture stays before fading back
+const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
+const BANANA_BONUS_COINS = 10;
+const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
+
 const STATE = {
   IDLE: "idle",
   AIM_ANGLE: "aim_angle",
@@ -89,10 +122,16 @@ class MainScene extends Phaser.Scene {
     this.load.image("background", "assets/building/background.png?v=2");
     this.load.image("snowball", "assets/snowball/snowball.png");
     this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
+    this.load.image("goal_window_banana", "assets/building/goal_window_banana.png");
+    // Doesn't exist yet (2026-09-19) - a missing file just 404s and Phaser skips it, so
+    // this.textures.exists("goal_window_banana_hit") reads false later and triggerBananaHit()
+    // falls back to a tint flash on the same texture. Drop the real PNG in once it's ready.
+    this.load.image("goal_window_banana_hit", "assets/building/goal_window_banana_hit.png");
     this.load.audio("theme", "assets/audio/theme.mp3?v=2");
     this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
     this.load.audio("window_clink", "assets/audio/window_clink.mp3");
+    this.load.audio("click", "assets/audio/click.mp3");
   }
 
   create() {
@@ -124,6 +163,17 @@ class MainScene extends Phaser.Scene {
     this.drawCharacter();
 
     this.marks = []; // stuck-snowball sprites; each one schedules its own fade-out in addMark()
+
+    // Sits over W20, invisible until the banana streak bonus triggers - see startBananaEvent().
+    this.bananaOverlay = this.add
+      .image(W20.xFrom, this.worldY(W20.heightTo), "goal_window_banana")
+      .setOrigin(0, 0);
+    this.bananaOverlay.setDisplaySize(W20.xTo - W20.xFrom, W20.heightTo - W20.heightFrom);
+    this.bananaOverlay.setDepth(1); // above the building, below marks/ball
+    this.bananaOverlay.setAlpha(0);
+    this.bananaOverlay.setVisible(false);
+    this.bananaActive = false;
+    this.bananaHitTriggered = false;
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
     this.ball.setDisplaySize(16, 16);
@@ -262,12 +312,20 @@ class MainScene extends Phaser.Scene {
     // that exact point lands inside W20 or W21.
     for (const win of WINDOWS) {
       if (x >= win.xFrom && x <= win.xTo && heightClimbed >= win.heightFrom && heightClimbed <= win.heightTo) {
-        this.finishThrow(true, win, x, heightClimbed);
+        const faceHit =
+          this.bananaActive &&
+          !this.bananaHitTriggered &&
+          win === W20 &&
+          x >= BANANA_FACE_BOX.xFrom &&
+          x <= BANANA_FACE_BOX.xTo &&
+          heightClimbed >= BANANA_FACE_BOX.heightFrom &&
+          heightClimbed <= BANANA_FACE_BOX.heightTo;
+        this.finishThrow(true, win, x, heightClimbed, faceHit);
         return;
       }
     }
 
-    this.finishThrow(false, null, x, heightClimbed);
+    this.finishThrow(false, null, x, heightClimbed, false);
   }
 
   addMark(x, heightClimbed) {
@@ -278,25 +336,33 @@ class MainScene extends Phaser.Scene {
 
     // Starts fading MARK_LIFETIME_MS after it's placed, regardless of what the camera's doing -
     // a smooth fade doesn't have the "vanished while I was looking" problem a hard cull did.
-    this.time.delayedCall(MARK_LIFETIME_MS, () => {
-      this.tweens.add({
-        targets: mark,
-        alpha: 0,
-        duration: MARK_FADE_MS,
-        onComplete: () => {
-          mark.destroy();
-          const idx = this.marks.indexOf(mark);
-          if (idx !== -1) this.marks.splice(idx, 1);
-        },
-      });
+    // Kept on the mark itself (not just a local var) so an early trigger (banana event start,
+    // a face hit) can cancel this normal-lifetime timer before it fires.
+    mark.fadeTimer = this.time.delayedCall(MARK_LIFETIME_MS, () => this.fadeAndRemoveMark(mark, MARK_FADE_MS));
+    return mark;
+  }
+
+  // Tweens a mark's alpha to 0 over `duration`, then destroys it and drops it from this.marks.
+  // Shared by the normal 10s lifetime fade and the two "quickly fade out" banana-event cases.
+  fadeAndRemoveMark(mark, duration) {
+    if (!mark.active) return; // already mid-fade or destroyed
+    this.tweens.add({
+      targets: mark,
+      alpha: 0,
+      duration,
+      onComplete: () => {
+        mark.destroy();
+        const idx = this.marks.indexOf(mark);
+        if (idx !== -1) this.marks.splice(idx, 1);
+      },
     });
   }
 
-  finishThrow(hit, win, stickX, stickHeight) {
+  finishThrow(hit, win, stickX, stickHeight, faceHit) {
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
     this.ball.setVisible(false); // the mark now represents where it stuck
-    this.addMark(stickX, stickHeight);
+    const mark = this.addMark(stickX, stickHeight);
     this.sound.play("snowball_impact", { volume: 0.6 });
 
     if (hit) {
@@ -304,11 +370,21 @@ class MainScene extends Phaser.Scene {
       let coins = win.coins;
       const streakBonus = Math.floor(coins * 0.15 * (this.streak - 1));
       coins += streakBonus;
+
+      let message = win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
+
+      if (faceHit) {
+        this.bananaHitTriggered = true;
+        coins += BANANA_BONUS_COINS;
+        this.triggerBananaHit(mark);
+        message = "BANANA BONUS! +" + coins + " coins";
+      } else if (this.streak === BANANA_STREAK_TRIGGER && !this.bananaActive) {
+        this.startBananaEvent();
+      }
+
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
-      this.showMessage(
-        win.name + " HIT! +" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "")
-      );
+      this.showMessage(message);
     } else {
       this.streak = 0;
       this.showMessage("MISS\nstreak reset");
@@ -316,6 +392,78 @@ class MainScene extends Phaser.Scene {
 
     this.time.delayedCall(1400, () => {
       if (this.state === STATE.RESULT) this.resetForNextThrow();
+    });
+  }
+
+  // Streak-3 bonus: swaps W20's texture to the banana art for BANANA_DURATION_MS, then fades
+  // back on its own. Any existing marks on W20's left section fade out quickly first, so they
+  // don't look like they're stuck to a texture that's about to change out from under them.
+  startBananaEvent() {
+    this.bananaActive = true;
+    this.bananaHitTriggered = false;
+
+    for (const mark of this.marks.slice()) {
+      const heightClimbed = -mark.y;
+      if (
+        mark.x >= W20.xFrom &&
+        mark.x <= BANANA_LEFT_SECTION_XTO &&
+        heightClimbed >= W20.heightFrom &&
+        heightClimbed <= W20.heightTo
+      ) {
+        if (mark.fadeTimer) mark.fadeTimer.remove();
+        this.fadeAndRemoveMark(mark, MARK_QUICK_FADE_MS);
+      }
+    }
+
+    this.bananaOverlay.setTexture("goal_window_banana");
+    this.bananaOverlay.clearTint();
+    this.bananaOverlay.setVisible(true);
+    this.tweens.add({ targets: this.bananaOverlay, alpha: 1, duration: BANANA_FADE_MS });
+
+    this.bananaEndTimer = this.time.delayedCall(BANANA_DURATION_MS, () => this.endBananaEvent());
+  }
+
+  // Normal 20s expiry - fades the banana texture back to nothing (the real W20 art underneath
+  // was never actually touched, this overlay just sits on top of it).
+  endBananaEvent() {
+    this.bananaActive = false;
+    this.tweens.add({
+      targets: this.bananaOverlay,
+      alpha: 0,
+      duration: BANANA_FADE_MS,
+      onComplete: () => this.bananaOverlay.setVisible(false),
+    });
+  }
+
+  // Hitting the face: cancels the pending 20s revert, quickly swaps to the _hit texture (a tint
+  // flash on the same art if goal_window_banana_hit.png hasn't been exported yet - see
+  // preload()), then after BANANA_HIT_REVERT_MS fades both the texture and the mark that
+  // triggered it back to nothing together.
+  triggerBananaHit(mark) {
+    if (this.bananaEndTimer) this.bananaEndTimer.remove();
+    if (mark.fadeTimer) mark.fadeTimer.remove();
+
+    const hasHitArt = this.textures.exists("goal_window_banana_hit");
+    this.bananaOverlay.setTexture(hasHitArt ? "goal_window_banana_hit" : "goal_window_banana");
+    if (!hasHitArt) this.bananaOverlay.setTint(0xfff3b0);
+    this.bananaOverlay.setAlpha(1);
+
+    this.time.delayedCall(BANANA_HIT_REVERT_MS, () => {
+      this.tweens.add({
+        targets: [this.bananaOverlay, mark],
+        alpha: 0,
+        duration: BANANA_FADE_MS,
+        onComplete: () => {
+          this.bananaOverlay.clearTint();
+          this.bananaOverlay.setVisible(false);
+          this.bananaActive = false;
+          if (mark.active) {
+            mark.destroy();
+            const idx = this.marks.indexOf(mark);
+            if (idx !== -1) this.marks.splice(idx, 1);
+          }
+        },
+      });
     });
   }
 

@@ -37,6 +37,27 @@ Verified via `scene.sound.get('theme')` (`loop: true`, `isPlaying: true`, new du
 monkey-patching `scene.sound.play` during a scripted throw to confirm the call order:
 `throw_whoosh` -> `snowball_impact` for a stick, with nothing else added.
 
+## Shop screen shell (2026-09-19)
+
+`#shop-btn` (bottom-right, brown `#8b5a2b`, white Press Start 2P) toggles `.shop-open` on
+`#game-container`, which fades `#shop-board` (`assets/ui/shop_board.png`, 160x90, stretched over
+the whole game display) in over 0.25s. Board is z 3, SHOP/BACK button z 4, mute button z 5, so
+mute stays usable in the shop. One button whose label swaps SHOP <-> BACK, so BACK is in the
+identical position/size by construction (verified: identical bounding rect in both states).
+While open the board has `pointer-events:auto`, so taps can't reach the canvas (verified game
+state unchanged). Click sound (`assets/audio/click.mp3`) goes through Phaser (`sound.play("click")`)
+so mute and master volume apply. Shop board is empty - items to buy come later.
+
+## Banana window streak bonus (2026-09-19, built, only partly verified)
+
+Streak of exactly 3 fades `goal_window_banana.png` (draft PSD export, scaled onto W20) over W20
+for 20s; hitting the face box during that (+10 coins on top of normal reward) swaps to the hit
+texture (tint-flash placeholder - `goal_window_banana_hit.png` didn't exist when built; new
+`goal_window_face*.png` files have since appeared at the project root, not yet wired in), then
+fades back after 1s together with the mark that hit it. Existing marks on W20's left pane fade
+out quickly when the banana texture loads. Streak-3 trigger confirmed live (overlay activates);
+the face-hit path and 20s expiry haven't been driven end-to-end yet.
+
 ## Mute button (2026-09-19)
 
 Top-right, HTML (`#volume-btn` in `index.html`), not Phaser - it's persistent UI chrome rather

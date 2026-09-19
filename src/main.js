@@ -211,6 +211,12 @@ const PROJECTILE_VISUALS = {
     impactSound: "chestnut_impact",
     impactVolume: 0.5,
   },
+  rowan_berry: {
+    ball: "rowan_berry",
+    sprites: { idle: "char_idle_rowan_berry", aiming: "char_aiming_rowan_berry", throwing: "char_throwing" },
+    impactSound: "chestnut_impact", // sounds and behaviour like the chestnut
+    impactVolume: 0.5,
+  },
   stone: {
     ball: "stone",
     sprites: { idle: "char_idle_stone", aiming: "char_aiming_stone", throwing: "char_throwing" },
@@ -275,11 +281,14 @@ class MainScene extends Phaser.Scene {
     this.load.image("goal_window_face_hit", "assets/building/goal_window_face_hit.png");
     this.load.image("char_idle", "assets/character/character1_idle.png?v=2"); // empty-handed: no snowballs left
     this.load.image("char_idle_snowball", "assets/character/character1_idle_snowball.png"); // a snowball in hand
-    this.load.image("char_aiming", "assets/character/character1_aiming.png");
+    this.load.image("char_aiming", "assets/character/character1_aiming.png?v=2");
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
     this.load.image("stone", "assets/snowball/stone.png");
+    this.load.image("rowan_berry", "assets/snowball/rowan_berry.png");
+    this.load.image("char_idle_rowan_berry", "assets/character/character1_idle_rowan_berry.png");
+    this.load.image("char_aiming_rowan_berry", "assets/character/character1_aiming_rowan_berry.png");
     this.load.image("char_idle_stone", "assets/character/character1_idle_stone.png");
     this.load.image("char_aiming_stone", "assets/character/character1_aiming_stone.png");
     this.load.image("char_idle_pinecone", "assets/character/character1_idle_pinecone.png");

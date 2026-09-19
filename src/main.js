@@ -100,6 +100,10 @@ const W20 = WINDOWS[0];
 // two lines (see drawAimBar). It depends on the window and the physics only, not on the projectile.
 const W20_SWING_GUARANTEE =
   Math.min(ORIGIN_X - W20.xFrom, W20.xTo - ORIGIN_X) / (MAX_SWING_SPEED * Math.sqrt((2 * W20.heightTo) / GRAVITY));
+const AIM_COLOR_ANGLE = 0x6fb1ff; // the offset marker - and the "OFFSET" label above the bar
+const AIM_COLOR_POWER = 0xff6f6f; // the strength marker - and the "STRENGTH" label
+const AIM_COLOR_ANGLE_CSS = "#6fb1ff";
+const AIM_COLOR_POWER_CSS = "#ff6f6f";
 const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's dot on the aim bars
 const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit range, so a marker on the dot always hits)
 const AIM_TICK_STEP = 0.1; // graduation lines on both aim bars every 10% (offset: of the full swing, from the center out)
@@ -229,6 +233,7 @@ class MainScene extends Phaser.Scene {
     this.bananaOverlay.setVisible(false);
     this.bananaActive = false;
     this.bananaHitTriggered = false;
+    this.activeEvent = null; // name of the running random event, or null - at most ONE runs at a time (see startEvent)
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
     this.ball.setDisplaySize(16, 16);
@@ -709,7 +714,7 @@ class MainScene extends Phaser.Scene {
 
       if (faceHit) {
         this.bananaHitTriggered = true;
-        coins += this.eco.events.faceWindow.faceBonusCoins;
+        coins *= this.eco.events.faceWindow.faceMultiplier; // hitting the face multiplies this throw's coins (x40)
         this.triggerBananaHit(mark);
       }
 
@@ -741,20 +746,45 @@ class MainScene extends Phaser.Scene {
   // True while any timed event is running. Only the face window exists so far - add every new event
   // here, so two events never overlap.
   isEventActive() {
-    return this.bananaActive;
+    return this.activeEvent !== null;
+  }
+
+  // Every random event is listed here: its name, its chance after a throw, and how it starts. To add an event, add
+  // it here and make it set `this.activeEvent = name` when it starts and `null` when it ends - the rule that only
+  // one event can run at a time is enforced in startEvent(), so a new event can't overlap the others.
+  eventDefs() {
+    return [{ name: "face", chance: this.eco.events.faceWindow.chancePerThrow, start: () => this.startBananaEvent() }];
+  }
+
+  // The single way to start an event by name. Refuses (returns false) while another event is running.
+  startEvent(name) {
+    if (this.isEventActive()) return false;
+    const def = this.eventDefs().find((d) => d.name === name);
+    if (!def) return false;
+    def.start();
+    return this.activeEvent === name;
   }
 
   // After every throw (hit, miss or escape) roll for a random event - but never while one is running.
   // Chance per event is in economy.json (events.faceWindow.chancePerThrow, 0.01 = 1%).
   maybeStartRandomEvent() {
     if (this.isEventActive()) return;
-    if (Math.random() < this.eco.events.faceWindow.chancePerThrow) this.startBananaEvent();
+    // One roll per event, in a random order so no event is favoured; the first success starts and the rest are skipped.
+    const defs = this.eventDefs().sort(() => Math.random() - 0.5);
+    for (const def of defs) {
+      if (Math.random() < def.chance) {
+        this.startEvent(def.name);
+        return;
+      }
+    }
   }
 
   // Random face-window event (1% chance after each throw): swaps W20's texture to the banana art for events.faceWindow.durationMs, then fades
   // back on its own. Any existing marks on W20's left section fade out quickly first, so they
   // don't look like they're stuck to a texture that's about to change out from under them.
   startBananaEvent() {
+    if (this.isEventActive()) return; // only one event at a time
+    this.activeEvent = "face";
     this.bananaActive = true;
     this.bananaHitTriggered = false;
 
@@ -782,6 +812,7 @@ class MainScene extends Phaser.Scene {
   // was never actually touched, this overlay just sits on top of it).
   endBananaEvent() {
     this.bananaActive = false;
+    this.activeEvent = null;
     this.tweens.add({
       targets: this.bananaOverlay,
       alpha: 0,
@@ -808,6 +839,7 @@ class MainScene extends Phaser.Scene {
         onComplete: () => {
           this.bananaOverlay.setVisible(false);
           this.bananaActive = false;
+          this.activeEvent = null;
           if (mark && mark.active) {
             mark.destroy();
             const idx = this.marks.indexOf(mark);
@@ -907,9 +939,26 @@ class MainScene extends Phaser.Scene {
     g.fillCircle(Math.round(x), y, radius);
   }
 
+  // The text above the left end of the aim bar: OFFSET during the offset phase, STRENGTH during the strength phase,
+  // in the marker's colour (HTML #aim-label, pixel font, no background, a thin dark outline so it reads on snow).
+  // Only shown while aiming.
+  updateAimLabel() {
+    const el = document.getElementById("aim-label");
+    if (!el) return;
+    const aiming = this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER;
+    const text = this.state === STATE.AIM_POWER ? "STRENGTH" : "OFFSET";
+    if (el.dataset.text !== text) {
+      el.dataset.text = text;
+      el.textContent = text;
+      el.style.color = this.state === STATE.AIM_POWER ? AIM_COLOR_POWER_CSS : AIM_COLOR_ANGLE_CSS;
+    }
+    el.classList.toggle("show", aiming);
+  }
+
   drawAimBar() {
     const g = this.aimGfx;
     g.clear();
+    this.updateAimLabel();
     if (this.state !== STATE.AIM_ANGLE && this.state !== STATE.AIM_POWER) return;
 
     const barX = 20;
@@ -996,7 +1045,7 @@ class MainScene extends Phaser.Scene {
       }
     }
 
-    g.fillStyle(isAngle ? 0x6fb1ff : 0xff6f6f, 1);
+    g.fillStyle(isAngle ? AIM_COLOR_ANGLE : AIM_COLOR_POWER, 1);
     const markerX = barX + markerPos * barW;
     g.fillRect(markerX - 2, barY - 4, 4, barH + 8);
 

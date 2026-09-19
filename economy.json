@@ -12,7 +12,7 @@
       "chancePerThrow": 0.01,
       "durationMs": 20000,
       "hitRevertMs": 1000,
-      "faceBonusCoins": 10
+      "faceMultiplier": 40
     }
   },
 

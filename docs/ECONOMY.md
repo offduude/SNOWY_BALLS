@@ -26,10 +26,10 @@ start with "economy.json failed to load or has a JSON syntax error".
 
 ### How a hit is paid
 
-`coins = floor( (base + faceBonus) x buffs.coinMultiplier )`
+`coins = floor( base x faceMultiplier x buffs.coinMultiplier )`
 
 - `base` = the equipped projectile's `rewards.W20` / `rewards.W21` (see "projectiles": snowball 5 / 3, chestnut 8 / 5)
-- `faceBonus` = `events.faceWindow.faceBonusCoins` (10) when the banana face is hit
+- `faceMultiplier` = `events.faceWindow.faceMultiplier` (40) when the banana face is hit during the face event, otherwise 1 - so a snowball face hit pays 5 x 40 = 200, a chestnut one 8 x 40 = 320
 - then the buffs' multiplier (read when the player tapped to aim), rounded down once at the end
 
 **The streak adds nothing.** It is only a counter (STREAK: n under the top-right buttons, saved across reloads, reset by a miss);
@@ -37,14 +37,16 @@ it no longer adds coins or speeds the markers up.
 
 ## events (live)
 
-`faceWindow` is the random event where W20 turns into the face window: hit the face for the bonus.
+`faceWindow` is the random event where W20 turns into the face window: hit the face for the multiplier.
+
+**Only one event can run at a time.** A new event never starts while another is running (enforced in one place, `startEvent` in `main.js`, which every event goes through), so future events can't overlap.
 
 | field | meaning |
 |---|---|
 | `chancePerThrow` | chance (0-1) that the event starts after each throw, hit or miss - `0.01` = 1%. It never starts while an event is already running. (It used to start at a streak of 3; the streak no longer matters.) |
 | `durationMs` | how long the face texture stays (20000 = 20s) |
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
-| `faceBonusCoins` | extra coins for hitting the face, on top of the normal hit reward |
+| `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`40`) |
 
 ## aim (live)
 

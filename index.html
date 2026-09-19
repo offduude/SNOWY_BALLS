@@ -529,6 +529,27 @@
       transition: opacity 0.25s ease;
     }
 
+    /* "OFFSET" / "STRENGTH" above the left end of the aim bar (bar: 20px from the left of the 432px canvas, its
+       top 223px down of 243). Text starts where the bar does; no background, only a thin dark outline. */
+    #aim-label {
+      position: absolute;
+      left: 4.63%; /* 20 / 432 - the bar's left end */
+      bottom: 11.93%; /* just above the bar and its marker: (243 - 223 + 9) / 243 */
+      display: none;
+      font-family: "Press Start 2P", monospace;
+      font-size: calc(var(--u) * 1.5);
+      line-height: 1;
+      letter-spacing: 0.02em;
+      text-shadow: 1px 0 #202020, -1px 0 #202020, 0 1px #202020, 0 -1px #202020, 1px 1px #202020, -1px -1px #202020,
+        1px -1px #202020, -1px 1px #202020;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    #aim-label.show {
+      display: block;
+    }
+
     /* STREAK: always visible, right under the top-right buttons. Same width as the BUFFS + mute
        buttons together (mute 10..38px from the right edge, BUFFS 46..106px -> 96px), same brown as the coin
        counter. Under the shop board (z 3), so they disappear with the rest of the game view in the shop. */
@@ -675,6 +696,7 @@
       <div id="list-scroll"></div>
     </div>
     <div id="buff-hud"></div>
+    <div id="aim-label"></div>
     <button id="buffs-btn" class="side-btn" type="button">BUFFS</button>
     <div id="streak-box" class="hud-stat"><span id="streak-text">STREAK: 0</span></div>
     <div id="side-buttons">
@@ -694,7 +716,7 @@
   <script src="src/buffs.js?v=2"></script>
   <script src="src/shop.js?v=12"></script>
   <script src="src/collection.js?v=8"></script>
-  <script src="src/main.js?v=68"></script>
+  <script src="src/main.js?v=69"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

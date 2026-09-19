@@ -446,3 +446,7 @@ not actual play.
 - **Cause**: the camera follow lerps `scrollY` toward the clamp at the top of the texture (-660), so it creeps -659.96, -659.98, -659.99 ... then hits exactly -660. The renderer draws a fractional scroll one pixel off from an integer one, so at that last step the whole picture snapped down 1 canvas px (measured by reading the canvas each frame: roof-edge row 14 -> 15 at flightTime 1.368, ~0.16s after the 1.204s apex). ~3 screen px on a phone. It only became visible with fall-behind because before that the camera stopped following at the apex, one frame before it ever got there. Same family as the half-pixel scrollX shake.
 - **Fix** (`updateFlight`): `scrollY` is now always a whole number (`Math.round` of the lerp), with a minimum 1px step so rounding can't stall the camera short of its target.
 - **Verified** by reading the rendered canvas every frame: apex 652 -> `scrollY` integer on every frame and the roof row is a constant 15 from the moment the camera arrives to the end; apex 500 (camera not clamped) -> integers, no stall, same shape as before. `main.js?v=48`.
+
+## CHARACTERS button removed (2026-09-19)
+
+- Removed the CHARACTERS button from `index.html`; PROJECTILES is now the only button in `#side-buttons` and sits vertically centered on the left edge (its center Y equals the display's center Y, checked). The character list data and its equip/save code are still in `src/collection.js` (button lookups are optional-chained), so bringing the button back is one line of HTML.

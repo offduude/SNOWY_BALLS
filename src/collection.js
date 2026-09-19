@@ -68,14 +68,14 @@ const Collection = (() => {
     refreshButtons();
     container.classList.add("list-open");
     buttons.projectile.classList.toggle("active", kind === "projectile");
-    buttons.character.classList.toggle("active", kind === "character");
+    buttons.character?.classList.toggle("active", kind === "character");
   }
 
   function close() {
     openKind = null;
     container.classList.remove("list-open");
     buttons.projectile.classList.remove("active");
-    buttons.character.classList.remove("active");
+    buttons.character?.classList.remove("active");
   }
 
   function click() {
@@ -110,7 +110,7 @@ const Collection = (() => {
         character: document.getElementById("characters-btn"),
       };
       buttons.projectile.addEventListener("click", () => toggle("projectile"));
-      buttons.character.addEventListener("click", () => toggle("character"));
+      buttons.character?.addEventListener("click", () => toggle("character")); // no CHARACTERS button for now
       scrollEl.addEventListener("click", onEquip);
       // Tapping the dimmed game area outside the list closes it.
       document.getElementById("list-backdrop").addEventListener("click", close);

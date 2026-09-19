@@ -415,9 +415,10 @@
        the name/description and the EQUIP button on the first row, and the weight / hit value stats in ONE row along the
        bottom, starting right after the picture and running under the text and the button. */
     .pick-row.has-stats {
-      /* Every projectile card is at least as tall as one with a 3-line description, so the EQUIP button (centred in
-         the first row) is at the same height on every card. */
-      min-height: calc(var(--u) * 21.5);
+      /* Every projectile card is at least as tall as one with a 3-line description (12.97 units measured, padding and
+         border included), so the EQUIP button (centred in the first row) is at the same height on every card. */
+      box-sizing: border-box;
+      min-height: calc(var(--u) * 13.05);
       display: grid;
       grid-template-rows: 1fr auto;
       grid-template-columns: auto minmax(0, 1fr) auto;
@@ -626,7 +627,7 @@
       font-family: "Press Start 2P", monospace;
       font-size: 8px;
       white-space: nowrap;
-      pointer-events: none;
+      pointer-events: auto; /* a tap on the counter does nothing - it must not start a throw (see the touch-blocking list below) */
       z-index: 2;
     }
 
@@ -684,6 +685,16 @@
       top: -8px;
     }
 
+    /* Same dot on the top-left corner of the BUFFS button (button: 46px from the right edge, 60px wide, 10px from the top). */
+    #buffs-dot {
+      right: 98px; /* 46 + 60 - half the dot */
+      top: 2px; /* 10 - half the dot */
+    }
+
+    #game-container.shop-open #buffs-dot {
+      display: none;
+    }
+
     .notif-dot.show {
       opacity: 1;
       animation: dot-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards, dot-pulse 1.3s ease-in-out 0.45s infinite;
@@ -722,7 +733,7 @@
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
       font-size: 9px;
-      pointer-events: none;
+      pointer-events: auto; /* same: tapping the coin counter must not start a throw */
       z-index: 4;
     }
 
@@ -750,6 +761,7 @@
     <div id="buff-hud"></div>
     <div id="aim-label"></div>
     <button id="buffs-btn" class="side-btn" type="button">BUFFS</button>
+    <span id="buffs-dot" class="notif-dot"></span>
     <div id="streak-box" class="hud-stat"><span id="streak-text">STREAK: 0</span></div>
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
@@ -764,10 +776,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=11"></script>
-  <script src="src/buffs.js?v=4"></script>
-  <script src="src/shop.js?v=15"></script>
-  <script src="src/collection.js?v=16"></script>
+  <script src="src/economy.js?v=12"></script>
+  <script src="src/buffs.js?v=5"></script>
+  <script src="src/shop.js?v=16"></script>
+  <script src="src/collection.js?v=17"></script>
   <script src="src/main.js?v=74"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
@@ -775,7 +787,7 @@
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "buff-hud", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "buff-hud", "streak-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

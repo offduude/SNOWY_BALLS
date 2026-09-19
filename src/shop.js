@@ -223,14 +223,14 @@ const Shop = (() => {
     const offer = (Economy.getShopState().offers || [])[slot] || null;
     const p = price(item, offer);
     const afford = Economy.getCoins() >= p;
-    // Bottom row: the amount of a stack ("x14") at the left, the price at the right (a single item has no amount).
+    // Bottom row: the price at the left, the amount of a stack ("x14") at the right (a single item has no amount).
     const amountHtml = offer ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
       `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>` +
       `<span class="shop-pic">${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
       `<span class="shop-name">${esc(item.name)}</span>` +
-      `<span class="shop-bottom">${amountHtml}<span class="shop-price"><i class="coin"></i>${p}</span></span>` +
+      `<span class="shop-bottom"><span class="shop-price"><i class="coin"></i>${p}</span>${amountHtml}</span>` +
       `</button>`
     );
   }

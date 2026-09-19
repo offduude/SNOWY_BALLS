@@ -89,11 +89,15 @@ const Collection = (() => {
     );
   }
 
-  // Projectiles are listed by their W20 base value, highest first.
+  // Projectiles are listed by RARITY, the rarest first (economy.json projectiles.<id>.rarity - a number, bigger = rarer;
+  // placeholders for now). Ties keep the older order: highest W20 base value first, then the catalog order.
   function sortedItems(kind, items) {
     if (kind !== "projectile" || !eco) return items;
-    const w20 = (it) => (eco.projectiles[it.id] ? eco.projectiles[it.id].rewards.W20 : 0);
-    return items.map((it, i) => ({ it, i })).sort((a, b) => w20(b.it) - w20(a.it) || a.i - b.i).map((x) => x.it);
+    const p = (it) => eco.projectiles[it.id] || { rarity: 0, rewards: { W20: 0 } };
+    return items
+      .map((it, i) => ({ it, i }))
+      .sort((a, b) => (p(b.it).rarity || 0) - (p(a.it).rarity || 0) || p(b.it).rewards.W20 - p(a.it).rewards.W20 || a.i - b.i)
+      .map((x) => x.it);
   }
 
   function rowHtml(kind, item) {
@@ -174,6 +178,7 @@ const Collection = (() => {
     openKind = kind;
     buttons.buff.classList.toggle("active", kind === "buff");
     if (kind === "buff") {
+      Economy.clearUnseenBuffs(); // the player is looking at the tab now: its red dot goes
       titleEl.textContent = "BUFFS";
       renderBuffList();
       scrollEl.scrollTop = 0;
@@ -254,6 +259,11 @@ const Collection = (() => {
       const updateDot = () => dotEl && dotEl.classList.toggle("show", Economy.hasUnseenProjectiles());
       Economy.onProjectilesChange(updateDot);
       updateDot();
+      // Red dot on the top-left corner of the BUFFS button: a new kind of buff arrived (not more of one already there).
+      const buffDot = document.getElementById("buffs-dot");
+      const updateBuffDot = () => buffDot && buffDot.classList.toggle("show", Economy.hasUnseenBuffs());
+      Economy.onBuffsChange(updateBuffDot);
+      updateBuffDot();
       Buffs.onChange(tickBuffList);
       setInterval(tickBuffList, 500);
       buttons.projectile.addEventListener("click", () => toggle("projectile"));

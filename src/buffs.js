@@ -60,17 +60,19 @@ const Buffs = (() => {
     return m;
   }
 
-  // Every buff the BUFFS tab shows: the ones in the inventory (count > 0) and the ones running right now, in the order
-  // of economy.json: [{ id, item, count, active, msLeft }]
+  // Every buff the BUFFS tab shows: the ones in the inventory (count > 0) and the ones running right now, the RAREST
+  // first (the item's `rarity` in economy.json, bigger = rarer; equal rarities keep the order of the file):
+  // [{ id, item, count, active, msLeft }]
   function owned() {
     const running = new Map(active().map((b) => [b.id, b]));
     return eco.shop.items
       .filter((it) => it.category === "consumable")
-      .map((it) => {
+      .map((it, i) => {
         const r = running.get(it.id);
-        return { id: it.id, item: it, count: Economy.getBuffCount(it.id), active: !!r, msLeft: r ? r.msLeft : 0 };
+        return { id: it.id, item: it, i, count: Economy.getBuffCount(it.id), active: !!r, msLeft: r ? r.msLeft : 0 };
       })
-      .filter((b) => b.count > 0 || b.active);
+      .filter((b) => b.count > 0 || b.active)
+      .sort((a, b) => (b.item.rarity || 0) - (a.item.rarity || 0) || a.i - b.i);
   }
 
   // USE: takes one from the inventory and starts it. Refused while the same buff is already running (its button is

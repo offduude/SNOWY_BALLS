@@ -58,6 +58,12 @@ not the projectile - those only change how wide the sliders are).
 | `markerHz` | back-and-forth sweeps per second (`0.85` = one sweep in about 1.2s) |
 | `offsetZoneAtWeight100` | the share of the OFFSET slider that is a guaranteed W20 hit for a weight-100 projectile (the snowball). `0.5` = half the slider. See "weight" below |
 
+## rarity (placeholders)
+
+Every projectile (`projectiles.<id>.rarity`) and every buff (the shop item's `rarity`) has a number, **bigger = rarer**. The PROJECTILES and
+BUFFS tabs list the rarest first. Equal rarities keep the older order (projectiles: highest W20 hit value first; buffs: file order).
+Right now the numbers are placeholders in the current order - snowball 1, chestnut 2, grenade 3, Skyr 1 - to be decided later.
+
 ## weightLabels (live)
 
 Projectile weights are never shown as numbers. `weightLabels` maps a weight to the word on the projectile card (`weight: light`):

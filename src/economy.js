@@ -10,6 +10,7 @@ const Economy = (() => {
       coins: 0,
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
+      buffsUnseen: false, // a NEW kind of buff arrived and the player hasn't opened the BUFFS tab yet (red dot)
       buffItems: {}, // how many of each buff the player has bought and not used yet (id -> count); using one starts it (see buffs.js)
       projectiles: {}, // how many of each consumable projectile the player has (the snowball is infinite and not listed)
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
@@ -53,6 +54,7 @@ const Economy = (() => {
         aiming: p.aiming === true,
         projectiles: cleanCounts(p.projectiles),
         buffItems: cleanCounts(p.buffItems),
+        buffsUnseen: p.buffsUnseen === true,
         projectilesUnseen: p.projectilesUnseen === true,
         unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
         equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
@@ -163,9 +165,31 @@ const Economy = (() => {
     return state.buffItems[id] || 0;
   }
 
+  const buffListeners = [];
+  function onBuffsChange(fn) {
+    buffListeners.push(fn);
+  }
+
+  // Adds `n` of a buff. If the buff wasn't in the BUFFS tab before (none in the inventory and none running), the tab
+  // "expands": the red dot is raised. More of a buff the player already has (in the inventory or running) raises nothing.
   function addBuffs(id, n) {
-    state.buffItems[id] = getBuffCount(id) + n;
+    const before = getBuffCount(id);
+    const running = state.buffs.some((b) => b.id === id && b.endsAt > Date.now());
+    state.buffItems[id] = before + n;
+    if (before === 0 && !running && n > 0) state.buffsUnseen = true;
     save();
+    buffListeners.forEach((fn) => fn());
+  }
+
+  function hasUnseenBuffs() {
+    return state.buffsUnseen;
+  }
+
+  function clearUnseenBuffs() {
+    if (!state.buffsUnseen) return;
+    state.buffsUnseen = false;
+    save();
+    buffListeners.forEach((fn) => fn());
   }
 
   // Takes one out of the inventory. Returns false (and changes nothing) if there is none.
@@ -255,6 +279,9 @@ const Economy = (() => {
     setAiming,
     getBuffCount,
     addBuffs,
+    onBuffsChange,
+    hasUnseenBuffs,
+    clearUnseenBuffs,
     takeBuff,
     getProjectileCount,
     addProjectiles,

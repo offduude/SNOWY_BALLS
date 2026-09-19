@@ -22,6 +22,7 @@
     "offsetZoneAtWeight100": 0.5
   },
 
+  "_rarityNote": "Every projectile (in \"projectiles\") and every buff (in the shop items) has a rarity number, bigger = rarer: the PROJECTILES and BUFFS tabs list the rarest first (equal rarities: projectiles by W20 hit value, buffs in file order). The numbers are PLACEHOLDERS - 1, 2, 3 in the current order - to be decided later.",
   "_weightLabelsNote": "The words shown on a projectile's card instead of its exact weight: the last entry whose 'from' is at most the weight. Now: 0+ very light, 50+ light, 75+ moderate, 125+ heavy, 150+ very heavy.",
   "weightLabels": [
     { "from": 0, "label": "very light" },
@@ -33,9 +34,9 @@
 
   "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps TAP to aim, and it is NOT given back if the aim is abandoned; when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile. weight: NOT shown to the player (only as a word, see weightLabels). The snowball is always 100 - the reference. It sets two things: (1) STRENGTH: the perfect W20 throw (the middle of the window) is at strength slider position weight / 200 - 100 = the centre of the slider, 200 = the very tip, 0 = the very beginning; (2) OFFSET: the share of the offset slider that hits W20 - 0 = only the exact middle, 200 = anywhere on the slider (see aim.offsetZoneAtWeight100 for the snowball, straight lines in between). leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",
   "projectiles": {
-    "snowball": { "infinite": true, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
-    "chestnut": { "infinite": false, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
-    "grenade": { "infinite": false, "weight": 130, "rewards": { "W20": 199, "W21": 199 }, "leavesMark": true, "spins": false }
+    "snowball": { "infinite": true, "rarity": 1, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
+    "chestnut": { "infinite": false, "rarity": 2, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
+    "grenade": { "infinite": false, "rarity": 3, "weight": 130, "rewards": { "W20": 199, "W21": 199 }, "leavesMark": true, "spins": false }
   },
 
 
@@ -59,6 +60,7 @@
         "id": "skyr",
         "name": "Skyr",
         "category": "consumable",
+        "rarity": 1,
         "price": 10,
         "ignorePriceOverride": true,
         "duration": { "seconds": 180 },

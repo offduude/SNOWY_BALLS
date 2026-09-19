@@ -181,7 +181,7 @@ const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the 
 const PROJECTILE_VISUALS = {
   snowball: {
     ball: "snowball",
-    sprites: { idle: "char_idle", aiming: "char_aiming", throwing: "char_throwing" },
+    sprites: { idle: "char_idle_snowball", aiming: "char_aiming", throwing: "char_throwing" }, // (the bare "char_idle" is the empty-handed pose, see updateCharacterPose)
     impactSound: "snowball_impact",
     impactVolume: 0.3, // halved from 0.6
   },
@@ -239,7 +239,8 @@ class MainScene extends Phaser.Scene {
     this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
     this.load.image("goal_window_face", "assets/building/goal_window_face.png");
     this.load.image("goal_window_face_hit", "assets/building/goal_window_face_hit.png");
-    this.load.image("char_idle", "assets/character/character1_idle.png");
+    this.load.image("char_idle", "assets/character/character1_idle.png?v=2"); // empty-handed: no snowballs left
+    this.load.image("char_idle_snowball", "assets/character/character1_idle_snowball.png"); // a snowball in hand
     this.load.image("char_aiming", "assets/character/character1_aiming.png");
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
@@ -651,6 +652,7 @@ class MainScene extends Phaser.Scene {
   updateCharacterPose() {
     const sprites = this.projVisuals.sprites; // the equipped projectile's set (chestnut in hand, etc.)
     let key = sprites.idle;
+    if (this.state === STATE.IDLE && !this.hasAmmo()) key = "char_idle"; // out of snowballs: empty hands
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) key = sprites.aiming;
     else if (this.state === STATE.FLIGHT && this.flightTime < 0.35) key = sprites.throwing;
     if (this.character.texture.key !== key) this.character.setTexture(key);

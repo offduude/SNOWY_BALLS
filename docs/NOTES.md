@@ -718,3 +718,8 @@ not actual play.
 - **x0:** the snowball card is always listed (`isListed`: a `regen` projectile never leaves). The corner shows `x<count>` (also "default x100"), and under the EQUIP button (its own `.pick-action` box, so the button stays at the same height as on the other cards - checked) the text "+1 in 00:xx" shows while the stock is not full, "MAX" when it is; the list refreshes every 0.5 s while open.
 - **At 0:** tapping the screen does not start a throw; the message in the middle reads "OUT of SNOWBALLS" with "+1 in 00:xx" under it (updated every frame) and turns back into "TAP to aim" when one arrives. Verified in the browser. Other consumables still fall back to the snowball when they run out (the snowball is not swapped when it is the empty one).
 - `economy.js?v=13`, `collection.js?v=19`, `main.js?v=78` (wording: "+1 in", "MAX", "OUT of SNOWBALLS", "TAP to AIM"; `collection.js?v=20`).
+
+## Character sprites: snowball in hand vs empty hands (2026-09-19)
+
+- `character1_idle_snowball.png` (new) is the idle pose with a snowball in hand (`PROJECTILE_VISUALS.snowball.sprites.idle` = `char_idle_snowball`); `character1_idle.png` (updated) is now the EMPTY-handed pose, used when the equipped snowball stock is at 0 and the game is idle (`updateCharacterPose`: `state === IDLE && !hasAmmo()` -> `char_idle`). Aiming/throwing poses are unchanged, so after the last snowball is used the character is empty-handed again once the throw is over, and gets the snowball back the moment one regenerates. `main.js?v=79`; `char_idle` loads with `?v=2` to beat the browser cache.
+- Shop restock timer set to 1800 s (30 minutes).

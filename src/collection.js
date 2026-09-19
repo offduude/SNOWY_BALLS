@@ -174,6 +174,9 @@ const Collection = (() => {
       : `<button class="pick-equip pick-use" type="button" data-id="${esc(b.id)}">USE</button>`;
     // The bottom line (the item's `detail`, e.g. "Coin bonus: 1.2x."), drawn over the bottom of the card (it takes no
     // room of its own, so the card's height stays fixed).
+    // Under the USE button: how long the buff lasts once used ("03:00") - the same style as "MAX" under a snowball's EQUIP button.
+    // (Not the running timer: while the buff is active its own countdown takes the button's place and nothing goes here.)
+    const maxTime = b.active ? "" : `<div class="pick-regen">${clock(Buffs.durationMs(b.item))}</div>`;
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (
       `<div class="pick-row buff-row" data-id="${esc(b.id)}">` +
@@ -181,7 +184,7 @@ const Collection = (() => {
       `<img class="pick-pic" src="${esc(b.item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +
       `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
-      `<div class="pick-action">${control}</div>` +
+      `<div class="pick-action">${control}${maxTime}</div>` +
       detail +
       cornerHtml(Rarity.ofItem(b.item), b.count > 0 ? `x${b.count}` : "") +
       `</div>`

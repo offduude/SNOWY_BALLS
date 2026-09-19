@@ -179,6 +179,7 @@ when none are left. Effects do not stack from the same buff; different buffs mul
 | `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed) |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
 | `coinMultiplier` | multiplies the coins of a hit (rounded down) |
+| `sliderSpeed` | both sliders move at this fraction of their speed (`0.8` = 20% slower); several such buffs can run at once but only the best counts - the slowest - they do not multiply |
 | `saveProjectile` | chance (0-1, e.g. `0.1` = 10%) that a throw does not use up its projectile (any projectile, the snowball included); several such buffs can run at once (each keeps its timer) but only the highest chance counts. When one saves a projectile the result text gets a "Saved Projectile" line |
 | `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 60 s). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual x40 |
 

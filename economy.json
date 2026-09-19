@@ -86,7 +86,7 @@
         "rarity": "rare",
         "priceRange": { "min": 30, "max": 50 },
         "ignorePriceOverride": true,
-        "duration": { "seconds": 180 },
+        "duration": { "seconds": 120 },
         "image": "assets/items/kaiser_roll.png",
         "effects": [{ "type": "coinMultiplier", "value": 1.2 }],
         "description": "Makes Making it Easier.",
@@ -103,6 +103,18 @@
         "image": "assets/items/water_bottle.png",
         "effects": [{ "type": "saveProjectile", "value": 0.1 }],
         "description": "Has 10% chance to not consume projectile."
+      },
+      {
+        "id": "triangles",
+        "name": "Triangles",
+        "category": "consumable",
+        "rarity": "rare",
+        "priceRange": { "min": 120, "max": 200 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 120 },
+        "image": "assets/items/triangles.png",
+        "effects": [{ "type": "sliderSpeed", "value": 0.8 }],
+        "description": "Tasty shapes to make your hand steadier."
       },
       {
         "id": "tomato_juice",

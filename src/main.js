@@ -401,7 +401,7 @@ class MainScene extends Phaser.Scene {
     // precision buff narrows it further.
     const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
     this.aim = {
-      markerHz: cfg.markerHz, // fixed: the streak no longer speeds it up
+      markerHz: cfg.markerHz * b.sliderSpeed, // fixed speed, x the best slow-down buff (Triangles 0.8) - the same for both sliders
       angleRange: offsetRangeForWeight(weight, cfg.offsetZoneAtWeight100) / b.precision,
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,

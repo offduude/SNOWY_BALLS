@@ -12,6 +12,8 @@
 //   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit
+//   sliderSpeed      x     both sliders move at x times their speed (0.8 = 20% slower, steadier). Several such buffs can run at once
+//                          (each keeps its timer) but only the BEST counts = the slowest (lowest x); they do not multiply
 //   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Several such buffs can run at once (all keep
 //                          their timers) but only the HIGHEST chance counts - they do not add up or combine; modifiers() also says
 //                          which buff that is (saveProjectileBy), it is shown on the result message when it saves a projectile
@@ -55,11 +57,12 @@ const Buffs = (() => {
 
   // The combined effect of everything active right now. Read this once per throw (see the top comment).
   function modifiers() {
-    const m = { guideLines: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null };
+    const m = { guideLines: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, sliderSpeed: 1 };
     for (const b of active()) {
       for (const e of b.item.effects || []) {
         if (!(e.type in m)) continue;
         if (e.type === "guideLines") m.guideLines += e.value; // a switch: any active source turns it on
+        else if (e.type === "sliderSpeed") m.sliderSpeed = Math.min(m.sliderSpeed, e.value); // only the slowest counts
         else if (e.type === "saveProjectile") {
           if (e.value > m.saveProjectile) {
             m.saveProjectile = e.value; // only the best one counts
@@ -183,6 +186,7 @@ const Buffs = (() => {
       });
     },
     active,
+    durationMs,
     owned,
     use,
     modifiers,

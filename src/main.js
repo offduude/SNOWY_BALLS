@@ -253,11 +253,19 @@ const PROJECTILE_VISUALS = {
 };
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
-// apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex. A projectile that bounces off comes back
-// towards the player: it grows back to full size over BALL_REGROW_MS.
+// apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex - and the closer it gets to the apex the
+// FASTER it shrinks. A projectile that bounces off comes back towards the player and grows back to full size over
+// BALL_REGROW_MS, growing fastest right after the bounce and slower and slower the further it gets from the bounce point.
+// Both are the same curve, a logarithm (fast at first, then flattening): growing follows it forwards in time, shrinking
+// follows it backwards, so the ball leaves the wall the way it arrived, in reverse.
 const BALL_SIZE = 16;
 const BALL_APEX_SCALE = 0.5;
 const BALL_REGROW_MS = 450;
+const BALL_CURVE_K = 9; // how sharply the curve bends (higher = more of the change happens near the wall)
+// 0..1 -> 0..1: log(1 + K x) / log(1 + K), steep near 0, flat near 1
+function logCurve(x) {
+  return Math.log(1 + BALL_CURVE_K * Math.min(1, Math.max(0, x))) / Math.log(1 + BALL_CURVE_K);
+}
 const BOUNCE_OFF_SPEED = 90; // px/s a bouncing projectile is kicked away from where it hit
 const BOUNCE_POP_SPEED = 130; // px/s upward pop of that bounce
 const BOUNCE_RESTITUTION = 0.35; // how much speed it keeps when it lands on the ground
@@ -794,8 +802,8 @@ class MainScene extends Phaser.Scene {
     const heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
     const y = this.worldY(heightClimbed);
     this.ball.setPosition(x, y);
-    // Smaller and smaller on the way to the apex (progress 0..1 of the flight up to it; it stays small for a ball that goes on over the roof).
-    const shrink = 1 - (1 - BALL_APEX_SCALE) * Math.min(1, t / this.apexTime);
+    // Smaller and smaller on the way to the apex, shrinking faster the closer it gets (progress 0..1 of the flight up to it; it stays small for a ball that goes on over the roof).
+    const shrink = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * logCurve(1 - Math.min(1, t / this.apexTime));
     this.ball.setDisplaySize(BALL_SIZE * shrink, BALL_SIZE * shrink);
     if (this.proj.spins) this.ball.setRotation(t * SPIN_RATE); // stops turning at the apex, where it hits the wall
 
@@ -877,9 +885,9 @@ class MainScene extends Phaser.Scene {
   updateBounce(dt) {
     const b = this.bounce;
     if (!b) return;
-    // Bouncing back towards the player: it grows from its apex size back to full size.
+    // Bouncing back towards the player: it grows from its apex size back to full size, fastest at first, slower the further it gets.
     b.age += dt * 1000;
-    const grow = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * Math.min(1, b.age / BALL_REGROW_MS);
+    const grow = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * logCurve(b.age / BALL_REGROW_MS);
     this.ball.setDisplaySize(BALL_SIZE * grow, BALL_SIZE * grow);
     if (b.resting) return;
     b.vh -= GRAVITY * dt;

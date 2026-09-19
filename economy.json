@@ -85,7 +85,7 @@
         "ignorePriceOverride": true,
         "image": "assets/snowball/grenade.png",
         "effect": { "type": "givesProjectile", "value": "grenade" },
-        "description": "no description"
+        "description": "What a great day to have one!"
       },
       {
         "id": "chestnut",

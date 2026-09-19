@@ -26,6 +26,7 @@ const Buffs = (() => {
   let hudEl = null;
   let renderedKey = "";
   const listeners = [];
+  const tickListeners = []; // called on every tick of the clock below
 
   function itemById(id) {
     return eco.shop.items.find((it) => it.id === id) || null;
@@ -175,12 +176,15 @@ const Buffs = (() => {
         cancel(card.dataset.id);
       });
       render();
-      // Twice a second: refresh timers, drop expired buffs (and tell the BUFFS list to redraw).
+      // ONE clock for every buff timer on screen (the cards at the top and the BUFFS list): four times a second it refreshes
+      // the cards, drops expired buffs (and tells the BUFFS list to redraw), then lets the list refresh its timers in the
+      // same tick - so both always show the same second.
       setInterval(() => {
         const before = Economy.getBuffList().length;
         render();
         if (Economy.getBuffList().length !== before) listeners.forEach((fn) => fn());
-      }, 500);
+        tickListeners.forEach((fn) => fn());
+      }, 250);
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden) changed();
       });
@@ -195,5 +199,6 @@ const Buffs = (() => {
     cancel,
     formatTime,
     onChange: (fn) => listeners.push(fn),
+    onTick: (fn) => tickListeners.push(fn),
   };
 })();

@@ -370,7 +370,7 @@ const Collection = (() => {
       Economy.onBuffsChange(updateBuffDot);
       updateBuffDot();
       Buffs.onChange(tickBuffList);
-      setInterval(tickBuffList, 500);
+      Buffs.onTick(tickBuffList); // the list's timers ride on the buffs' own clock, so they change at the same moment as the cards on screen
       buttons.projectile.addEventListener("click", () => toggle("projectile"));
       buttons.character?.addEventListener("click", () => toggle("character")); // no CHARACTERS button for now
       scrollEl.addEventListener("click", onEquip);

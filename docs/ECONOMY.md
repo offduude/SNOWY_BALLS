@@ -57,6 +57,12 @@ not the projectile - those only change how wide the sliders are).
 |---|---|
 | `markerHz` | back-and-forth sweeps per second (`0.85` = one sweep in about 1.2s) |
 
+## weightLabels (live)
+
+Projectile weights are never shown as numbers. `weightLabels` maps a weight to the word on the projectile card (`weight: light`):
+the first entry whose `upTo` is at least the weight is used. Now: up to 59 very light, 60-89 light, 90-110 moderate, 111-140 heavy,
+above that very heavy (snowball 100 = moderate, chestnut 75 = light). Edit the thresholds or words freely.
+
 ## projectiles (live)
 
 Gameplay numbers for each projectile you can equip, keyed by its id (the same id as its shop item and its
@@ -92,7 +98,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 - `mode: random_from_eligible` - random pick among items the player is allowed to see
 - `excludeOwned` - permanent items already bought never come back
 - **every eligible item has the same chance** to be put in a slot (a plain random pick). Optional `categoryWeights` (e.g. `{ "consumable": 9, "projectile": 1 }`) makes some TYPES rarer: the type is picked by those weights first, then an item of that type at random. It is not set right now
-- (always on) a **projectile** is never on sale in two slots at once; **consumables can be** (the same one can show in two or more slots)
+- (always on) **any item can be on sale in several slots at once**, projectiles included; every slot rolls its own amount and price
 - `guaranteeCheapItem` - after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop
   filling up with things the player can't afford.
@@ -103,9 +109,9 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 |---|---|
 | `id` | unique, never change it once players own it (saves refer to it) |
 | `name`, `description` | shown in the shop |
-| `category` | `consumable` (common: buy it as often as you like, used up over `duration`; can be on sale in two slots at once) or `projectile` (rare: bought once and kept, never on sale twice) |
+| `category` | `consumable` (a timed buff: used up over `duration`) or `projectile` (a stack of consumable projectiles). Either can be on sale in several slots at once |
 | `price` | coins |
-| `amount`, `unitPrice` | **stack items (projectiles)**: `{min, max}` ranges. Each time the item is put on sale (first fill and every restock) an `amount` and the price of ONE are rolled inside the ranges (chestnut: 10-20 pieces at 4-6 coins each); the slot costs `amount x unitPrice` and shows "x14" on its card. Saved with the stock, so leaving the shop can't reroll it. Buying adds the whole stack to the inventory. A stack item is never on sale in two slots at once, and a slot that just sold one keeps it reserved until its timer ends |
+| `amount`, `unitPrice` | **stack items (projectiles)**: `{min, max}` ranges. Each time the item is put on sale (first fill and every restock) an `amount` and the price of ONE are rolled inside the ranges (chestnut: 10-20 pieces at 4-6 coins each); the slot costs `amount x unitPrice` and shows "x14" on its card. Saved with the stock, so leaving the shop can't reroll it. Buying adds the whole stack to the inventory. |
 | `image` | optional: picture path shown on the shop card (the chestnut has one; other items show an empty picture box) |
 | `ignorePriceOverride` | optional. `true` = always costs its own `price`, even while `shop.priceOverride` makes everything else 1 coin (the chestnut is 10) |
 | `duration` | buffs only: `{ "seconds": N }` |

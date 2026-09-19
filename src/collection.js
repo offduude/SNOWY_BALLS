@@ -23,7 +23,7 @@ const Collection = (() => {
         {
           id: "chestnut", // same id as its shop item and its economy.json "projectiles" entry
           name: "Chestnut",
-          description: "no description",
+          description: "Found it in someone's backpack. How convenient!",
           image: "assets/snowball/chestnut.png",
         },
       ],
@@ -43,6 +43,7 @@ const Collection = (() => {
   };
 
   let container, panelEl, titleEl, scrollEl, buttons, dotEl;
+  let eco = null; // economy.json - set by the game scene (setEconomy); projectile numbers come from it
   let openKind = null;
 
   function esc(s) {
@@ -60,14 +61,43 @@ const Collection = (() => {
     return kind === "projectile" && Economy.getProjectileCount(it.id) > 0;
   }
 
-  function rowHtml(kind, item) {
+  // The word for a projectile's weight (never the number): the first weightLabels entry that is >= the weight.
+  function weightWord(weight) {
+    const labels = (eco && eco.weightLabels) || [];
+    const hit = labels.find((l) => weight <= l.upTo);
+    return hit ? hit.label : "?";
+  }
+
+  // The two stats along the bottom of a projectile card, in two fixed columns (each half of the card), so they
+  // are in the same place on every card whatever the words' lengths - "weight: very heavy" fits its half.
+  function statsHtml(kind, item) {
+    const p = kind === "projectile" && eco && eco.projectiles && eco.projectiles[item.id];
+    if (!p) return "";
     return (
-      `<div class="pick-row" data-id="${esc(item.id)}">` +
+      `<div class="pick-stats">` +
+      `<span class="pick-stat">weight: ${esc(weightWord(p.weight))}</span>` +
+      `<span class="pick-stat">hit value: <i class="coin"></i>${p.rewards.W20}</span>` +
+      `</div>`
+    );
+  }
+
+  // Projectiles are listed by their W20 base value, highest first.
+  function sortedItems(kind, items) {
+    if (kind !== "projectile" || !eco) return items;
+    const w20 = (it) => (eco.projectiles[it.id] ? eco.projectiles[it.id].rewards.W20 : 0);
+    return items.map((it, i) => ({ it, i })).sort((a, b) => w20(b.it) - w20(a.it) || a.i - b.i).map((x) => x.it);
+  }
+
+  function rowHtml(kind, item) {
+    const stats = statsHtml(kind, item);
+    return (
+      `<div class="pick-row${stats ? " has-stats" : ""}" data-id="${esc(item.id)}">` +
       `<img class="pick-pic" src="${esc(item.image)}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description)}</div></div>` +
       `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>` +
       countHtml(kind, item) + // the amount sits in the card's top-right corner
+      stats +
       `</div>`
     );
   }
@@ -121,7 +151,6 @@ const Collection = (() => {
 
   function open(kind) {
     openKind = kind;
-    panelEl.classList.toggle("small", kind === "buff");
     buttons.buff.classList.toggle("active", kind === "buff");
     if (kind === "buff") {
       titleEl.textContent = "BUFFS";
@@ -133,8 +162,7 @@ const Collection = (() => {
     }
     titleEl.textContent = CATALOG[kind].title;
     if (kind === "projectile") Economy.clearUnseenProjectiles(); // the player is looking at the list now: the dot goes
-    scrollEl.innerHTML = CATALOG[kind].items
-      .filter((it) => isListed(kind, it))
+    scrollEl.innerHTML = sortedItems(kind, CATALOG[kind].items.filter((it) => isListed(kind, it)))
       .map((it) => rowHtml(kind, it))
       .join("");
     scrollEl.scrollTop = 0;
@@ -180,6 +208,9 @@ const Collection = (() => {
   return {
     isOpen: () => openKind !== null,
     close,
+    setEconomy(economyJson) {
+      eco = economyJson;
+    },
     init() {
       container = document.getElementById("game-container");
       panelEl = document.getElementById("list-panel");

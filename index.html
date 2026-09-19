@@ -398,6 +398,32 @@
       display: none;
     }
 
+    /* A projectile card has a stats line along its bottom: the row wraps and the stats take the whole last line. */
+    .pick-row.has-stats {
+      flex-wrap: wrap;
+    }
+
+    .pick-stats {
+      flex: 0 0 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr; /* two fixed halves: same place on every card, room for the longest words */
+      font-size: calc(var(--u) * 1.1);
+      color: #6b4a2a;
+      white-space: nowrap;
+    }
+
+    .pick-stat .coin {
+      display: inline-block;
+      width: calc(var(--u) * 1.1);
+      height: calc(var(--u) * 1.1);
+      margin: 0 calc(var(--u) * 0.3);
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+      vertical-align: -0.1em;
+    }
+
     .pick-row {
       position: relative; /* the amount is placed in its top-right corner */
       flex: none;
@@ -580,14 +606,6 @@
       pointer-events: none;
     }
 
-    /* The BUFFS list is the projectiles panel, smaller. */
-    #list-panel.small {
-      left: 30%;
-      top: 20%;
-      width: 40%;
-      height: 60%;
-    }
-
     .pick-timer {
       flex: none;
       min-width: calc(var(--u) * 7);
@@ -714,9 +732,9 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=9"></script>
   <script src="src/buffs.js?v=3"></script>
-  <script src="src/shop.js?v=13"></script>
-  <script src="src/collection.js?v=9"></script>
-  <script src="src/main.js?v=70"></script>
+  <script src="src/shop.js?v=14"></script>
+  <script src="src/collection.js?v=10"></script>
+  <script src="src/main.js?v=71"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

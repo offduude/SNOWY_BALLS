@@ -195,6 +195,7 @@ class MainScene extends Phaser.Scene {
     if (!this.eco) throw new Error("economy.json failed to load or has a JSON syntax error - check it.");
     Shop.init(this.eco);
     Buffs.init(this.eco);
+    Collection.setEconomy(this.eco);
 
     this.state = STATE.IDLE;
     this.streak = Economy.getStreak(); // hits in a row - saved, so it survives closing the app

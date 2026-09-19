@@ -21,6 +21,15 @@
     "markerHz": 0.85
   },
 
+  "_weightLabelsNote": "The words shown on a projectile's card instead of its exact weight. The first entry whose upTo is at least the projectile's weight is used (weight 100 = moderate, 75 = light). Edit the thresholds or the words freely.",
+  "weightLabels": [
+    { "upTo": 59, "label": "very light" },
+    { "upTo": 89, "label": "light" },
+    { "upTo": 110, "label": "moderate" },
+    { "upTo": 140, "label": "heavy" },
+    { "upTo": 100000, "label": "very heavy" }
+  ],
+
   "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps 'TAP to aim', and when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile (streak and face bonuses are added on top). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; 75 flies 33% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far); the aim bar keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker speed is the same for everything. leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",
   "projectiles": {
     "snowball": { "infinite": true, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "angleRange": 1, "leavesMark": true, "spins": false },
@@ -42,7 +51,7 @@
       "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
     },
 
-    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (guideLines, precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; never on sale in two slots at once).",
+    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (guideLines, precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; the same stack can be on sale in several slots at once, each with its own roll).",
     "items": [
       {
         "id": "skyr",
@@ -53,7 +62,7 @@
         "duration": { "seconds": 180 },
         "image": "assets/items/skyr.png",
         "effects": [{ "type": "guideLines", "value": 1 }],
-        "description": "no description"
+        "description": "Improves brain function."
       },
       {
         "id": "chestnut",
@@ -64,7 +73,7 @@
         "ignorePriceOverride": true,
         "image": "assets/snowball/chestnut.png",
         "effect": { "type": "givesProjectile", "value": "chestnut" },
-        "description": "no description"
+        "description": "Found it in someone's backpack. How convenient!"
       }
     ]
   }

@@ -5,7 +5,8 @@
 //
 // Two item types: "consumable" (a timed buff, the same one can be on sale in several slots) and
 // "projectile" (a STACK of consumable projectiles: the amount and the price of one are rolled at random
-// each time it is put on sale, the slot's price is amount x unit price; never on sale twice at once).
+// each time it is put on sale, the slot's price is amount x unit price). Any item can be on sale in several
+// slots at once - each slot has its own offer.
 // When a slot restocks while the shop is closed, the SHOP button gets a dot and a sound plays.
 //
 // Effects (coinMultiplier, aimSpeedMultiplier, ...) are NOT applied yet - buying currently just
@@ -58,22 +59,10 @@ const Shop = (() => {
     return eco.shop.items.find((it) => it.id === id) || null;
   }
 
-  // A projectile stack is never on sale in two slots at once (buffs may be).
-  function isUnique(item) {
-    return item.category === "projectile";
-  }
-
-  // Items that may go into a slot right now: everything except a unique item that is already on sale elsewhere, or
-  // that another slot just sold and is still waiting to restock (`reserved`) - otherwise an empty slot would grab it
-  // at once and the sold-out timer would mean nothing.
-  // (Projectiles can be bought again and again - they're consumable - so owning some doesn't exclude them.)
-  function eligible(shownOthers, reserved) {
-    const shownUnique = shownOthers.filter((id) => {
-      const it = itemById(id);
-      return it && isUnique(it);
-    });
-    const blocked = shownUnique.concat(reserved || []);
-    return eco.shop.items.filter((it) => !(isUnique(it) && blocked.includes(it.id)));
+  // Items that may go into a slot: all of them - nothing is unique any more (the same item, projectiles included,
+  // can be on sale in any number of slots; every slot rolls its own amount and price).
+  function eligible() {
+    return eco.shop.items.slice();
   }
 
   function averageHitCoins() {
@@ -111,9 +100,9 @@ const Shop = (() => {
   }
 
   // Choose an item for one slot. `shownOthers` = ids in the OTHER slots.
-  function pickFor(shownOthers, reserved) {
+  function pickFor(shownOthers) {
     const refill = eco.shop.refill;
-    const pool = eligible(shownOthers, reserved);
+    const pool = eligible();
     if (!pool.length) return null;
 
     let candidate = pickWeighted(pool);
@@ -155,8 +144,6 @@ const Shop = (() => {
 
     // Invalid entries (item removed from economy.json, duplicate unique item) become empty slots.
     stock = stock.map((id) => (id && itemById(id) ? id : null));
-    // Only projectiles must be unique; a duplicated buff is allowed.
-    stock = stock.map((id, i) => (id && isUnique(itemById(id)) && stock.indexOf(id) !== i ? null : id));
 
     for (let i = 0; i < slots; i++) {
       if (stock[i] !== null) {
@@ -174,9 +161,7 @@ const Shop = (() => {
         if (now < t.at) continue; // still counting down
       }
       const others = stock.filter((id, j) => j !== i && id);
-      // Unique items that OTHER slots sold and are still counting down for stay theirs until their timer ends.
-      const reserved = restock.filter((r, j) => j !== i && r && typeof r.at === "number" && r.at > now).map((r) => r.prev);
-      stock[i] = pickFor(others, reserved); // nothing eligible -> stays empty, shown as (TBD)
+      stock[i] = pickFor(others); // nothing eligible (an empty item list) -> stays empty, shown as (TBD)
       offers[i] = stock[i] !== null ? rollOffer(itemById(stock[i])) : null; // a fresh amount and price on every (re)stock
       if (t && stock[i] !== null) restocked++;
       restock[i] = null;

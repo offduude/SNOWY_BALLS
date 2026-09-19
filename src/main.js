@@ -304,6 +304,7 @@ class MainScene extends Phaser.Scene {
       angleRange: this.proj.angleRange / b.precision,
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
+      guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Skyr) gives them
     };
   }
 
@@ -987,12 +988,14 @@ class MainScene extends Phaser.Scene {
         }
       };
       // Graduations: skip the bar's own edge and everything between the two guarantee lines.
+      // Without the guide-lines buff the ticks are drawn everywhere - a gap in them would give the lines away.
+      const guide = this.aim.guideLines;
       for (let k = 1; k * AIM_TICK_STEP < range - 1e-9; k++) {
         const swing = k * AIM_TICK_STEP;
-        if (swing > W20_SWING_GUARANTEE) lineAt(swing, 0x202020, 0.85, 1, 3);
+        if (!guide || swing > W20_SWING_GUARANTEE) lineAt(swing, 0x202020, 0.85, 1, 3);
       }
-      // The two lines that guarantee a hit on W20 (sideways) - nothing else is drawn between them.
-      lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
+      // The two lines that guarantee a hit on W20 (sideways) - nothing else is drawn between them. Buff only.
+      if (guide) lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
 
       const target = this.activeEventTarget();
       if (target) {
@@ -1028,9 +1031,9 @@ class MainScene extends Phaser.Scene {
       };
       for (let k = 1; k * AIM_TICK_STEP < 1 - 1e-9; k++) {
         const power = k * AIM_TICK_STEP; // fixed power values: they spread out when the bar zooms in
-        if (!band || power < lo || power > hi) lineAtPower(power, 0x202020, 0.85, 1, 3);
+        if (!band || !this.aim.guideLines || power < lo || power > hi) lineAtPower(power, 0x202020, 0.85, 1, 3);
       }
-      if (band) {
+      if (band && this.aim.guideLines) {
         lineAtPower(lo, 0x5cff5c, 1, 2, 5);
         lineAtPower(hi, 0x5cff5c, 1, 2, 5);
       }

@@ -7,6 +7,7 @@
 // mid-aim never changes the sliders under the player's finger.
 //
 // Effect types (economy.json item `effects`: [{ "type", "value" }], values multiply if several buffs share a type):
+//   guideLines       1     shows the green guarantee lines on both sliders (hidden without this buff)
 //   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit
@@ -47,10 +48,12 @@ const Buffs = (() => {
 
   // The combined effect of everything active right now. Read this once per throw (see the top comment).
   function modifiers() {
-    const m = { precision: 1, strengthControl: 1, coinMultiplier: 1 };
+    const m = { guideLines: 0, precision: 1, strengthControl: 1, coinMultiplier: 1 };
     for (const b of active()) {
       for (const e of b.item.effects || []) {
-        if (e.type in m) m[e.type] *= e.value;
+        if (!(e.type in m)) continue;
+        if (e.type === "guideLines") m.guideLines += e.value; // a switch: any active source turns it on
+        else m[e.type] *= e.value;
       }
     }
     return m;

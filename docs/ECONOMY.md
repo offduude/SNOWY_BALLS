@@ -119,6 +119,7 @@ effects do not stack from the same buff; different buffs multiply. Its `effects`
 
 | type | value means |
 |---|---|
+| `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise, and the graduation lines then run unbroken so a gap can't give them away). Does NOT affect the yellow event dots, which always show |
 | `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed), so the graduation lines spread out |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
 | `coinMultiplier` | multiplies the coins of a hit (rounded down) |

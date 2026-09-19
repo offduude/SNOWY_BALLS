@@ -68,8 +68,9 @@ const Collection = (() => {
     return hit ? hit.label : "?";
   }
 
-  // The two stats along the bottom of a projectile card, in two fixed columns (each half of the card), so they
-  // are in the same place on every card whatever the words' lengths - "weight: very heavy" fits its half.
+  // The two stats at the bottom of the text column, right of the picture: one line each, pinned to the bottom of
+  // the card (CSS margin-top: auto), so they sit in the same place on every card whatever the description's length
+  // or the words' lengths.
   function statsHtml(kind, item) {
     const p = kind === "projectile" && eco && eco.projectiles && eco.projectiles[item.id];
     if (!p) return "";
@@ -91,13 +92,12 @@ const Collection = (() => {
   function rowHtml(kind, item) {
     const stats = statsHtml(kind, item);
     return (
-      `<div class="pick-row${stats ? " has-stats" : ""}" data-id="${esc(item.id)}">` +
+      `<div class="pick-row" data-id="${esc(item.id)}">` +
       `<img class="pick-pic" src="${esc(item.image)}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
-      `<div class="pick-desc">${esc(item.description)}</div></div>` +
+      `<div class="pick-desc">${esc(item.description)}</div>${stats}</div>` +
       `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>` +
       countHtml(kind, item) + // the amount sits in the card's top-right corner
-      stats +
       `</div>`
     );
   }

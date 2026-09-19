@@ -398,15 +398,14 @@
       display: none;
     }
 
-    /* A projectile card has a stats line along its bottom: the row wraps and the stats take the whole last line. */
-    .pick-row.has-stats {
-      flex-wrap: wrap;
-    }
-
+    /* The weight / hit value lines: the last thing in the text column (right of the picture), pinned to the card's
+       bottom - the text column is as tall as the card, so margin-top: auto puts them in the same place on every card. */
     .pick-stats {
-      flex: 0 0 100%;
-      display: grid;
-      grid-template-columns: 1fr 1fr; /* two fixed halves: same place on every card, room for the longest words */
+      margin-top: auto;
+      padding-top: calc(var(--u) * 0.9);
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--u) * 0.5);
       font-size: calc(var(--u) * 1.1);
       color: #6b4a2a;
       white-space: nowrap;
@@ -452,6 +451,8 @@
       flex: 1;
       align-self: stretch;
       min-width: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     .pick-name {
@@ -733,7 +734,7 @@
   <script src="src/economy.js?v=9"></script>
   <script src="src/buffs.js?v=3"></script>
   <script src="src/shop.js?v=14"></script>
-  <script src="src/collection.js?v=10"></script>
+  <script src="src/collection.js?v=11"></script>
   <script src="src/main.js?v=71"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

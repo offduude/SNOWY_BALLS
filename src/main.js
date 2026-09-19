@@ -83,6 +83,28 @@ const WINDOWS = [
   { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273 },
 ];
 
+// EVERY window of the building (the two goal windows above are among them), in IMAGE pixels [x from, x to, y from, y to]
+// (inclusive) - read from the red boxes of docs/background_annotated.png by tools/find_windows.py. Only W20 / W21 score;
+// this list is for effects that react to ANY window (the stone's hard_impact sound).
+const WALL_WINDOWS = [
+  [0, 26, 73, 116], [209, 231, 73, 116], [267, 318, 73, 116], [385, 436, 73, 116],
+  [472, 494, 73, 116], [677, 703, 73, 116], [96, 139, 138, 157], [564, 607, 138, 157],
+  [0, 26, 173, 216], [209, 231, 173, 216], [267, 318, 173, 216], [385, 436, 173, 216],
+  [472, 494, 173, 216], [677, 703, 173, 216], [96, 139, 231, 250], [564, 607, 231, 250],
+  [0, 27, 273, 316], [210, 232, 273, 316], [268, 319, 273, 316], [385, 436, 273, 316],
+  [472, 494, 273, 316], [676, 703, 273, 316], [96, 139, 324, 343], [564, 607, 324, 343],
+  [0, 27, 373, 416], [209, 231, 373, 416], [267, 318, 373, 416], [385, 436, 373, 416],
+  [472, 494, 373, 416], [676, 703, 373, 416], [96, 139, 417, 436], [564, 607, 417, 436],
+  [0, 26, 473, 516], [209, 231, 473, 516], [267, 318, 473, 516], [385, 436, 473, 516],
+  [472, 494, 473, 516], [677, 703, 473, 516], [102, 153, 513, 549], [572, 623, 513, 549],
+];
+
+// Is the point where a projectile stuck (world x, height climbed) inside any window of the building?
+function hitsAnyWindow(x, heightClimbed) {
+  const imageY = IMG_GROUND_Y - heightClimbed;
+  return WALL_WINDOWS.some(([x0, x1, y0, y1]) => x >= x0 && x <= x1 && imageY >= y0 && imageY <= y1);
+}
+
 // "Banana window" streak bonus (2026-09-19). goal_window_face.png / goal_window_face_hit.png are
 // 54x46 (cropped from the 58x50 exports - the outer 2px grey padding would otherwise paint over
 // the wall). They map 1:1 onto the building with NO scaling: the glass area is 52x44 px, exactly
@@ -194,7 +216,7 @@ const PROJECTILE_VISUALS = {
     sprites: { idle: "char_idle_stone", aiming: "char_aiming_stone", throwing: "char_throwing" },
     impactSound: "chestnut_impact", // a throw that hits no window: the chestnut's sound
     impactVolume: 0.5,
-    hitSound: "hard_impact", // ... a throw that hits a window (W20 / W21)
+    hitSound: "hard_impact", // ... a throw that lands on ANY window of the building (see WALL_WINDOWS), goal window or not
     hitVolume: 0.6,
   },
   pinecone: {
@@ -893,7 +915,7 @@ class MainScene extends Phaser.Scene {
     if (!escaped) {
       // A projectile can have its own sound for hitting a window (the stone's hard_impact); otherwise its one impact sound.
       const v = this.projVisuals;
-      if (hit && v.hitSound) this.sound.play(v.hitSound, { volume: v.hitVolume });
+      if (v.hitSound && (hit || hitsAnyWindow(stickX, stickHeight))) this.sound.play(v.hitSound, { volume: v.hitVolume });
       else this.sound.play(v.impactSound, { volume: v.impactVolume });
     }
     // An exploding projectile lights up the wall where it hit (not when it flew out of the top / fell behind the roof).

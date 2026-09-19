@@ -586,3 +586,10 @@ not actual play.
 - **Streak speed-up**: `takeAimSnapshot()` sets `this.aim.markerHz = markerHz x min(maxSpeedMultiplier, 1 + streakSpeedUp x streak)` (0.05 per streak level, capped at 3x - both in economy.json `aim`). The streak is read at the tap like the buffs, so the speed is fixed for the throw (verified: changing the streak mid-aim leaves the snapshot alone) and a miss resets it. Applies to both sliders equally.
 - Measured on screen (bar lengths per second, angle / power): streak 0 = 0.84 / 0.84, streak 5 = 1.06 / 1.05, streak 10 = 1.27 / 1.27, streak 40 = 2.5 / 2.49, streak 100 = 2.52 / 2.47 (cap 2.55). `main.js?v=65`.
 - With linear +5%/level the marker is 1.5x at streak 10 and 2x at streak 20; tune `streakSpeedUp` / `maxSpeedMultiplier` to taste. Nothing shows the player the speed yet.
+
+## Faster speed-up, saved streak, test potion removed (2026-09-19)
+
+- **Speed curve steeper**: `aim.streakSpeedUp` 0.05 -> **0.1** (+10% of the base speed per streak level): streak 10 = 2x, the 3x cap now comes at streak 20. Marker at streak 6 measured = 1.36 Hz (0.85 x 1.6), at streak 8 = 1.53.
+- **Streak is saved** (`streak` in the save; `Economy.getStreak()/setStreak()`), written after every throw (hit -> +1, miss -> 0) and read at startup. So it survives reloads/closing the app, and the marker speed - derived from the streak at the tap - comes back with it. Changing projectile never touched the streak (verified: equip left streak and speed as they were). Verified: streak 6 in an old save -> STREAK: 6 after reload, speed 1.36; two hits -> 8 saved; reload -> 8, speed 1.53; a miss -> 0 saved, best streak (8) kept.
+- **Focus Potion removed** from `economy.json`, plus its placeholder icon `assets/items/focus_potion.png` (and the empty folder). The buff system (`buffs.js`, HUD, BUFFS list) stays, currently with no buff items. An old save that still had the potion (in the shop stock and as an active buff) was cleaned automatically on load (buff dropped, slot emptied). `main.js?v=66`, `economy.js?v=8`.
+- (The potion icon was drawn by me with a small Python/PIL script - a few polygons and rectangles in 32x32 - not taken from anywhere.)

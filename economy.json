@@ -20,10 +20,10 @@
     }
   },
 
-  "_aimNote": "Speed of the two aim markers (offset and strength - always the same speed). markerHz = full back-and-forth sweeps per second at streak 0 (0.85 = one sweep in ~1.2s). Every consecutive hit of the current streak speeds BOTH markers up by streakSpeedUp (0.05 = +5% of the base speed per streak level, so streak 10 is 1.5x), never above maxSpeedMultiplier. The streak is read when the player taps 'TAP to aim', so the speed is fixed during a throw. Buffs and projectiles do NOT change it.",
+  "_aimNote": "Speed of the two aim markers (offset and strength - always the same speed). markerHz = full back-and-forth sweeps per second at streak 0 (0.85 = one sweep in ~1.2s). Every consecutive hit of the current streak speeds BOTH markers up by streakSpeedUp (0.1 = +10% of the base speed per streak level, so streak 10 is 2x and the 3x cap comes at streak 20), never above maxSpeedMultiplier. The streak is read when the player taps 'TAP to aim', so the speed is fixed during a throw. Buffs and projectiles do NOT change it.",
   "aim": {
     "markerHz": 0.85,
-    "streakSpeedUp": 0.05,
+    "streakSpeedUp": 0.1,
     "maxSpeedMultiplier": 3
   },
 
@@ -50,20 +50,6 @@
 
     "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (common, can be bought again and again, and can be on sale in two slots at once; needs a duration) or 'projectile' (rare, bought once and kept, never on sale twice).",
     "items": [
-      {
-        "id": "focus_potion",
-        "name": "Focus Potion",
-        "category": "consumable",
-        "price": 1,
-        "duration": { "seconds": 120 },
-        "image": "assets/items/focus_potion.png",
-        "effects": [
-          { "type": "precision", "value": 1.5 },
-          { "type": "strengthControl", "value": 1.5 },
-          { "type": "coinMultiplier", "value": 1.5 }
-        ],
-        "description": "TEST BUFF: +50% precision, +50% strength control, +50% coins for 2 minutes."
-      },
       {
         "id": "chestnut",
         "name": "Chestnut",

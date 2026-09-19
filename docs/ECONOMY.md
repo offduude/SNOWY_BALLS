@@ -66,10 +66,10 @@ The speed of the two aim markers. **Both sliders always run at the same speed**,
 | field | meaning |
 |---|---|
 | `markerHz` | back-and-forth sweeps per second at streak 0 (`0.85` = one sweep in about 1.2s) |
-| `streakSpeedUp` | each hit of the current streak adds this fraction of the base speed: `0.05` = +5% per level, so streak 10 = 1.5x, streak 20 = 2x |
-| `maxSpeedMultiplier` | the speed never goes above this multiple of the base (`3` = reached at streak 40) |
+| `streakSpeedUp` | each hit of the current streak adds this fraction of the base speed: `0.1` = +10% per level, so streak 10 = 2x, streak 20 = 3x |
+| `maxSpeedMultiplier` | the speed never goes above this multiple of the base (`3` = reached at streak 20 with the current 0.1) |
 
-`speed = markerHz x min(maxSpeedMultiplier, 1 + streakSpeedUp x streak)`. The streak is read when the player taps "TAP to aim", so
+`speed = markerHz x min(maxSpeedMultiplier, 1 + streakSpeedUp x streak)`. The streak is saved (it survives closing the app and changing projectile) and is read when the player taps "TAP to aim", so
 the speed is fixed for that whole throw; a miss resets the streak and the speed with it.
 
 ## projectiles (live)

@@ -10,6 +10,7 @@ const Economy = (() => {
       coins: 0,
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
+      streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
       unlockedCharacters: ["default"],
       equipped: { character: "default", projectile: "snowball" }, // what the player currently uses
       buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
@@ -35,6 +36,7 @@ const Economy = (() => {
         // Saves from before lifetimeCoins existed: the best honest guess is what they hold now.
         lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
         bestStreak: p.bestStreak || 0,
+        streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
         unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
         equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
         buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number") : [],
@@ -104,6 +106,16 @@ const Economy = (() => {
     return state.bestStreak;
   }
 
+  function getStreak() {
+    return state.streak;
+  }
+
+  function setStreak(n) {
+    if (state.streak === n) return;
+    state.streak = n;
+    save();
+  }
+
   function getBestStreak() {
     return state.bestStreak;
   }
@@ -144,6 +156,8 @@ const Economy = (() => {
     getLifetimeCoins,
     reportStreak,
     getBestStreak,
+    getStreak,
+    setStreak,
     getEquipped,
     setEquipped,
     getBuffList,

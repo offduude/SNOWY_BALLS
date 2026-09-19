@@ -193,7 +193,7 @@ class MainScene extends Phaser.Scene {
     Buffs.init(this.eco);
 
     this.state = STATE.IDLE;
-    this.streak = 0;
+    this.streak = Economy.getStreak(); // hits in a row - saved, so it survives closing the app
     this.angleValue = 0.5;
     this.powerValue = 0.5;
     this.flightTime = 0;
@@ -690,10 +690,12 @@ class MainScene extends Phaser.Scene {
       // (The streak itself is shown all the time in the top-right STREAK box now.)
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
+      Economy.setStreak(this.streak);
       this.updateStreakHud();
       this.showMessage("HIT\n+" + coins + " coins");
     } else {
       this.streak = 0;
+      Economy.setStreak(0);
       if (this.eco.rewards.missCoins) Economy.addCoins(this.eco.rewards.missCoins);
       this.updateStreakHud();
       this.showMessage("MISS");

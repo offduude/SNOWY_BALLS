@@ -263,12 +263,18 @@ const Collection = (() => {
     const use = e.target.closest(".pick-use");
     if (use) {
       click();
+      Economy.clearNewBuff(use.dataset.id); // using a new buff takes its red dot away (the list redraws without it)
       Buffs.use(use.dataset.id); // takes one from the inventory and starts it; the list redraws itself (Buffs.onChange)
       return;
     }
     const btn = e.target.closest(".pick-equip");
     if (!btn || btn.classList.contains("on")) return;
     Economy.setEquipped(openKind, btn.dataset.id);
+    if (openKind === "projectile") {
+      Economy.clearNewProjectile(btn.dataset.id); // equipping a new projectile takes its red dot away
+      const dot = btn.closest(".pick-row").querySelector(".pick-new");
+      if (dot) dot.remove();
+    }
     click();
     refreshButtons();
     if (openKind === "projectile") {

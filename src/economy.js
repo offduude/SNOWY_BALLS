@@ -326,6 +326,21 @@ const Economy = (() => {
     return state.newBuffs.includes(id);
   }
 
+  // One card's dot goes when the player equips / uses that item.
+  function clearNewProjectile(id) {
+    const i = state.newProjectiles.indexOf(id);
+    if (i < 0) return;
+    state.newProjectiles.splice(i, 1);
+    save();
+  }
+
+  function clearNewBuff(id) {
+    const i = state.newBuffs.indexOf(id);
+    if (i < 0) return;
+    state.newBuffs.splice(i, 1);
+    save();
+  }
+
   function clearNewProjectiles() {
     if (!state.newProjectiles.length) return;
     state.newProjectiles = [];
@@ -416,6 +431,8 @@ const Economy = (() => {
     isNewProjectile,
     isNewBuff,
     clearNewProjectiles,
+    clearNewProjectile,
+    clearNewBuff,
     clearNewBuffs,
     hasUnseenProjectiles,
     clearUnseenProjectiles,

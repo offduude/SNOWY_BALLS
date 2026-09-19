@@ -244,6 +244,7 @@ class MainScene extends Phaser.Scene {
 
     this.bounce = null; // a projectile bouncing off the wall after impact (see startBounce)
     this.pendingProjectile = null; // equipped mid-flight, applied when the throw concludes
+    this.aimConsumed = null; // the projectile taken from the inventory by the current tap (see consumeProjectile)
     this.applyProjectile(Economy.getEquipped("projectile"));
     this.takeAimSnapshot();
     this.updateStreakHud();
@@ -273,8 +274,8 @@ class MainScene extends Phaser.Scene {
   // or not owned falls back to the snowball.
   applyProjectile(id) {
     const known = PROJECTILE_VISUALS[id] && this.eco.projectiles && this.eco.projectiles[id];
-    const owned = id === "snowball" || Economy.getShopState().owned.includes(id);
-    if (!known || !owned) {
+    const available = known && (this.eco.projectiles[id].infinite || Economy.getProjectileCount(id) > 0);
+    if (!known || !available) {
       id = "snowball"; // the default
       if (Economy.getEquipped("projectile") !== id) Economy.setEquipped("projectile", id); // keep the save honest
     }
@@ -309,9 +310,40 @@ class MainScene extends Phaser.Scene {
   // already in flight is left to finish (its coins count) and resets by itself like any other throw.
   onShopOpened() {
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
+      this.refundProjectile(true); // no throw happened, so the projectile the tap used up comes back
       this.state = STATE.IDLE;
       this.showMessage("TAP to aim");
     }
+  }
+
+  // Consumable projectiles: one is used up the moment the player taps "TAP to aim". The throw still uses it
+  // (this.proj is unchanged until the throw is over); if it was the LAST one, the snowball is equipped again -
+  // saved right now, applied when the throw concludes (pendingProjectile), so the aim isn't disturbed.
+  consumeProjectile() {
+    this.aimConsumed = null;
+    if (this.proj.infinite) return;
+    const id = this.projectileId;
+    if (!Economy.useProjectile(id)) return;
+    const depleted = Economy.getProjectileCount(id) === 0;
+    this.aimConsumed = { id, depleted };
+    if (depleted) {
+      Economy.setEquipped("projectile", "snowball");
+      this.pendingProjectile = "snowball";
+    }
+  }
+
+  // The aim was thrown away before the ball left (the shop was opened, or another projectile was equipped): give
+  // the used-up projectile back. `restoreEquipped`: also put it back as the equipped one if its use had auto-switched
+  // to the snowball (not when the player has just chosen something else on purpose). Nothing is raised on the red dot.
+  refundProjectile(restoreEquipped) {
+    const c = this.aimConsumed;
+    if (!c) return;
+    Economy.addProjectiles(c.id, 1, true);
+    if (c.depleted) {
+      this.pendingProjectile = null;
+      if (restoreEquipped) Economy.setEquipped("projectile", c.id);
+    }
+    this.aimConsumed = null;
   }
 
   // The always-visible STREAK: x box under the top-right buttons. The text shrinks a little if it would be
@@ -337,6 +369,7 @@ class MainScene extends Phaser.Scene {
       return;
     }
     this.pendingProjectile = null;
+    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) this.refundProjectile(false);
     this.applyProjectile(id);
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
       this.state = STATE.IDLE;
@@ -470,6 +503,7 @@ class MainScene extends Phaser.Scene {
     if (cls.contains("shop-open") || cls.contains("list-open")) return;
     if (this.state === STATE.IDLE) {
       this.takeAimSnapshot(); // the one moment the player's buffs are read for this throw
+      this.consumeProjectile(); // ... and the moment a consumable projectile is used up
       this.state = STATE.AIM_ANGLE;
       this.aimStartTime = this.time.now;
       this.showMessage("");
@@ -486,6 +520,7 @@ class MainScene extends Phaser.Scene {
   launchBall() {
     this.state = STATE.FLIGHT;
     this.flightTime = 0;
+    this.aimConsumed = null; // the throw is happening: the projectile is really spent
 
     const swing = (this.angleValue - 0.5) * 2; // -1..1
     this.ballVX = swing * MAX_SWING_SPEED;
@@ -672,7 +707,7 @@ class MainScene extends Phaser.Scene {
 
     if (hit) {
       this.streak += 1;
-      let coins = this.eco.rewards.windows[win.name];
+      let coins = this.proj.rewards[win.name]; // the base coins for this window come from the projectile in use
       const streakBonus = Math.floor(coins * this.eco.rewards.streakBonusPerLevel * (this.streak - 1));
       coins += streakBonus;
 
@@ -682,10 +717,9 @@ class MainScene extends Phaser.Scene {
         this.triggerBananaHit(mark);
       }
 
-      // Projectile handicap/bonus (economy.json "projectiles"), rounded down, on the whole payout.
-      // Then the coin multiplier of the buffs that were active when the player tapped to aim (+1e-9 so
-      // 5 x 0.8 x 1.5 = 6 doesn't fall to 5 through floating point).
-      coins = Math.floor(coins * this.proj.coinMultiplier * this.aim.coinMultiplier + 1e-9);
+      // The coin multiplier of the buffs that were active when the player tapped to aim, rounded down (+1e-9 so a
+      // product like 8 x 1.5 doesn't fall short through floating point).
+      coins = Math.floor(coins * this.aim.coinMultiplier + 1e-9);
 
       // (The streak itself is shown all the time in the top-right STREAK box now.)
       Economy.addCoins(coins);

@@ -28,9 +28,15 @@ def check(eco):
     shop = eco["shop"]
     seen = set()
     for it in shop["items"]:
-        for field in ("id", "name", "category", "price"):
+        # A stack item (projectiles) has amount + unitPrice ranges instead of a fixed price.
+        stack = "amount" in it or "unitPrice" in it
+        for field in ("id", "name", "category") + (("amount", "unitPrice") if stack else ("price",)):
             if field not in it:
                 problems.append(f"item {it.get('id', '?')}: missing '{field}'")
+        for rng in ("amount", "unitPrice"):
+            r = it.get(rng)
+            if r is not None and (not isinstance(r, dict) or "min" not in r or "max" not in r or r["min"] > r["max"] or r["min"] < 1):
+                problems.append(f"item {it.get('id', '?')}: '{rng}' must be {{min, max}} with 1 <= min <= max")
         if "effect" not in it and "effects" not in it:
             problems.append(f"item {it.get('id', '?')}: needs 'effect' or 'effects'")
         if it.get("id") in seen:
@@ -42,7 +48,12 @@ def check(eco):
             problems.append(f"{it.get('id')}: consumable needs a 'duration'")
     # Empty slots simply show (TBD), so a shop with few or no items is allowed.
     projectiles = eco.get("projectiles", {})
+    if "snowball" not in projectiles:
+        problems.append("projectiles: the 'snowball' (the infinite default) is missing")
     for pid, p in projectiles.items():
+        for w in ("W20", "W21"):
+            if w not in p.get("rewards", {}):
+                problems.append(f"projectile {pid}: missing rewards.{w}")
         if not p.get("weight"):
             problems.append(f"projectile {pid}: missing 'weight'")
     for i in shop["items"]:
@@ -53,18 +64,28 @@ def check(eco):
 
 def main():
     eco = load()
-    windows = eco["rewards"]["windows"]
-    avg_hit = sum(windows.values()) / len(windows)
-    print(f"Average base coins per hit: {avg_hit:.2f}  (windows: {windows}; streak bonus not counted)\n")
+    print("Base coins per hit, by projectile (streak bonus not counted):")
+    for pid, p in eco["projectiles"].items():
+        r = p["rewards"]
+        print(f"  {pid:<10} W20 {r['W20']}  W21 {r['W21']}  (average {sum(r.values()) / len(r):.2f})  weight {p.get('weight')}")
+    snow = eco["projectiles"]["snowball"]["rewards"]
+    avg_hit = sum(snow.values()) / len(snow)
+    print(f"\nPrices below are in snowball hits (average {avg_hit:.2f} coins per hit).\n")
 
     header = f"{'item':<18}{'cat':<11}{'price':>6}{'hits':>7}" + "".join(
         f"{'@' + str(int(a * 100)) + '%':>8}" for a in ACCURACY
     )
     print(header + "   (throws needed to afford it, from zero)")
     print("-" * len(header))
-    for it in sorted(eco["shop"]["items"], key=lambda i: i["price"]):
-        hits = it["price"] / avg_hit
-        row = f"{it['name']:<18}{it['category']:<11}{it['price']:>6}{hits:>7.1f}"
+    def avg_price(i):
+        if "amount" in i:  # a stack: average amount x average price of one
+            return (i["amount"]["min"] + i["amount"]["max"]) / 2 * (i["unitPrice"]["min"] + i["unitPrice"]["max"]) / 2
+        return i["price"]
+
+    for it in sorted(eco["shop"]["items"], key=avg_price):
+        price = avg_price(it)
+        hits = price / avg_hit
+        row = f"{it['name']:<18}{it['category']:<11}{price:>6.0f}{hits:>7.1f}"
         row += "".join(f"{hits / a:>8.0f}" for a in ACCURACY)
         print(row)
 

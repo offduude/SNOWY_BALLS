@@ -3,10 +3,7 @@
   "_readme": "Every reward, price and shop rule lives here. Edit numbers, save, reload the game. The game reads 'rewards', 'events' and 'shop'. All shop items below are PLACEHOLDER test data - names, prices and effects are just there so the shop has something to show (effects are not applied yet). See docs/ECONOMY.md for what every field means, and run 'py tools/economy_report.py' for a quick balance table.",
 
   "rewards": {
-    "windows": {
-      "W20": 5,
-      "W21": 3
-    },
+    "_note": "The base coins for hitting each window now come from the projectile in use - see 'projectiles' below (rewards.W20 / rewards.W21).",
     "streakBonusPerLevel": 0.15,
     "missCoins": 0
   },
@@ -27,11 +24,12 @@
     "maxSpeedMultiplier": 3
   },
 
-  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match a shop projectile / the PROJECTILES list). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; a weight of 80 flies 25% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far). The aim bar always keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker itself always moves at the same fixed speed. coinMultiplier: multiplies the coins for a hit, rounded DOWN. leavesMark: false = no snow mark on the wall, it bounces off instead. spins: the projectile rotates in flight.",
+  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps 'TAP to aim', and when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile (streak and face bonuses are added on top). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; 75 flies 33% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far); the aim bar keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker speed is the same for everything. leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",
   "projectiles": {
-    "snowball": { "weight": 100, "angleRange": 1, "coinMultiplier": 1, "leavesMark": true, "spins": false },
-    "chestnut": { "weight": 80, "angleRange": 0.8, "coinMultiplier": 0.8, "leavesMark": false, "spins": true }
+    "snowball": { "infinite": true, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "angleRange": 1, "leavesMark": true, "spins": false },
+    "chestnut": { "infinite": false, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "angleRange": 0.8, "leavesMark": false, "spins": true }
   },
+
 
   "shop": {
     "slots": 6,
@@ -48,17 +46,18 @@
       "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
     },
 
-    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (common, can be bought again and again, and can be on sale in two slots at once; needs a duration) or 'projectile' (rare, bought once and kept, never on sale twice).",
+    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; never on sale in two slots at once).",
     "items": [
       {
         "id": "chestnut",
         "name": "Chestnut",
         "category": "projectile",
-        "price": 10,
+        "amount": { "min": 10, "max": 20 },
+        "unitPrice": { "min": 4, "max": 6 },
         "ignorePriceOverride": true,
         "image": "assets/snowball/chestnut.png",
-        "effect": { "type": "unlocksProjectile", "value": "chestnut" },
-        "description": "Easier to aim, but pays 20% less. Bounces off the wall."
+        "effect": { "type": "givesProjectile", "value": "chestnut" },
+        "description": "A stack of chestnuts: easier to aim and pays more (8 / 5), but they are used up and bounce off the wall."
       }
     ]
   }

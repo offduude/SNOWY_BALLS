@@ -2,7 +2,9 @@
 // name, picture, description and an EQUIP button per entry. Only one list is open at a time.
 // What's equipped is saved (Economy.getEquipped). Equipping a projectile tells the game
 // (MainScene.onProjectileEquipped); characters are not selectable yet (no CHARACTERS button).
-// Only what the player owns is listed: entries with `free: true`, plus projectiles bought in the shop.
+// Only what the player has is listed: `free`/`infinite` entries (the snowball never runs out) and projectiles
+// they still have some of (consumable: one is used per throw, and a kind that runs out leaves the list).
+// A red dot on the PROJECTILES button pops up when the list EXPANDS (a new kind arrives), not on a refill.
 //
 // To add an entry: add an object to the right array below. `id` is stored in saves, so never
 // rename it once players have it. `image` is any picture URL (shown pixelated).
@@ -16,12 +18,12 @@ const Collection = (() => {
           name: "Snowball",
           description: "The classic. Cold, round and reliable.",
           image: "assets/snowball/snowball_shop.png",
-          free: true,
+          infinite: true,
         },
         {
           id: "chestnut", // same id as its shop item and its economy.json "projectiles" entry
           name: "Chestnut",
-          description: "Easier to aim, but pays 20% less. Bounces off the wall and leaves no mark.",
+          description: "Easier to aim and pays more, but it bounces off the wall, leaves no mark and is used up.",
           image: "assets/snowball/chestnut.png",
         },
       ],
@@ -40,18 +42,29 @@ const Collection = (() => {
     },
   };
 
-  let container, panelEl, titleEl, scrollEl, buttons;
+  let container, panelEl, titleEl, scrollEl, buttons, dotEl;
   let openKind = null;
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
 
+  // "x12" next to the name of a consumable projectile (the snowball is infinite: nothing).
+  function countHtml(kind, item) {
+    if (kind !== "projectile" || item.infinite) return "";
+    return ` <span class="pick-count">x${Economy.getProjectileCount(item.id)}</span>`;
+  }
+
+  function isListed(kind, it) {
+    if (it.free || it.infinite) return true;
+    return kind === "projectile" && Economy.getProjectileCount(it.id) > 0;
+  }
+
   function rowHtml(kind, item) {
     return (
       `<div class="pick-row" data-id="${esc(item.id)}">` +
       `<img class="pick-pic" src="${esc(item.image)}" alt="" draggable="false" />` +
-      `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
+      `<div class="pick-text"><div class="pick-name">${esc(item.name)}${countHtml(kind, item)}</div>` +
       `<div class="pick-desc">${esc(item.description)}</div></div>` +
       `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>` +
       `</div>`
@@ -118,8 +131,9 @@ const Collection = (() => {
       return;
     }
     titleEl.textContent = CATALOG[kind].title;
+    if (kind === "projectile") Economy.clearUnseenProjectiles(); // the player is looking at the list now: the dot goes
     scrollEl.innerHTML = CATALOG[kind].items
-      .filter((it) => it.free || Economy.getShopState().owned.includes(it.id))
+      .filter((it) => isListed(kind, it))
       .map((it) => rowHtml(kind, it))
       .join("");
     scrollEl.scrollTop = 0;
@@ -176,6 +190,11 @@ const Collection = (() => {
         buff: document.getElementById("buffs-btn"),
       };
       buttons.buff.addEventListener("click", () => toggle("buff"));
+      // Red dot on the PROJECTILES button (same dot as the shop's, but silent).
+      dotEl = document.getElementById("projectiles-dot");
+      const updateDot = () => dotEl && dotEl.classList.toggle("show", Economy.hasUnseenProjectiles());
+      Economy.onProjectilesChange(updateDot);
+      updateDot();
       Buffs.onChange(tickBuffList);
       setInterval(tickBuffList, 500);
       buttons.projectile.addEventListener("click", () => toggle("projectile"));

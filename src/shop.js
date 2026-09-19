@@ -3,8 +3,9 @@
 // Timers are device-clock timestamps saved with the stock (Economy.getShopState()), so they keep
 // running while the app is closed and leaving/re-entering can not reroll anything.
 //
-// Two item types: "consumable" (common, buy as often as you like, the same one can be on sale in two
-// slots) and "projectile" (rare, bought once and kept, never on sale twice).
+// Two item types: "consumable" (a timed buff, the same one can be on sale in several slots) and
+// "projectile" (a STACK of consumable projectiles: the amount and the price of one are rolled at random
+// each time it is put on sale, the slot's price is amount x unit price; never on sale twice at once).
 // When a slot restocks while the shop is closed, the SHOP button gets a dot and a sound plays.
 //
 // Effects (coinMultiplier, aimSpeedMultiplier, ...) are NOT applied yet - buying currently just
@@ -25,42 +26,63 @@ const Shop = (() => {
 
   // ---------- rules ----------
 
-  function price(item) {
-    if (item.ignorePriceOverride) return item.price; // e.g. the chestnut always costs its real 10
+  function randInt(min, max) {
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+
+  // Items that come in stacks have an `amount` and a `unitPrice` range; each time one is put on sale a concrete
+  // offer is rolled: { amount, unitPrice }. Saved with the stock so leaving the shop can't reroll it.
+  function rollOffer(item) {
+    if (!item || !item.amount || !item.unitPrice) return null;
+    return { amount: randInt(item.amount.min, item.amount.max), unitPrice: randInt(item.unitPrice.min, item.unitPrice.max) };
+  }
+
+  function needsOffer(item) {
+    return !!(item && item.amount && item.unitPrice);
+  }
+
+  // What the slot costs. `offer` is the rolled offer for stack items.
+  function price(item, offer) {
+    if (offer) return offer.amount * offer.unitPrice;
+    if (item.ignorePriceOverride) return item.price;
     const o = eco.shop.priceOverride; // placeholder pricing switch, see economy.json
     return o !== null && o !== undefined ? o : item.price;
+  }
+
+  // The cheapest a stack item can be (for the "always show something affordable" safety net).
+  function minPrice(item) {
+    return needsOffer(item) ? item.amount.min * item.unitPrice.min : price(item);
   }
 
   function itemById(id) {
     return eco.shop.items.find((it) => it.id === id) || null;
   }
 
-  // Projectiles are bought once and kept; consumables can be bought forever.
-  function isPermanent(item) {
+  // A projectile stack is never on sale in two slots at once (buffs may be).
+  function isUnique(item) {
     return item.category === "projectile";
   }
 
-  function isOwnedPermanent(item) {
-    return isPermanent(item) && Economy.getShopState().owned.includes(item.id);
-  }
-
-  // Items that may go into a slot right now. Only permanent items are excluded when already on sale
-  // elsewhere - two identical consumables in the shop is fine.
-  function eligible(shownOthers) {
-    const shownPermanent = shownOthers.filter((id) => {
+  // Items that may go into a slot right now: everything except a unique item that is already on sale elsewhere, or
+  // that another slot just sold and is still waiting to restock (`reserved`) - otherwise an empty slot would grab it
+  // at once and the sold-out timer would mean nothing.
+  // (Projectiles can be bought again and again - they're consumable - so owning some doesn't exclude them.)
+  function eligible(shownOthers, reserved) {
+    const shownUnique = shownOthers.filter((id) => {
       const it = itemById(id);
-      return it && isPermanent(it);
+      return it && isUnique(it);
     });
-    return eco.shop.items.filter((it) => !isOwnedPermanent(it) && !shownPermanent.includes(it.id));
+    const blocked = shownUnique.concat(reserved || []);
+    return eco.shop.items.filter((it) => !(isUnique(it) && blocked.includes(it.id)));
   }
 
   function averageHitCoins() {
-    const w = Object.values(eco.rewards.windows);
+    const w = Object.values(eco.projectiles.snowball.rewards); // what a normal hit pays
     return w.reduce((a, b) => a + b, 0) / w.length;
   }
 
   function isCheap(item, cfg) {
-    return price(item) <= cfg.maxPriceInAverageHits * averageHitCoins();
+    return minPrice(item) <= cfg.maxPriceInAverageHits * averageHitCoins();
   }
 
   function pickRandom(list) {
@@ -86,9 +108,9 @@ const Shop = (() => {
   }
 
   // Choose an item for one slot. `shownOthers` = ids in the OTHER slots.
-  function pickFor(shownOthers) {
+  function pickFor(shownOthers, reserved) {
     const refill = eco.shop.refill;
-    const pool = eligible(shownOthers);
+    const pool = eligible(shownOthers, reserved);
     if (!pool.length) return null;
 
     let candidate = pickWeighted(pool);
@@ -125,18 +147,21 @@ const Shop = (() => {
     while (stock.length < slots) stock.push(null);
     const restock = Array.isArray(st.restock) ? st.restock.slice(0, slots) : [];
     while (restock.length < slots) restock.push(null);
+    const offers = Array.isArray(st.offers) ? st.offers.slice(0, slots) : [];
+    while (offers.length < slots) offers.push(null);
 
-    // Invalid entries (item removed from economy.json, already owned, duplicate) become empty slots.
-    stock = stock.map((id) => {
-      const it = id && itemById(id);
-      return it && !isOwnedPermanent(it) ? id : null;
-    });
-    // Only projectiles must be unique; a duplicated consumable is allowed.
-    stock = stock.map((id, i) => (id && isPermanent(itemById(id)) && stock.indexOf(id) !== i ? null : id));
+    // Invalid entries (item removed from economy.json, duplicate unique item) become empty slots.
+    stock = stock.map((id) => (id && itemById(id) ? id : null));
+    // Only projectiles must be unique; a duplicated buff is allowed.
+    stock = stock.map((id, i) => (id && isUnique(itemById(id)) && stock.indexOf(id) !== i ? null : id));
 
     for (let i = 0; i < slots; i++) {
       if (stock[i] !== null) {
         restock[i] = null;
+        // A stack item on sale needs its rolled offer (an old save from before offers existed has none).
+        const it = itemById(stock[i]);
+        if (needsOffer(it) && !(offers[i] && offers[i].amount > 0 && offers[i].unitPrice > 0)) offers[i] = rollOffer(it);
+        if (!needsOffer(it)) offers[i] = null;
         continue;
       }
       const t = restock[i];
@@ -146,12 +171,16 @@ const Shop = (() => {
         if (now < t.at) continue; // still counting down
       }
       const others = stock.filter((id, j) => j !== i && id);
-      stock[i] = pickFor(others); // nothing eligible -> stays empty, shown as (TBD)
+      // Unique items that OTHER slots sold and are still counting down for stay theirs until their timer ends.
+      const reserved = restock.filter((r, j) => j !== i && r && typeof r.at === "number" && r.at > now).map((r) => r.prev);
+      stock[i] = pickFor(others, reserved); // nothing eligible -> stays empty, shown as (TBD)
+      offers[i] = stock[i] !== null ? rollOffer(itemById(stock[i])) : null; // a fresh amount and price on every (re)stock
       if (t && stock[i] !== null) restocked++;
       restock[i] = null;
     }
     st.stock = stock;
     st.restock = restock;
+    st.offers = offers;
     Economy.saveShop();
     return restocked;
   }
@@ -161,12 +190,19 @@ const Shop = (() => {
     const id = st.stock && st.stock[slot];
     const item = id && itemById(id);
     if (!item) return { ok: false, reason: "empty" };
-    if (!Economy.spendCoins(price(item))) return { ok: false, reason: "funds" };
+    const offer = (st.offers || [])[slot] || null;
+    if (!Economy.spendCoins(price(item, offer))) return { ok: false, reason: "funds" };
 
-    if (isPermanent(item)) st.owned.push(item.id);
-    else Buffs.activate(item); // a consumable is a timed buff: it starts right now (see buffs.js)
+    if (item.category === "projectile") {
+      // The whole stack goes into the inventory. If this is a kind the player had none of, the PROJECTILES
+      // list expands and its red dot comes on (Economy raises it; more of a kind they already have doesn't).
+      Economy.addProjectiles(item.id, offer ? offer.amount : 1);
+    } else {
+      Buffs.activate(item); // a consumable is a timed buff: it starts right now (see buffs.js)
+    }
 
     st.stock[slot] = null;
+    st.offers[slot] = null;
     st.restock[slot] = { at: Date.now() + restockMs(), prev: item.id };
     Economy.saveShop();
     return { ok: true, item };
@@ -196,11 +232,13 @@ const Shop = (() => {
       // A slot with a timer is SOLD OUT; a slot with nothing to sell at all is (TBD) - there are no items for it yet.
       return `<div class="shop-card empty"><span class="shop-name">${timer ? "SOLD OUT" : "(TBD)"}</span>${timer}</div>`;
     }
-    const p = price(item);
+    const offer = (Economy.getShopState().offers || [])[slot] || null;
+    const p = price(item, offer);
     const afford = Economy.getCoins() >= p;
+    const amountLabel = offer ? ` x${offer.amount}` : ""; // a stack: "PROJECTILE x14"
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
-      `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>` +
+      `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}${amountLabel}</span>` +
       `<span class="shop-pic">${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
       `<span class="shop-name">${esc(item.name)}</span>` +
       `<span class="shop-price"><i class="coin"></i>${p}</span>` +

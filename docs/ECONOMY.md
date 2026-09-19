@@ -22,19 +22,18 @@ start with "economy.json failed to load or has a JSON syntax error".
 
 | field | meaning |
 |---|---|
-| `windows.W20`, `windows.W21` | base coins for a hit on that window |
 | `streakBonusPerLevel` | each hit in a streak beyond the first adds this fraction of the base, rounded down. `0.15` = +15% per level. Set `0` to turn streak bonuses off |
 | `missCoins` | coins for a miss (or a ball that flies out the top). `0` normally |
 
 ### How a hit is paid (the streak bonus)
 
-`coins = floor( (base + streakBonus + faceBonus) x projectile.coinMultiplier x buffs.coinMultiplier )`
+`coins = floor( (base + streakBonus + faceBonus) x buffs.coinMultiplier )`
 
-- `base` = `rewards.windows.W20` / `W21` (5 / 3)
+- `base` = the equipped projectile's `rewards.W20` / `rewards.W21` (see "projectiles": snowball 5 / 3, chestnut 8 / 5)
 - `streakBonus = floor( base x streakBonusPerLevel x (streak - 1) )` - with `streakBonusPerLevel` 0.15, every hit beyond
   the first in a streak adds 15% of the base per level, **rounded down**. The streak is the number of hits in a row (a miss resets it to 0)
 - `faceBonus` = `events.faceWindow.faceBonusCoins` (10) when the banana face is hit
-- then the projectile's multiplier and the buffs' multiplier (read when the player tapped to aim), rounded down once at the end
+- then the buffs' multiplier (read when the player tapped to aim), rounded down once at the end (projectiles no longer have a coin multiplier - their own `rewards` are the numbers)
 
 | streak | W20 (base 5) | W21 (base 3) |
 |---|---|---|
@@ -80,13 +79,14 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 
 | field | meaning |
 |---|---|
+| `infinite` | `true` = never runs out (the snowball). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim"; when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
+| `rewards` | the base coins for a hit on `W20` / `W21` with this projectile (the streak and face bonuses are added on top) |
 | `weight` | **not shown to the player.** Heavier projectiles fly lower with the same throw strength: the apex is multiplied by `100 / weight` (snowball = 100 is the reference; chestnut 80 flies 25% higher). A very heavy projectile is clamped so it never ends up below the lowest allowed stick height |
 | `angleRange` | how far the throw can drift sideways. `1` = the full swing; `0.8` = only 80% as far. The marker's speed is fixed for everything (projectiles and buffs only change the *spread*). The offset bar always keeps its full width and shows the projectile's range edge to edge, so its graduation lines (every 10% of the full swing) look stretched on a smaller range. Two green lines mark where a W20 hit is guaranteed sideways |
-| `coinMultiplier` | multiplies the coins of a hit (streak and face bonuses included), rounded **down**. `0.8` on a 6-coin hit = 4 |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
 | `spins` | the projectile rotates in flight |
 
-A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5). Chestnut right now: `weight 80`, `angleRange 0.8`, `coinMultiplier 0.8`, no mark, spins (placeholder numbers, to be tuned).
+A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5). Chestnut right now: rewards 8 / 5, `weight 75`, `angleRange 0.8`, no mark, spins, consumable (placeholder numbers, to be tuned).
 
 ## shop
 
@@ -119,6 +119,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 | `name`, `description` | shown in the shop |
 | `category` | `consumable` (common: buy it as often as you like, used up over `duration`; can be on sale in two slots at once) or `projectile` (rare: bought once and kept, never on sale twice) |
 | `price` | coins |
+| `amount`, `unitPrice` | **stack items (projectiles)**: `{min, max}` ranges. Each time the item is put on sale (first fill and every restock) an `amount` and the price of ONE are rolled inside the ranges (chestnut: 10-20 pieces at 4-6 coins each); the slot costs `amount x unitPrice` and shows "x14" on its card. Saved with the stock, so leaving the shop can't reroll it. Buying adds the whole stack to the inventory. A stack item is never on sale in two slots at once, and a slot that just sold one keeps it reserved until its timer ends |
 | `image` | optional: picture path shown on the shop card (the chestnut has one; other items show an empty picture box) |
 | `ignorePriceOverride` | optional. `true` = always costs its own `price`, even while `shop.priceOverride` makes everything else 1 coin (the chestnut is 10) |
 | `duration` | buffs only: `{ "seconds": N }` |
@@ -134,7 +135,7 @@ effects do not stack from the same buff; different buffs multiply. Its `effects`
 |---|---|
 | `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed), so the graduation lines spread out |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
-| `coinMultiplier` | multiplies the coins of a hit (multiplies with the projectile's own multiplier, rounded down) |
+| `coinMultiplier` | multiplies the coins of a hit (rounded down) |
 
 **When buffs are read:** only at the moment the player taps "TAP to aim". That snapshot is used for the whole throw
 (sliders, graduations, event dots and payout), so a buff expiring or being bought mid-aim never changes anything under the

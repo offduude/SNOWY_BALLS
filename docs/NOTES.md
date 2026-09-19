@@ -518,3 +518,10 @@ not actual play.
 - **Two green guarantee lines** at +-`W20_SWING_GUARANTEE` = **0.1528** of the swing, drawn taller and 2px wide, with nothing between them (the 0.1 tick and the center are not drawn). Derivation: the ball drifts `swing x MAX_SWING_SPEED x apexTime` sideways; the longest flight that still hits W20 peaks at its top edge (apexTime = sqrt(2 x 387 / 900) = 0.929s), so the offset stays inside W20's half-width (25.5px) whenever `|swing| <= 25.5 / (180 x 0.929)`. It depends only on the window and the physics, not on weight (apex time depends on the apex height, not the launch weight) - checked for both projectiles.
 - **Verified** with the real launch code: at swing 0.1523 every combination of 6 apex heights across W20's vertical band x both directions x both projectiles lands inside W20's x range (12/12 each); at 0.1728 none do (0/12). Screenshots of both bars.
 - Note: the guarantee is about the sideways offset only; the player still has to get the power right for the height.
+
+## Same graduations on the power bar (2026-09-19)
+
+- The power (strength) bar now has a dark graduation line every 10% (0.1 ... 0.9) and two green lines around the **power range that puts the apex inside W20's height band** (344-387), with no other line between them (ticks inside the band are skipped). `powerForApex(apex)` inverts the launch speed formula from `launchBall` (incl. the weight scale): `power = (sqrt(2g x apex / (100/weight)) - MIN_POWER_SPEED) / (MAX_POWER_SPEED - MIN_POWER_SPEED)`.
+- The band moves with the projectile: snowball 0.622-0.762 (tick 0.7 removed), chestnut (weight 80, flies higher) 0.378-0.503 (ticks 0.4 and 0.5 removed). A line is only drawn if it lies inside the bar.
+- Verified with the real `launchBall`: 5 powers spread across each band all give an apex inside 344-387; 0.01 below/above gives 341/390.2 (snowball) and 340.7/390.5 (chestnut). Screenshot of the snowball bar. `main.js?v=55`.
+- With this the two bars together cover W20: stay between the green lines on both and the throw hits W20 (sideways guarantee assumes the apex is inside the band - see the offset-bar note above).

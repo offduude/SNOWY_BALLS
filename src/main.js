@@ -99,7 +99,7 @@ const W20 = WINDOWS[0];
 // two lines (see drawAimBar). It depends on the window and the physics only, not on the projectile.
 const W20_SWING_GUARANTEE =
   Math.min(ORIGIN_X - W20.xFrom, W20.xTo - ORIGIN_X) / (MAX_SWING_SPEED * Math.sqrt((2 * W20.heightTo) / GRAVITY));
-const AIM_TICK_STEP = 0.1; // graduation lines on the offset bar every 10% of the full swing, from the center out
+const AIM_TICK_STEP = 0.1; // graduation lines on both aim bars every 10% (offset: of the full swing, from the center out)
 
 const FACE_IMG_X = W20.xFrom - 1; // world x of the texture's left edge
 const FACE_IMG_TOP_HEIGHT = W20.heightTo + 1; // heightClimbed of the texture's top edge
@@ -758,6 +758,13 @@ class MainScene extends Phaser.Scene {
     document.getElementById("message").textContent = msg;
   }
 
+  // The power-bar value (0..1) whose throw peaks at `apex` (a world height) with the equipped projectile.
+  // Inverse of the launch speed in launchBall(): apex = ((MIN + power x (MAX - MIN)) x sqrt(100/weight))^2 / 2g.
+  powerForApex(apex) {
+    const apexScale = REFERENCE_WEIGHT / (this.proj.weight || REFERENCE_WEIGHT);
+    return (Math.sqrt((2 * GRAVITY * apex) / apexScale) - MIN_POWER_SPEED) / (MAX_POWER_SPEED - MIN_POWER_SPEED);
+  }
+
   drawAimBar() {
     const g = this.aimGfx;
     g.clear();
@@ -797,6 +804,25 @@ class MainScene extends Phaser.Scene {
       lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
     } else {
       markerPos = this.powerValue;
+
+      // Same idea for power: a graduation line every 10% of the bar, and two green lines around the power
+      // range that puts the apex inside W20's height band (a guaranteed vertical hit). That range depends
+      // on the projectile's weight (a lighter one flies higher, so it needs less power); nothing else is
+      // drawn between the two lines.
+      const lo = this.powerForApex(W20.heightFrom);
+      const hi = this.powerForApex(W20.heightTo);
+      const lineAtPower = (power, color, alpha, width, extra) => {
+        if (power <= 0 || power >= 1) return; // this projectile can't reach that edge of the band with the bar
+        const x = Math.round(barX + power * barW);
+        g.lineStyle(width, color, alpha);
+        g.lineBetween(x, barY - extra, x, barY + barH + extra);
+      };
+      for (let k = 1; k * AIM_TICK_STEP < 1 - 1e-9; k++) {
+        const power = k * AIM_TICK_STEP;
+        if (power < lo || power > hi) lineAtPower(power, 0x202020, 0.85, 1, 3);
+      }
+      lineAtPower(lo, 0x5cff5c, 1, 2, 5);
+      lineAtPower(hi, 0x5cff5c, 1, 2, 5);
     }
 
     g.fillStyle(isAngle ? 0x6fb1ff : 0xff6f6f, 1);

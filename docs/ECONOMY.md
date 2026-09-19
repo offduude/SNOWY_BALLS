@@ -132,8 +132,8 @@ If that happens while the shop is closed, the SHOP button gets a pulsing red dot
 (the dot is saved and stays until the shop is opened; a restock that happened while the app was closed shows the dot but
 plays no sound, since browsers only allow sound after a tap). Only the first restock after you last looked at the shop makes a sound: if more slots restock later while the dot is still showing, they stay silent.
 
-**`restockSeconds`** - how long a bought slot stays SOLD OUT. `60` while testing, `3600` for the real
-one hour. The deadline is stored as a timestamp from the **device clock** in the save, so it keeps
+**`restockSeconds`** - how long a bought slot stays SOLD OUT. `3600` = the real
+one hour (now set); use `60` to test. The deadline is stored as a timestamp from the **device clock** in the save, so it keeps
 counting while the app is closed: on the next open every slot whose time has passed is restocked.
 Setting the phone clock forward will restock early - there is no server to check against - but
 setting it back can not make a timer longer than one full `restockSeconds`.

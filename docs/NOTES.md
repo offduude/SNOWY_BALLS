@@ -453,7 +453,7 @@ not actual play.
 
 ## Shop redesign: timed SOLD OUT slots (2026-09-19)
 
-- **Mechanic**: buying empties the slot ("SOLD OUT" + countdown) for `shop.restockSeconds` (economy.json; **60 for testing - set to 3600 for the real hour**). The card style is unchanged; the sold-out card just gets a `.shop-timer` line under the text (`m:ss`, or `h:mm:ss` once it's over an hour).
+- **Mechanic**: buying empties the slot ("SOLD OUT" + countdown) for `shop.restockSeconds` (economy.json; 3600 = one hour (was 60 while testing, set to 3600 on 2026-09-19)). The card style is unchanged; the sold-out card just gets a `.shop-timer` line under the text (`m:ss`, or `h:mm:ss` once it's over an hour).
 - **Device clock**: the deadline is a `Date.now()` timestamp saved per slot in `shop.restock[i] = { at, prev }` (localStorage), so it keeps running while the app is closed. `ensureStock()` runs on load and on every shop open and restocks every slot whose `at` has passed. While the shop is open a 1s `tick()` counts the timers down and restocks a slot the moment it expires; it also runs when the tab/app returns to the foreground (`visibilitychange`).
 - **Restock** picks a different item from the sold one (`prev`) and never duplicates one currently on sale. If nothing is eligible the slot stays SOLD OUT without a timer and is retried at the next open.
 - **Clock cheating**: forward = restocks early (can't be prevented without a server). Back = clamped, a deadline further than one full timer away is reset to one timer.

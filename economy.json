@@ -53,8 +53,8 @@
     "slots": 6,
     "_priceOverrideNote": "PLACEHOLDER: while priceOverride is a number, EVERY item costs that many coins in the shop (so we can test buying). Set it to null to use each item's real 'price' below.",
     "priceOverride": 1,
-    "_restockNote": "After buying, that slot shows SOLD OUT for this many seconds (by the device clock, so it also counts while the app is closed), then restocks. 60 = 1 minute for testing; 3600 = 1 hour.",
-    "restockSeconds": 60,
+    "_restockNote": "After buying, that slot shows SOLD OUT for this many seconds (by the device clock, so it also counts while the app is closed), then restocks. 3600 = 1 hour (60 = 1 minute is handy for testing).",
+    "restockSeconds": 3600,
 
     "refill": {
       "mode": "random_from_eligible",

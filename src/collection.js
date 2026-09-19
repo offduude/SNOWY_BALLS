@@ -67,10 +67,11 @@ const Collection = (() => {
     return kind === "projectile" && Economy.getProjectileCount(it.id) > 0;
   }
 
-  // The word for a projectile's weight (never the number): the first weightLabels entry that is >= the weight.
+  // The word for a projectile's weight (never the number): the LAST weightLabels entry whose `from` is <= the weight.
   function weightWord(weight) {
     const labels = (eco && eco.weightLabels) || [];
-    const hit = labels.find((l) => weight <= l.upTo);
+    let hit = null;
+    for (const l of labels) if (weight >= l.from) hit = l;
     return hit ? hit.label : "?";
   }
 

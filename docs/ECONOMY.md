@@ -56,12 +56,30 @@ not the projectile - those only change how wide the sliders are).
 | field | meaning |
 |---|---|
 | `markerHz` | back-and-forth sweeps per second (`0.85` = one sweep in about 1.2s) |
+| `offsetZoneAtWeight100` | the share of the OFFSET slider that is a guaranteed W20 hit for a weight-100 projectile (the snowball). `0.5` = half the slider. See "weight" below |
 
 ## weightLabels (live)
 
 Projectile weights are never shown as numbers. `weightLabels` maps a weight to the word on the projectile card (`weight: light`):
-the first entry whose `upTo` is at least the weight is used. Now: up to 59 very light, 60-89 light, 90-110 moderate, 111-140 heavy,
-above that very heavy (snowball 100 = moderate, chestnut 75 = light). Edit the thresholds or words freely.
+the **last** entry whose `from` is at most the weight is used. Now: 0+ very light, 50+ light, 75+ moderate, 125+ heavy,
+150+ very heavy (snowball 100 = moderate, chestnut 75 = moderate, grenade 130 = heavy). Edit the thresholds or words freely.
+
+## weight (live)
+
+The **snowball is always weight 100** - the reference every other weight is measured against. A projectile's `weight` (0 to 200,
+shown to the player only as a word) sets two things:
+
+**Strength slider.** The perfect throw - the apex in the exact middle of W20 - is at strength position `weight / 200`:
+weight 100 = the centre of the slider, weight 200 = the very tip, weight 0 = the very beginning (50 -> 25%, 130 -> 65%, ...).
+Heavier projectiles need more strength. Below/above the perfect position the apex falls/rises along the snowball's curve
+(start of the slider = the lowest allowed height 184, centre = W20's middle 365.5, tip = the middle of the window row above, 465.5;
+beyond the tip, for light projectiles, the curve continues upward in a straight line).
+
+**Offset slider.** The share of the slider that lands inside W20 sideways is `weight / 200` on a straight line: weight 0 = only the exact
+middle (a floor of 1.5% is used so the slider still works), weight 200 = anywhere on the slider, and the snowball (100) is
+`aim.offsetZoneAtWeight100` (0.5 = half). Heavier projectiles are therefore easier to throw in a straight line.
+Precision buffs narrow the spread further. **Note:** with 0.5 the snowball's offset slider only spans +-0.31 swing, which is too short to
+reach W21 (it needs about +-0.37) - only projectiles lighter than ~68 can reach it. Lower `offsetZoneAtWeight100` to widen the snowball's spread.
 
 ## projectiles (live)
 
@@ -71,14 +89,13 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 
 | field | meaning |
 |---|---|
-| `infinite` | `true` = never runs out (the snowball). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim"; when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
+| `infinite` | `true` = never runs out (the snowball). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim" (and is NOT given back if the aim is abandoned - opening a tab, equipping something else); when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
 | `rewards` | the base coins for a hit on `W20` / `W21` with this projectile (the face bonus is added on top) |
-| `weight` | **not shown to the player.** Heavier projectiles fly lower with the same throw strength: the apex is multiplied by `100 / weight` (snowball = 100 is the reference; chestnut 80 flies 25% higher). A very heavy projectile is clamped so it never ends up below the lowest allowed stick height |
-| `angleRange` | how far the throw can drift sideways. `1` = the full swing; `0.8` = only 80% as far. The marker's speed is fixed for everything (projectiles and buffs only change the *spread*). The offset bar always keeps its full width and shows the projectile's range edge to edge, so its graduation lines (every 10% of the full swing) look stretched on a smaller range. Two green lines mark where a W20 hit is guaranteed sideways |
+| `weight` | 0-200, **not shown as a number** (see "weight" above; the snowball is always 100): the strength position of the perfect W20 throw is `weight / 200`, and the share of the offset slider that hits W20 also grows with it |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
 | `spins` | the projectile rotates in flight |
 
-A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5). Chestnut right now: rewards 8 / 5, `weight 75`, `angleRange 0.8`, no mark, spins, consumable (placeholder numbers, to be tuned).
+A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5); its centred throw hits the middle of W20. Chestnut right now: rewards 8 / 5, `weight 75`, `angleRange 0.8`, no mark, spins, consumable (placeholder numbers, to be tuned).
 
 ## shop
 

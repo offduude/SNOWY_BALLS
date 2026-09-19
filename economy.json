@@ -16,25 +16,26 @@
     }
   },
 
-  "_aimNote": "Speed of the two aim markers (offset and strength - always the same, fixed speed). markerHz = full back-and-forth sweeps per second (0.85 = one sweep in ~1.2s). Nothing changes it: not the streak, not buffs, not the projectile.",
+  "_aimNote": "Speed of the two aim markers (offset and strength - always the same, fixed speed). markerHz = full back-and-forth sweeps per second (0.85 = one sweep in ~1.2s). Nothing changes it: not the streak, not buffs, not the projectile. offsetZoneAtWeight100 = the share of the OFFSET slider that is a guaranteed W20 hit for a weight-100 projectile (the snowball): 0.5 = half the slider. A weight of 0 always needs the exact middle (share 0), a weight of 200 hits anywhere (share 1), and every other weight is on a straight line through these three points. Lower it to make the snowball offset harder - note that with 0.5 the snowball offset slider only spans +-0.31 swing, which is too short to reach W21 (it needs about +-0.37).",
   "aim": {
-    "markerHz": 0.85
+    "markerHz": 0.85,
+    "offsetZoneAtWeight100": 0.5
   },
 
-  "_weightLabelsNote": "The words shown on a projectile's card instead of its exact weight. The first entry whose upTo is at least the projectile's weight is used (weight 100 = moderate, 75 = light). Edit the thresholds or the words freely.",
+  "_weightLabelsNote": "The words shown on a projectile's card instead of its exact weight: the last entry whose 'from' is at most the weight. Now: 0+ very light, 50+ light, 75+ moderate, 125+ heavy, 150+ very heavy.",
   "weightLabels": [
-    { "upTo": 59, "label": "very light" },
-    { "upTo": 89, "label": "light" },
-    { "upTo": 110, "label": "moderate" },
-    { "upTo": 140, "label": "heavy" },
-    { "upTo": 100000, "label": "very heavy" }
+    { "from": 0, "label": "very light" },
+    { "from": 50, "label": "light" },
+    { "from": 75, "label": "moderate" },
+    { "from": 125, "label": "heavy" },
+    { "from": 150, "label": "very heavy" }
   ],
 
-  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps 'TAP to aim', and when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile (streak and face bonuses are added on top). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; 75 flies 33% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far); the aim bar keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker speed is the same for everything. leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",
+  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps TAP to aim, and it is NOT given back if the aim is abandoned; when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile. weight: NOT shown to the player (only as a word, see weightLabels). The snowball is always 100 - the reference. It sets two things: (1) STRENGTH: the perfect W20 throw (the middle of the window) is at strength slider position weight / 200 - 100 = the centre of the slider, 200 = the very tip, 0 = the very beginning; (2) OFFSET: the share of the offset slider that hits W20 - 0 = only the exact middle, 200 = anywhere on the slider (see aim.offsetZoneAtWeight100 for the snowball, straight lines in between). leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",
   "projectiles": {
-    "snowball": { "infinite": true, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "angleRange": 1, "leavesMark": true, "spins": false },
-    "chestnut": { "infinite": false, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "angleRange": 0.8, "leavesMark": false, "spins": true },
-    "grenade": { "infinite": false, "weight": 120, "rewards": { "W20": 199, "W21": 199 }, "angleRange": 1, "leavesMark": true, "spins": false }
+    "snowball": { "infinite": true, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
+    "chestnut": { "infinite": false, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
+    "grenade": { "infinite": false, "weight": 130, "rewards": { "W20": 199, "W21": 199 }, "leavesMark": true, "spins": false }
   },
 
 

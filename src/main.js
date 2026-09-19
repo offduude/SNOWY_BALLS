@@ -43,28 +43,25 @@ const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 20);
 // and the roofline - never in the sky, never in the red-marked restricted area (+10px buffer
 // above it) from the user's reference image. Restricted zone's top edge was image-y=486;
 // converted via IMG_GROUND_Y - imageY, plus the 10px buffer, that's a minimum stick height of
-// 184. The roofline (IMG_GROUND_Y - IMG_ROOF_Y = 643) is the maximum. MIN/MAX_POWER_SPEED are
-// calibrated so a 0%/100% power throw's apex lands exactly on those two bounds -
-// vy0 = sqrt(2 * GRAVITY * height).
+// 184. The roofline (IMG_GROUND_Y - IMG_ROOF_Y = 643) is the maximum. The strength curve below is built on
+// these bounds (vy0 = sqrt(2 * GRAVITY * height)).
 const MIN_STICK_HEIGHT = IMG_GROUND_Y - 486 + 10; // 184
 // Apex of a full-strength throw of the reference projectile (weight 100, the snowball) with no buffs:
 // the middle of the window row above the goal windows (image y 173-216 -> height 660 - 194.5).
 // Buffs/lighter projectiles can still push a throw higher - past the roof edge it falls back behind
 // the building, past the top of the texture it escapes (see updateFlight).
 const MAX_APEX_HEIGHT = IMG_GROUND_Y - (173 + 216) / 2; // 465.5
-// A projectile of this weight flies exactly as the constants above say; heavier flies lower, lighter higher
-// (see launchBall). The number is per projectile in economy.json ("weight") and never shown to the player.
+// The snowball's weight - the reference all other weights are measured against (economy.json "weight", never
+// shown to the player as a number). See the "weight" section below for what a weight does.
 const REFERENCE_WEIGHT = 100;
 // Where the wall ends and the sky starts: background.png rows 0-14 are sky, row 15 is the dark roof
 // edge. Nothing can stick above this line - a ball whose apex is higher falls back down and sinks
 // behind the roofline instead (see updateFlight), and marks are clipped at it (see addMark).
 const ROOF_EDGE_HEIGHT = IMG_GROUND_Y - 15; // 645
-const MIN_POWER_SPEED = Math.sqrt(2 * GRAVITY * MIN_STICK_HEIGHT); // ~575.6
-const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_APEX_HEIGHT); // ~1200
 
 // Marker speed (full back-and-forth sweeps per second) - the numbers live in economy.json under "aim".
 // ONE fixed speed for both sliders - nothing (streak, buffs, projectiles) changes it.
-const AIM_DEFAULTS = { markerHz: 0.85 };
+const AIM_DEFAULTS = { markerHz: 0.85, offsetZoneAtWeight100: 0.5 };
 
 const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
 const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed
@@ -106,7 +103,58 @@ const AIM_COLOR_ANGLE_CSS = "#6fb1ff";
 const AIM_COLOR_POWER_CSS = "#ff6f6f";
 const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's dot on the aim bars
 const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit range, so a marker on the dot always hits)
-const AIM_TICK_STEP = 0.1; // graduation lines on both aim bars every 10% (offset: of the full swing, from the center out)
+
+// ---------------------------------------------------------------------------------------------------------
+// WEIGHT. One number per projectile (economy.json "projectiles.<id>.weight"; snowball = 100 is the reference).
+//
+// STRENGTH slider: `power` is where the marker is (0 = start .. 1 = tip). The apex the throw reaches is
+// apexForEffectivePower(power + weightShift(weight)), and the curve passes through the apex bounds
+// (0 -> MIN_STICK_HEIGHT, 1 -> MAX_APEX_HEIGHT) and through W20's MIDDLE at 0.5. The shift moves where the
+// middle of W20 sits on the slider: 0.5 for weight 100, the tip (1.0) for weight 200, the very start (0) for
+// weight 0 - i.e. the perfect W20 throw is at power = weight / 200. Heavier = a higher power is needed.
+//
+// OFFSET slider: the sideways drift is swing x MAX_SWING_SPEED x flight time, and a swing of +-W20_SWING_GUARANTEE
+// is the most that is still guaranteed to land inside W20's width. The offset bar spans +-offsetRange swing, so
+// the share of the bar that hits W20 is W20_SWING_GUARANTEE / offsetRange = the "zone": 0 for weight 0 (only the exact
+// middle), 1 for weight 200 (anywhere on the slider), and `offsetZoneAtWeight100` (economy.json aim, default 0.5)
+// for the snowball, straight lines in between.
+const APEX_MID = (W20.heightFrom + W20.heightTo) / 2; // the middle of W20 (365.5)
+const CURVE_C = 2 * (MAX_APEX_HEIGHT - MIN_STICK_HEIGHT) - 4 * (APEX_MID - MIN_STICK_HEIGHT);
+const CURVE_B = MAX_APEX_HEIGHT - MIN_STICK_HEIGHT - CURVE_C;
+const CURVE_SLOPE_TOP = CURVE_B + 2 * CURVE_C; // beyond effective power 1 the curve continues in a straight line
+
+function weightShift(weight) {
+  return (REFERENCE_WEIGHT - weight) / (2 * REFERENCE_WEIGHT); // (100 - w) / 200
+}
+
+// Effective power (0..1 = the snowball's slider) -> apex height. Never below the lowest allowed stick height.
+function apexForEffectivePower(pe) {
+  if (pe <= 0) return MIN_STICK_HEIGHT;
+  if (pe <= 1) return MIN_STICK_HEIGHT + CURVE_B * pe + CURVE_C * pe * pe;
+  return MAX_APEX_HEIGHT + CURVE_SLOPE_TOP * (pe - 1);
+}
+
+// The inverse (can return values below 0 for apexes under the minimum; those are unreachable).
+function effectivePowerForApex(apex) {
+  if (apex >= MAX_APEX_HEIGHT) return 1 + (apex - MAX_APEX_HEIGHT) / CURVE_SLOPE_TOP;
+  const d = apex - MIN_STICK_HEIGHT;
+  return (-CURVE_B + Math.sqrt(CURVE_B * CURVE_B + 4 * CURVE_C * d)) / (2 * CURVE_C);
+}
+
+// The share of the offset bar that is a guaranteed W20 hit (sideways) for a projectile of this weight.
+function offsetZone(weight, zoneAt100) {
+  const w = Math.min(Math.max(weight, 0), 2 * REFERENCE_WEIGHT);
+  return w <= REFERENCE_WEIGHT
+    ? (zoneAt100 * w) / REFERENCE_WEIGHT
+    : zoneAt100 + ((1 - zoneAt100) * (w - REFERENCE_WEIGHT)) / REFERENCE_WEIGHT;
+}
+
+// How far (in swing) the offset marker can drift from the middle - i.e. the bar spans +-this.
+function offsetRangeForWeight(weight, zoneAt100) {
+  return Math.min(10, W20_SWING_GUARANTEE / Math.max(0.015, offsetZone(weight, zoneAt100)));
+}
+
+const AIM_TICK_STEP = 0.1; // graduation lines on the STRENGTH bar every 10% of its power span
 
 const FACE_IMG_X = W20.xFrom - 1; // world x of the texture's left edge
 const FACE_IMG_TOP_HEIGHT = W20.heightTo + 1; // heightClimbed of the texture's top edge
@@ -267,7 +315,6 @@ class MainScene extends Phaser.Scene {
 
     this.bounce = null; // a projectile bouncing off the wall after impact (see startBounce)
     this.pendingProjectile = null; // equipped mid-flight, applied when the throw concludes
-    this.aimConsumed = null; // the projectile taken from the inventory by the current tap (see consumeProjectile)
     this.applyProjectile(Economy.getEquipped("projectile"));
     this.takeAimSnapshot();
     this.updateStreakHud();
@@ -312,14 +359,20 @@ class MainScene extends Phaser.Scene {
   // next tap, so a buff that runs out or is bought mid-aim, mid-flight or on the result screen can never
   // change the sliders (or the payout) of the throw in progress. The bars, their graduations and the event
   // dots are all drawn from this snapshot.
-  //  angleRange / powerRange: how much of the full swing / power span the slider covers, edge to edge
-  //    (1 = all of it; smaller = more precise - the graduations spread out like a magnified ruler)
+  //  angleRange: how far (in swing) the offset marker can drift, edge to edge of the bar - from the weight (see
+  //    "WEIGHT" above), narrowed by a precision buff; smaller = more precise, the graduations spread out.
+  //  powerRange: how much of the power span the strength slider covers (1 = all of it; strength-control buff).
   takeAimSnapshot() {
     const b = Buffs.modifiers();
     const cfg = { ...AIM_DEFAULTS, ...(this.eco.aim || {}) };
+    // The offset spread comes from the projectile's WEIGHT (heavier = a wider share of the bar is a hit), then a
+    // precision buff narrows it further. The graduation lines are every 10% of the SNOWBALL's spread, at fixed swing
+    // values, so they look stretched on lighter/heavier projectiles (a magnified ruler).
+    const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
     this.aim = {
       markerHz: cfg.markerHz, // fixed: the streak no longer speeds it up
-      angleRange: this.proj.angleRange / b.precision,
+      angleRange: offsetRangeForWeight(weight, cfg.offsetZoneAtWeight100) / b.precision,
+      angleTickStep: 0.1 * offsetRangeForWeight(REFERENCE_WEIGHT, cfg.offsetZoneAtWeight100),
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Skyr) gives them
@@ -331,9 +384,15 @@ class MainScene extends Phaser.Scene {
   // already in flight is left to finish (its coins count) and resets by itself like any other throw.
   onShopOpened() {
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
-      this.refundProjectile(true); // no throw happened, so the projectile the tap used up comes back
+      // The projectile the tap used up is NOT given back - it was spent at the first tap, so abandoning a bad aim
+      // (opening a tab) can't be used to get it back.
       this.state = STATE.IDLE;
       this.showMessage("TAP to aim");
+      if (this.pendingProjectile) {
+        // That tap was the last of its kind: the snowball takes over now, since no throw will follow to apply it.
+        this.applyProjectile(this.pendingProjectile);
+        this.pendingProjectile = null;
+      }
     }
   }
 
@@ -341,30 +400,13 @@ class MainScene extends Phaser.Scene {
   // (this.proj is unchanged until the throw is over); if it was the LAST one, the snowball is equipped again -
   // saved right now, applied when the throw concludes (pendingProjectile), so the aim isn't disturbed.
   consumeProjectile() {
-    this.aimConsumed = null;
     if (this.proj.infinite) return;
     const id = this.projectileId;
     if (!Economy.useProjectile(id)) return;
-    const depleted = Economy.getProjectileCount(id) === 0;
-    this.aimConsumed = { id, depleted };
-    if (depleted) {
+    if (Economy.getProjectileCount(id) === 0) {
       Economy.setEquipped("projectile", "snowball");
       this.pendingProjectile = "snowball";
     }
-  }
-
-  // The aim was thrown away before the ball left (the shop was opened, or another projectile was equipped): give
-  // the used-up projectile back. `restoreEquipped`: also put it back as the equipped one if its use had auto-switched
-  // to the snowball (not when the player has just chosen something else on purpose). Nothing is raised on the red dot.
-  refundProjectile(restoreEquipped) {
-    const c = this.aimConsumed;
-    if (!c) return;
-    Economy.addProjectiles(c.id, 1, true);
-    if (c.depleted) {
-      this.pendingProjectile = null;
-      if (restoreEquipped) Economy.setEquipped("projectile", c.id);
-    }
-    this.aimConsumed = null;
   }
 
   // The always-visible STREAK: x box under the top-right buttons. The text shrinks a little if it would be
@@ -390,7 +432,6 @@ class MainScene extends Phaser.Scene {
       return;
     }
     this.pendingProjectile = null;
-    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) this.refundProjectile(false);
     this.applyProjectile(id);
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
       this.state = STATE.IDLE;
@@ -541,18 +582,14 @@ class MainScene extends Phaser.Scene {
   launchBall() {
     this.state = STATE.FLIGHT;
     this.flightTime = 0;
-    this.aimConsumed = null; // the throw is happening: the projectile is really spent
 
     const swing = (this.angleValue - 0.5) * 2; // -1..1
     this.ballVX = swing * MAX_SWING_SPEED;
-    // Same throw strength, different weight: the apex scales with REFERENCE_WEIGHT / weight (weight 80 flies
-    // 25% higher than the snowball, weight 125 would fly 20% lower). Never below the lowest allowed stick
-    // height, so a heavy projectile can't end up in the restricted ground zone.
-    const apexScale = REFERENCE_WEIGHT / (this.proj.weight || REFERENCE_WEIGHT);
-    this.ballVY0 = Math.max(
-      MIN_POWER_SPEED,
-      (MIN_POWER_SPEED + this.powerValue * (MAX_POWER_SPEED - MIN_POWER_SPEED)) * Math.sqrt(apexScale)
-    );
+    // The strength marker's position (0..1) plus the weight shift is the effective power on the snowball's curve
+    // (see "WEIGHT" above); the apex is never below the lowest allowed stick height.
+    const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
+    const apex = apexForEffectivePower(this.powerValue + weightShift(weight));
+    this.ballVY0 = Math.sqrt(2 * GRAVITY * apex);
     this.ballStartX = ORIGIN_X;
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     // An apex above the roof edge would be a stick in the sky: that ball doesn't stick, it falls back.
@@ -942,11 +979,11 @@ class MainScene extends Phaser.Scene {
     };
   }
 
-  // The power-bar value (0..1) whose throw peaks at `apex` (a world height) with the equipped projectile.
-  // Inverse of the launch speed in launchBall(): apex = ((MIN + power x (MAX - MIN)) x sqrt(100/weight))^2 / 2g.
+  // The strength-bar value whose throw peaks at `apex` (a world height) with the equipped projectile - the inverse
+  // of launchBall(). May fall outside 0..1 (then that apex can't be reached with the bar).
   powerForApex(apex) {
-    const apexScale = REFERENCE_WEIGHT / (this.proj.weight || REFERENCE_WEIGHT);
-    return (Math.sqrt((2 * GRAVITY * apex) / apexScale) - MIN_POWER_SPEED) / (MAX_POWER_SPEED - MIN_POWER_SPEED);
+    const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
+    return effectivePowerForApex(apex) - weightShift(weight);
   }
 
   // `hitWidthPx` = how wide (on the bar) the range that really hits is. The dot never sticks out of it - it is
@@ -1009,9 +1046,10 @@ class MainScene extends Phaser.Scene {
       // Graduations: skip the bar's own edge and everything between the two guarantee lines.
       // Without the guide-lines buff the ticks are drawn everywhere - a gap in them would give the lines away.
       const guide = this.aim.guideLines;
-      for (let k = 1; k * AIM_TICK_STEP < range - 1e-9; k++) {
-        const swing = k * AIM_TICK_STEP;
-        if (!guide || swing > W20_SWING_GUARANTEE) lineAt(swing, 0x202020, 0.85, 1, 3);
+      const step = this.aim.angleTickStep;
+      for (let k = 1; k * step < range - 1e-9; k++) {
+        const swing = k * step;
+        if (!guide || swing > W20_SWING_GUARANTEE + 1e-6) lineAt(swing, 0x202020, 0.85, 1, 3);
       }
       // The two lines that guarantee a hit on W20 (sideways) - nothing else is drawn between them. Buff only.
       if (guide) lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
@@ -1059,10 +1097,13 @@ class MainScene extends Phaser.Scene {
 
       const target = this.activeEventTarget(swingNow);
       if (target && target.powerFrom !== null) {
-        const power = (target.powerFrom + target.powerTo) / 2;
-        if (power > pLo && power < pLo + pRange) {
-          const hitWidthPx = ((target.powerTo - target.powerFrom) / pRange) * barW;
-          this.drawEventDot(g, barX + barPos(power) * barW, barY + barH / 2, target.color, hitWidthPx);
+        // The hit band can stick out past the ends of the bar (a heavy projectile's band ends beyond the tip):
+        // aim the dot at the part that is on the bar.
+        const from = Math.max(target.powerFrom, pLo);
+        const to = Math.min(target.powerTo, pLo + pRange);
+        if (from < to) {
+          const hitWidthPx = ((to - from) / pRange) * barW;
+          this.drawEventDot(g, barX + barPos((from + to) / 2) * barW, barY + barH / 2, target.color, hitWidthPx);
         }
       }
     }

@@ -163,6 +163,25 @@ const Shop = (() => {
     return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   }
 
+  // A slot's new item takes over the clock of the one it replaces: its availability starts when the previous one ran out (or
+  // when the sold-out slot came back), NOT when the player happens to open the app. If that is already over too (the app was
+  // closed for a long time) the slot is rerolled again, and again, until the item that would be on sale right now is found -
+  // so time away is used up, never refunded as a fresh timer. Returns { id, expires } (id null: nothing eligible).
+  function rollFrom(startAt, others, now) {
+    let at = startAt;
+    let id = null;
+    let d = 0;
+    for (let n = 0; n < 500; n++) {
+      id = pickFor(others);
+      if (id === null) return { id: null, expires: null };
+      d = availMs(itemById(id));
+      if (!d) return { id, expires: null }; // an item without a timer
+      at += d;
+      if (at > now) return { id, expires: at };
+    }
+    return { id, expires: now + d }; // (safety net for an absurd absence: the last pick gets a full timer)
+  }
+
   // Make the saved stock valid (right length, real items, nothing owned, no duplicate projectiles), restock
   // slots whose timer has run out, and fill any other gap. Returns how many slots just came back from SOLD OUT.
   function ensureStock() {
@@ -198,12 +217,13 @@ const Shop = (() => {
         } else if (expires[i] - now > dur + 1000) {
           expires[i] = now + dur; // the device clock was set back: never longer than one full timer
         } else if (now >= expires[i]) {
-          // Ran out: the slot rerolls - a new pick, with a fresh amount, price and timer.
+          // Ran out: the slot rerolls - a new pick with a fresh amount and price. Its timer continues from where the old one ended
+          // (see rollFrom), so if the app was closed for a while it may already have been replaced again in between.
           const others = stock.filter((id, j) => j !== i && id);
-          stock[i] = pickFor(others);
-          offers[i] = stock[i] !== null ? rollOffer(itemById(stock[i])) : null;
-          const nd = stock[i] !== null ? availMs(itemById(stock[i])) : 0;
-          expires[i] = nd ? now + nd : null;
+          const r = rollFrom(expires[i], others, now);
+          stock[i] = r.id;
+          offers[i] = r.id !== null ? rollOffer(itemById(r.id)) : null;
+          expires[i] = r.expires;
           if (stock[i] !== null) restocked++;
         }
         continue;
@@ -216,12 +236,13 @@ const Shop = (() => {
         if (now < t.at) continue; // still counting down
       }
       const others = stock.filter((id, j) => j !== i && id);
-      stock[i] = pickFor(others); // nothing eligible (an empty item list) -> stays empty, shown as (TBD)
+      // The new item's availability timer starts when the sold-out timer ended (or now, for a first stocking) - see rollFrom.
+      const r = rollFrom(t && typeof t.at === "number" ? t.at : now, others, now);
+      stock[i] = r.id; // nothing eligible (an empty item list) -> stays empty, shown as (TBD)
       offers[i] = stock[i] !== null ? rollOffer(itemById(stock[i])) : null; // a fresh amount and price on every (re)stock
       if (t && stock[i] !== null) restocked++;
       restock[i] = null;
-      const nd2 = stock[i] !== null ? availMs(itemById(stock[i])) : 0;
-      expires[i] = nd2 ? now + nd2 : null; // its availability timer starts now
+      expires[i] = r.expires;
     }
     st.stock = stock;
     st.restock = restock;

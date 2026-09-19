@@ -55,6 +55,8 @@
     "priceOverride": 1,
     "_restockNote": "After buying, that slot shows SOLD OUT for this many seconds (by the device clock, so it also counts while the app is closed), then restocks. 1800 = 30 minutes (60 = 1 minute is handy for testing; 3600 = 1 hour).",
     "restockSeconds": 1800,
+    "_buffMaxNote": "The most copies of ONE buff the player can hold. Buying one they are already maxed on is refused like too little money (the card shakes, nothing is charged).",
+    "buffMax": 99,
 
     "refill": {
       "mode": "random_from_eligible",

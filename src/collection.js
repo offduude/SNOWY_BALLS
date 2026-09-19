@@ -178,6 +178,24 @@ const Collection = (() => {
     );
   }
 
+  // A long name next to a wide corner ("legendary x99") would run into it: the name gets a max width that stops short of the
+  // corner (so it wraps instead). Measured after the list is drawn; redone when the window is resized.
+  function fitNames() {
+    scrollEl.querySelectorAll(".pick-row").forEach((row) => {
+      const name = row.querySelector(".pick-name");
+      const corner = row.querySelector(".pick-corner");
+      if (!name || !corner) return;
+      name.style.maxWidth = "";
+      const n = name.getBoundingClientRect();
+      const c = corner.getBoundingClientRect();
+      const inner = document.createRange();
+      inner.selectNodeContents(name);
+      const textRight = inner.getBoundingClientRect().right;
+      const gap = 8; // px of air between the name and the label
+      if (textRight > c.left - gap) name.style.maxWidth = Math.max(40, c.left - gap - n.left) + "px";
+    });
+  }
+
   // What the list shows, as a string: when it changes (used, expired, bought) the list is redrawn.
   function buffKey(list) {
     return list.map((b) => `${b.id}:${b.active ? 1 : 0}:${b.count}`).join("|");
@@ -192,6 +210,7 @@ const Collection = (() => {
     scrollEl.innerHTML = list.length
       ? list.map(buffRowHtml).join("")
       : `<div class="list-empty">NO BUFFS YET<br /><br />BUY ONE IN THE SHOP FIRST</div>`;
+    fitNames();
   }
 
   // ...and a cheap timer-only refresh twice a second while it's open.
@@ -232,6 +251,7 @@ const Collection = (() => {
     scrollEl.innerHTML = sortedItems(kind, CATALOG[kind].items.filter((it) => isListed(kind, it)))
       .map((it) => rowHtml(kind, it))
       .join("");
+    fitNames();
     scrollEl.scrollTop = 0;
     refreshButtons();
     container.classList.add("list-open");
@@ -248,6 +268,13 @@ const Collection = (() => {
     buttons.character?.classList.remove("active");
   }
 
+  // The sound of drinking / using a buff (instead of the plain click).
+  const BUFF_USE_VOLUME = 0.6;
+  function playBuffUse() {
+    const game = window.snowyBallsGame;
+    if (game) game.sound.play("buff_use", { volume: BUFF_USE_VOLUME });
+  }
+
   function click() {
     playUiClick();
   }
@@ -262,9 +289,8 @@ const Collection = (() => {
   function onEquip(e) {
     const use = e.target.closest(".pick-use");
     if (use) {
-      click();
       Economy.clearNewBuff(use.dataset.id); // using a new buff takes its red dot away (the list redraws without it)
-      Buffs.use(use.dataset.id); // takes one from the inventory and starts it; the list redraws itself (Buffs.onChange)
+      if (Buffs.use(use.dataset.id)) playBuffUse(); // takes one from the inventory and starts it; the list redraws itself (Buffs.onChange)
       return;
     }
     const btn = e.target.closest(".pick-equip");
@@ -329,6 +355,7 @@ const Collection = (() => {
       buttons.projectile.addEventListener("click", () => toggle("projectile"));
       buttons.character?.addEventListener("click", () => toggle("character")); // no CHARACTERS button for now
       scrollEl.addEventListener("click", onEquip);
+      window.addEventListener("resize", () => openKind && fitNames());
       // Tapping the dimmed game area outside the list closes it.
       document.getElementById("list-backdrop").addEventListener("click", close);
     },

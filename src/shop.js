@@ -190,11 +190,17 @@ const Shop = (() => {
     return restocked;
   }
 
+  // A buff can't be held in more than Economy.getBuffMax() (99) copies.
+  function isMaxed(item) {
+    return item.category === "consumable" && Economy.getBuffCount(item.id) >= Economy.getBuffMax();
+  }
+
   function buy(slot) {
     const st = Economy.getShopState();
     const id = st.stock && st.stock[slot];
     const item = id && itemById(id);
     if (!item) return { ok: false, reason: "empty" };
+    if (isMaxed(item)) return { ok: false, reason: "max" }; // already holding the most of this buff: nothing is charged
     const offer = (st.offers || [])[slot] || null;
     if (!Economy.spendCoins(price(item, offer))) return { ok: false, reason: "funds" };
 
@@ -239,7 +245,7 @@ const Shop = (() => {
     }
     const offer = (Economy.getShopState().offers || [])[slot] || null;
     const p = price(item, offer);
-    const afford = Economy.getCoins() >= p;
+    const afford = Economy.getCoins() >= p && !isMaxed(item); // a maxed-out buff looks unbuyable, like a too-expensive one
     // Bottom row: the price at the left, the amount of a stack ("x14") at the right (a single item has no amount).
     const amountHtml = offer && offer.amount ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
     return (
@@ -319,7 +325,7 @@ const Shop = (() => {
       playUiClick();
       btn.classList.add("bought");
       setTimeout(render, 220); // let the "bought" flash play, then show SOLD OUT + its timer
-    } else if (result.reason === "funds") {
+    } else if (result.reason === "funds" || result.reason === "max") {
       btn.classList.remove("shake");
       void btn.offsetWidth; // restart the animation if they tap repeatedly
       btn.classList.add("shake");
@@ -330,6 +336,7 @@ const Shop = (() => {
     isReady: () => !!eco,
     init(economyJson) {
       eco = economyJson;
+      if (eco.shop && eco.shop.buffMax) Economy.setBuffMax(eco.shop.buffMax);
       root = document.getElementById("shop-items");
       root.addEventListener("click", onClick);
       dotEl = document.getElementById("shop-dot");

@@ -740,3 +740,9 @@ not actual play.
 - **Natural face event chance 1% -> 0.1%** (`events.faceWindow.chancePerThrow` 0.001, 1 in 1000 throws).
 - Balance report: Tomato Juice ~1600 coins on average (400 snowball hits); shop odds per slot with it: chestnut 85.7%, skyr 6.4%, grenade 6.4%, tomato juice 1.4%.
 - `economy.js?v=15`, `buffs.js?v=7`, `collection.js?v=24`, `main.js?v=81`.
+
+## Buff cap x99, long names, buff-use sound (2026-09-19)
+
+- **Buff cap**: at most 99 of one buff (`shop.buffMax` in economy.json; `Economy.setBuffMax/getBuffMax`, `addBuffs` clamps as a safety net). Buying one you are maxed on is refused like too little money: `Shop.buy` returns `reason: "max"` BEFORE charging, the card greys (`cant`) and shakes. Verified: 98 -> buy -> 99 (charged 1500), next buy: shake, 0 charged, slot stays on sale, count 99; `addBuffs(+5)` stays 99. Projectiles have no cap.
+- **Name vs corner**: `fitNames()` in `collection.js` (after each list draw and on window resize) gives a card's name a `max-width` that stops 8px short of the rarity/amount corner, so a long name wraps instead of touching it (Tomato Juice + "legendary x99" wraps to two lines and the card keeps its 13.05u height).
+- **Sound on USE**: `assets/audio/buff_use.mp3` (the file the user dropped in the project root - they called it "accessory_use"; a `consumable_accessory_use.mp3` also exists in the lawnmower_frenzy project, not used) plays at volume 0.6 (a guess) when a buff is used from the BUFFS list, replacing the plain click; only when the use actually succeeds. Verified `buff_use@0.6` played. `economy.js?v=16`, `shop.js?v=20`, `collection.js?v=25`, `main.js?v=82`.

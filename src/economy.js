@@ -272,10 +272,21 @@ const Economy = (() => {
 
   // Adds `n` of a buff. If the buff wasn't in the BUFFS tab before (none in the inventory and none running), the tab
   // "expands": the red dot is raised. More of a buff the player already has (in the inventory or running) raises nothing.
+  // (An inventory holds at most getBuffMax() of one buff - 99; the shop refuses to sell more, this is the safety net.)
+  let buffMax = 99;
+
+  function setBuffMax(n) {
+    if (n > 0) buffMax = Math.floor(n);
+  }
+
+  function getBuffMax() {
+    return buffMax;
+  }
+
   function addBuffs(id, n) {
     const before = getBuffCount(id);
     const running = state.buffs.some((b) => b.id === id && b.endsAt > Date.now());
-    state.buffItems[id] = before + n;
+    state.buffItems[id] = Math.min(buffMax, before + n);
     if (before === 0 && !running && n > 0) {
       state.buffsUnseen = true;
       if (!state.newBuffs.includes(id)) state.newBuffs.push(id);
@@ -424,6 +435,8 @@ const Economy = (() => {
     clearUnseenBuffs,
     takeBuff,
     setRegenConfig,
+    setBuffMax,
+    getBuffMax,
     regenInfo,
     getProjectileCount,
     addProjectiles,

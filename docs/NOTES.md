@@ -645,3 +645,8 @@ not actual play.
 ## Weight and hit value in one row (2026-09-19)
 
 - The two stats are now a **single row** along the bottom of the projectile card, starting right after the picture (14px from it) and running under the text and the EQUIP button (`.pick-row.has-stats` is a 3-column grid: picture spanning both rows and staying vertically centered, text + button on row 1, `.pick-stats` on row 2 across columns 2-3). Both stats did not fit side by side in the text column beside the picture alone (~23em of width vs the ~34 needed), hence running under the button too. The row is a 2-column grid: the left column is `19.5u` (the longest weight word "weight: very heavy" is 18 characters, one em each), so `hit value:` starts at the same x on every card (302px measured on every case) and font size is 1u. Worst cases checked: `very heavy` + 88 leaves a 14px gap between the two texts and ends 31px inside the card; `very light` + 888 ends 21px inside. Picture unchanged (87px). `collection.js?v=12`.
+
+## Coin/number alignment and lighter stats (2026-09-19)
+
+- **Alignment**: measured the font (canvas `measureText`): Press Start 2P has ascent 1em / descent 0 and its digits' ink spans 0.13em..1em above the baseline, so the ink centre is 0.565em above the baseline. The 1.1em coin used `vertical-align: -0.1em`, which put its centre at 0.45em - about 0.115em (~1px) lower than the digit, which is why the "8" looked high. `vertical-align: baseline` puts the coin's centre at 0.55em: measured coin centre vs digit ink centre now differ by 0.15px on both cards.
+- **Lighter font**: the weight / hit value stats use `#8a6a44`, the same lighter brown as the amount ("x12"), instead of the darker `#6b4a2a` (verified identical computed colours). `collection.js?v=13`.

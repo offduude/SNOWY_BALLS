@@ -420,7 +420,7 @@
       display: grid;
       grid-template-columns: calc(var(--u) * 19.5) auto;
       font-size: calc(var(--u) * 1);
-      color: #6b4a2a;
+      color: #8a6a44; /* the same lighter brown as the amount (x12) */
       white-space: nowrap;
     }
 
@@ -433,7 +433,9 @@
       border: 2px solid #b8860b;
       border-radius: 50%;
       box-sizing: border-box;
-      vertical-align: -0.1em;
+      /* In Press Start 2P the digits' ink centre sits 0.565em above the baseline (measured), and this 1.1em coin has
+         its centre 0.55em above the baseline when it stands on the baseline - so the number lines up with the coin. */
+      vertical-align: baseline;
     }
 
     .pick-row {
@@ -745,7 +747,7 @@
   <script src="src/economy.js?v=9"></script>
   <script src="src/buffs.js?v=3"></script>
   <script src="src/shop.js?v=14"></script>
-  <script src="src/collection.js?v=12"></script>
+  <script src="src/collection.js?v=13"></script>
   <script src="src/main.js?v=71"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

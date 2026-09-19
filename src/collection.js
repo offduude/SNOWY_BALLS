@@ -40,7 +40,7 @@ const Collection = (() => {
         {
           id: "stone", // same id as its shop item and its economy.json "projectiles" entry
           name: "Stone",
-          description: "Vile snowball",
+          description: "Vile snowball.",
           image: "assets/snowball/stone.png",
         },
       ],

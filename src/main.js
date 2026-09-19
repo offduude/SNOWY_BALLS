@@ -192,8 +192,8 @@ const PROJECTILE_VISUALS = {
   stone: {
     ball: "stone",
     sprites: { idle: "char_idle_stone", aiming: "char_aiming_stone", throwing: "char_throwing" },
-    impactSound: "snowball_impact", // a throw that hits no window: the plain wall thud
-    impactVolume: 0.3,
+    impactSound: "chestnut_impact", // a throw that hits no window: the chestnut's sound
+    impactVolume: 0.5,
     hitSound: "hard_impact", // ... a throw that hits a window (W20 / W21)
     hitVolume: 0.6,
   },

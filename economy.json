@@ -45,7 +45,7 @@
   "projectiles": {
     "snowball": { "infinite": false, "regen": { "max": 100, "everySeconds": 30 }, "rarity": "default", "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
     "chestnut": { "infinite": false, "rarity": "common", "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
-    "stone": { "infinite": false, "weight": 145, "rewards": { "W20": 15, "W21": 15 }, "leavesMark": false, "spins": true },
+    "stone": { "infinite": false, "rarity": "common", "weight": 145, "rewards": { "W20": 15, "W21": 15 }, "leavesMark": false, "spins": true },
     "pinecone": { "infinite": false, "rarity": "rare", "weight": 126, "rewards": { "W20": 21, "W21": 21 }, "leavesMark": false, "spins": true },
     "grenade": { "infinite": false, "rarity": "epic", "weight": 130, "rewards": { "W20": 199, "W21": 199 }, "leavesMark": true, "spins": false }
   },
@@ -171,7 +171,7 @@
         "ignorePriceOverride": true,
         "image": "assets/snowball/stone.png",
         "effect": { "type": "givesProjectile", "value": "stone" },
-        "description": "Vile snowball"
+        "description": "Vile snowball."
       }
     ]
   }

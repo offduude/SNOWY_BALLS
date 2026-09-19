@@ -207,7 +207,7 @@ class MainScene extends Phaser.Scene {
 
     this.marks = []; // stuck-snowball sprites; each one schedules its own fade-out in addMark()
 
-    // Sits over W20, invisible until the banana streak bonus triggers - see startBananaEvent().
+    // Sits over W20, invisible until the banana event triggers - see startBananaEvent().
     this.bananaOverlay = this.add
       .image(FACE_IMG_X, this.worldY(FACE_IMG_TOP_HEIGHT), "goal_window_face")
       .setOrigin(0, 0); // native size, 1:1 with the wall - no scaling
@@ -621,8 +621,6 @@ class MainScene extends Phaser.Scene {
         this.bananaHitTriggered = true;
         coins += this.eco.events.faceWindow.faceBonusCoins;
         this.triggerBananaHit(mark);
-      } else if (this.streak === this.eco.events.faceWindow.streakTrigger && !this.bananaActive) {
-        this.startBananaEvent();
       }
 
       // Projectile handicap/bonus (economy.json "projectiles"), rounded down, on the whole payout.
@@ -638,12 +636,27 @@ class MainScene extends Phaser.Scene {
       this.showMessage("MISS\nstreak reset");
     }
 
+    this.maybeStartRandomEvent();
+
     this.time.delayedCall(1400, () => {
       if (this.state === STATE.RESULT) this.resetForNextThrow();
     });
   }
 
-  // Streak-3 bonus: swaps W20's texture to the banana art for events.faceWindow.durationMs, then fades
+  // True while any timed event is running. Only the face window exists so far - add every new event
+  // here, so two events never overlap.
+  isEventActive() {
+    return this.bananaActive;
+  }
+
+  // After every throw (hit, miss or escape) roll for a random event - but never while one is running.
+  // Chance per event is in economy.json (events.faceWindow.chancePerThrow, 0.01 = 1%).
+  maybeStartRandomEvent() {
+    if (this.isEventActive()) return;
+    if (Math.random() < this.eco.events.faceWindow.chancePerThrow) this.startBananaEvent();
+  }
+
+  // Random face-window event (1% chance after each throw): swaps W20's texture to the banana art for events.faceWindow.durationMs, then fades
   // back on its own. Any existing marks on W20's left section fade out quickly first, so they
   // don't look like they're stuck to a texture that's about to change out from under them.
   startBananaEvent() {

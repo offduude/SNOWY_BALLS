@@ -13,7 +13,7 @@
 
   "events": {
     "faceWindow": {
-      "streakTrigger": 3,
+      "chancePerThrow": 0.01,
       "durationMs": 20000,
       "hitRevertMs": 1000,
       "faceBonusCoins": 10

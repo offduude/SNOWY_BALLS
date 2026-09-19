@@ -28,11 +28,11 @@ start with "economy.json failed to load or has a JSON syntax error".
 
 ## events (live)
 
-`faceWindow` is the streak bonus where W20 turns into the face window.
+`faceWindow` is the random event where W20 turns into the face window: hit the face for the bonus.
 
 | field | meaning |
 |---|---|
-| `streakTrigger` | hit streak that starts it (exactly this number) |
+| `chancePerThrow` | chance (0-1) that the event starts after each throw, hit or miss - `0.01` = 1%. It never starts while an event is already running. (It used to start at a streak of 3; the streak no longer matters.) |
 | `durationMs` | how long the face texture stays (20000 = 20s) |
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceBonusCoins` | extra coins for hitting the face, on top of the normal hit reward |

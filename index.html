@@ -279,7 +279,11 @@
       flex: 1;
       align-self: stretch;
       min-height: 0;
-      margin: calc(var(--u) * 0.5) 0;
+      /* The rectangle sits a little higher (0.15u under the category row instead of 0.5u; the 0.35u goes to the bottom, so it
+         keeps its height) and the picture inside is a little smaller and lower (padding), clear of the availability timer. */
+      margin: calc(var(--u) * 0.15) 0 calc(var(--u) * 0.85);
+      padding: calc(var(--u) * 0.9) calc(var(--u) * 0.4) calc(var(--u) * 0.3);
+      box-sizing: border-box;
       background: rgba(122, 82, 48, 0.1);
       border-radius: 2px;
     }

@@ -12,6 +12,7 @@ const Economy = (() => {
       bestStreak: 0,
       projectiles: {}, // how many of each consumable projectile the player has (the snowball is infinite and not listed)
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
+      aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
       unlockedCharacters: ["default"],
       equipped: { character: "default", projectile: "snowball" }, // what the player currently uses
@@ -48,6 +49,7 @@ const Economy = (() => {
         lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
         bestStreak: p.bestStreak || 0,
         streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
+        aiming: p.aiming === true,
         projectiles: cleanCounts(p.projectiles),
         projectilesUnseen: p.projectilesUnseen === true,
         unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
@@ -165,6 +167,16 @@ const Economy = (() => {
     projectilesChanged();
   }
 
+  function wasAiming() {
+    return state.aiming;
+  }
+
+  function setAiming(on) {
+    if (state.aiming === on) return;
+    state.aiming = on;
+    save();
+  }
+
   function getStreak() {
     return state.streak;
   }
@@ -217,6 +229,8 @@ const Economy = (() => {
     getBestStreak,
     getStreak,
     setStreak,
+    wasAiming,
+    setAiming,
     getProjectileCount,
     addProjectiles,
     useProjectile,

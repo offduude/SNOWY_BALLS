@@ -199,6 +199,9 @@ const PROJECTILE_VISUALS = {
     impactSound: "grenade_impact",
     impactVolume: 0.5,
     mark: { texture: "grenade_impact", size: 40 }, // a big scorch mark (the snowball's is 20px)
+    // On impact: a radial flash growing out of the grenade (ms, and how big it gets as a multiple of its 128px
+    // texture) and a short shake of the game picture (share of the screen size, x/y; the UI does not shake).
+    explosion: { flashMs: 340, flashScale: 4.6, shakeMs: 330, shakeX: 0.014, shakeY: 0.008 },
   },
 };
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
@@ -263,6 +266,11 @@ class MainScene extends Phaser.Scene {
     Collection.setEconomy(this.eco);
 
     this.state = STATE.IDLE;
+    if (Economy.wasAiming()) {
+      // The app was closed in the middle of an aim: that is an abandoned aim, so the streak is lost.
+      Economy.setStreak(0);
+      Economy.setAiming(false);
+    }
     this.streak = Economy.getStreak(); // hits in a row - saved, so it survives closing the app
     this.angleValue = 0.5;
     this.powerValue = 0.5;
@@ -382,10 +390,60 @@ class MainScene extends Phaser.Scene {
   // The shop was opened. An aim in progress (angle or power phase) is dropped and the game goes back to
   // "TAP to aim" - the player is no longer looking at it, and the buffs are re-read on the next tap. A ball
   // already in flight is left to finish (its coins count) and resets by itself like any other throw.
+  // Purely visual: a bright radial flash that grows out of the grenade where it hit and fades, and a short shake of
+  // the main camera (the game picture only - the HTML buttons and the rear-view window stay still).
+  playExplosion(x, y, fx) {
+    if (!this.textures.exists("explosion_glow")) this.makeExplosionGlowTexture();
+    const glow = this.add.image(x, y, "explosion_glow").setDepth(15).setBlendMode(Phaser.BlendModes.ADD).setScale(0.5).setAlpha(1);
+    this.tweens.add({
+      targets: glow,
+      scale: fx.flashScale,
+      alpha: 0,
+      duration: fx.flashMs,
+      ease: "Quad.easeOut",
+      onComplete: () => glow.destroy(),
+    });
+    // A small hot core that flashes faster than the glow, so the first frames are almost white.
+    const core = this.add.image(x, y, "explosion_glow").setDepth(16).setBlendMode(Phaser.BlendModes.ADD).setScale(0.3).setAlpha(1);
+    this.tweens.add({
+      targets: core,
+      scale: fx.flashScale * 0.45,
+      alpha: 0,
+      duration: fx.flashMs * 0.55,
+      ease: "Cubic.easeOut",
+      onComplete: () => core.destroy(),
+    });
+    this.cameras.main.shake(fx.shakeMs, new Phaser.Math.Vector2(fx.shakeX, fx.shakeY), true);
+  }
+
+  // A soft white-yellow-orange radial gradient, drawn once into a canvas texture (smooth, not pixelated).
+  makeExplosionGlowTexture() {
+    const tex = this.textures.createCanvas("explosion_glow", 128, 128);
+    const ctx = tex.getContext();
+    const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.25, "rgba(255,244,190,0.95)");
+    grad.addColorStop(0.55, "rgba(255,160,50,0.55)");
+    grad.addColorStop(1, "rgba(255,90,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 128);
+    tex.refresh();
+    tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
+
+  // Throwing away an aim in progress (opening the shop, equipping something else, closing the app) counts as a
+  // failed throw: the projectile the tap used up is NOT given back, and the streak is lost - otherwise a bad aim
+  // could be escaped for free. (No miss coins, no message: nothing was thrown.)
+  abandonAim() {
+    Economy.setAiming(false);
+    this.streak = 0;
+    Economy.setStreak(0);
+    this.updateStreakHud();
+  }
+
   onShopOpened() {
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
-      // The projectile the tap used up is NOT given back - it was spent at the first tap, so abandoning a bad aim
-      // (opening a tab) can't be used to get it back.
+      this.abandonAim();
       this.state = STATE.IDLE;
       this.showMessage("TAP to aim");
       if (this.pendingProjectile) {
@@ -432,8 +490,10 @@ class MainScene extends Phaser.Scene {
       return;
     }
     this.pendingProjectile = null;
+    const wasAiming = this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER;
+    if (wasAiming) this.abandonAim();
     this.applyProjectile(id);
-    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
+    if (wasAiming) {
       this.state = STATE.IDLE;
       this.showMessage("TAP to aim");
     }
@@ -566,6 +626,7 @@ class MainScene extends Phaser.Scene {
     if (this.state === STATE.IDLE) {
       this.takeAimSnapshot(); // the one moment the player's buffs are read for this throw
       this.consumeProjectile(); // ... and the moment a consumable projectile is used up
+      Economy.setAiming(true); // an aim is open until the ball is thrown (see abandonAim)
       this.state = STATE.AIM_ANGLE;
       this.aimStartTime = this.time.now;
       this.showMessage("");
@@ -582,6 +643,7 @@ class MainScene extends Phaser.Scene {
   launchBall() {
     this.state = STATE.FLIGHT;
     this.flightTime = 0;
+    Economy.setAiming(false); // thrown: the aim is no longer open
 
     const swing = (this.angleValue - 0.5) * 2; // -1..1
     this.ballVX = swing * MAX_SWING_SPEED;
@@ -763,6 +825,8 @@ class MainScene extends Phaser.Scene {
       this.ball.setVisible(false);
     }
     if (!escaped) this.sound.play(this.projVisuals.impactSound, { volume: this.projVisuals.impactVolume });
+    // An exploding projectile lights up the wall where it hit (not when it flew out of the top / fell behind the roof).
+    if (!escaped && this.projVisuals.explosion) this.playExplosion(stickX, this.worldY(stickHeight), this.projVisuals.explosion);
 
     if (hit) {
       this.streak += 1;

@@ -89,7 +89,7 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 
 | field | meaning |
 |---|---|
-| `infinite` | `true` = never runs out (the snowball). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim" (and is NOT given back if the aim is abandoned - opening a tab, equipping something else); when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
+| `infinite` | `true` = never runs out (the snowball). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim" (and is NOT given back if the aim is abandoned - opening the shop, equipping something else, closing the app; an abandoned aim also loses the streak); when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
 | `rewards` | the base coins for a hit on `W20` / `W21` with this projectile (the face bonus is added on top) |
 | `weight` | 0-200, **not shown as a number** (see "weight" above; the snowball is always 100): the strength position of the perfect W20 throw is `weight / 200`, and the share of the offset slider that hits W20 also grows with it |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |

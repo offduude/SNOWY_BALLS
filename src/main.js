@@ -124,7 +124,9 @@ const BANANA_LEFT_SECTION_XTO = FACE_IMG_X + FACE_RAW_LEFT_DIVIDER_X;
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
 
-// What each equippable projectile LOOKS and SOUNDS like (texture / sound keys from preload). Its
+// What each equippable projectile LOOKS and SOUNDS like (texture / sound keys from preload; `mark` = the texture and
+// on-screen size of the mark it leaves on the wall, `launchSound` = the sound when it is thrown - both optional, the
+// defaults are the snowball's mark and the throw whoosh). Its
 // gameplay numbers (aim range/speed, coin multiplier, mark or bounce, spin) live in economy.json
 // under "projectiles", keyed by the same id. Character sprites that aren't listed fall back to the
 // normal ones - there is no chestnut "throwing" sprite yet, so that pose uses the plain one.
@@ -140,6 +142,15 @@ const PROJECTILE_VISUALS = {
     sprites: { idle: "char_idle_chestnut", aiming: "char_aiming_chestnut", throwing: "char_throwing" },
     impactSound: "chestnut_impact",
     impactVolume: 0.5,
+  },
+  grenade: {
+    ball: "grenade_flying",
+    sprites: { idle: "char_idle_grenade", aiming: "char_aiming_grenade", throwing: "char_throwing" },
+    launchSound: "grenade_launch",
+    launchVolume: 0.6,
+    impactSound: "grenade_impact",
+    impactVolume: 0.5,
+    mark: { texture: "grenade_impact", size: 40 }, // a big scorch mark (the snowball's is 20px)
   },
 };
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
@@ -175,6 +186,10 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_aiming", "assets/character/character1_aiming.png");
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
+    this.load.image("grenade_flying", "assets/snowball/grenade_flying.png"); // the ball while it is in the air
+    this.load.image("grenade_impact", "assets/snowball/grenade_impact.png"); // the scorch mark it leaves on the wall
+    this.load.image("char_idle_grenade", "assets/character/character1_idle_grenade.png");
+    this.load.image("char_aiming_grenade", "assets/character/character1_aiming_grenade.png");
     this.load.image("char_idle_chestnut", "assets/character/character1_idle_chestnut.png?v=2");
     this.load.image("char_aiming_chestnut", "assets/character/character1_aiming_chestnut.png");
     // Timestamp so an edited economy.json is never served from a stale browser/CDN cache.
@@ -186,6 +201,8 @@ class MainScene extends Phaser.Scene {
     this.load.audio("click", "assets/audio/click.mp3");
     this.load.audio("shop_restock", "assets/audio/shop_restock.mp3?v=2");
     this.load.audio("chestnut_impact", "assets/audio/chestnut_impact.mp3");
+    this.load.audio("grenade_launch", "assets/audio/grenade_launch.mp3");
+    this.load.audio("grenade_impact", "assets/audio/grenade_impact.mp3");
   }
 
   create() {
@@ -549,7 +566,7 @@ class MainScene extends Phaser.Scene {
     this.ball.setAlpha(1);
     this.ball.setVisible(true);
     this.flightWorst = 0;
-    this.sound.play("throw_whoosh", { volume: 0.6 });
+    this.sound.play(this.projVisuals.launchSound || "throw_whoosh", { volume: this.projVisuals.launchVolume || 0.6 });
   }
 
   updateFlight(dt) {
@@ -657,8 +674,9 @@ class MainScene extends Phaser.Scene {
   }
 
   addMark(x, heightClimbed) {
-    const mark = this.add.image(x, this.worldY(heightClimbed), "snowball_mark");
-    mark.setDisplaySize(20, 20);
+    const look = this.projVisuals.mark || { texture: "snowball_mark", size: 20 };
+    const mark = this.add.image(x, this.worldY(heightClimbed), look.texture);
+    mark.setDisplaySize(look.size, look.size);
     mark.setDepth(5); // above the building, below the live ball (depth 10)
     // A mark stuck right under the roof must not overhang into the sky: clip off the part above the roof edge.
     const overhang = this.worldY(ROOF_EDGE_HEIGHT) - (mark.y - mark.displayHeight / 2);

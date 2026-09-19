@@ -33,7 +33,8 @@
   "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps 'TAP to aim', and when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile (streak and face bonuses are added on top). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; 75 flies 33% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far); the aim bar keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker speed is the same for everything. leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",
   "projectiles": {
     "snowball": { "infinite": true, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "angleRange": 1, "leavesMark": true, "spins": false },
-    "chestnut": { "infinite": false, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "angleRange": 0.8, "leavesMark": false, "spins": true }
+    "chestnut": { "infinite": false, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "angleRange": 0.8, "leavesMark": false, "spins": true },
+    "grenade": { "infinite": false, "weight": 120, "rewards": { "W20": 199, "W21": 199 }, "angleRange": 1, "leavesMark": true, "spins": false }
   },
 
 
@@ -48,7 +49,7 @@
       "mode": "random_from_eligible",
       "excludeOwned": true,
       "_equalChanceNote": "Every item has the SAME chance to be put on sale in a slot. To make some kinds rarer again, add \"categoryWeights\": { \"consumable\": 9, \"projectile\": 1 } here (odds of each TYPE; then an item of that type is picked at random).",
-      "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
+      "guaranteeCheapItem": { "enabled": false, "maxPriceInAverageHits": 12 }
     },
 
     "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (guideLines, precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; the same stack can be on sale in several slots at once, each with its own roll).",
@@ -63,6 +64,17 @@
         "image": "assets/items/skyr.png",
         "effects": [{ "type": "guideLines", "value": 1 }],
         "description": "Improves brain function."
+      },
+      {
+        "id": "grenade",
+        "name": "Grenade",
+        "category": "projectile",
+        "amount": { "min": 1, "max": 3 },
+        "unitPrice": { "min": 114, "max": 198 },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/grenade.png",
+        "effect": { "type": "givesProjectile", "value": "grenade" },
+        "description": "no description"
       },
       {
         "id": "chestnut",

@@ -99,7 +99,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 - `excludeOwned` - permanent items already bought never come back
 - **every eligible item has the same chance** to be put in a slot (a plain random pick). Optional `categoryWeights` (e.g. `{ "consumable": 9, "projectile": 1 }`) makes some TYPES rarer: the type is picked by those weights first, then an item of that type at random. It is not set right now
 - (always on) **any item can be on sale in several slots at once**, projectiles included; every slot rolls its own amount and price
-- `guaranteeCheapItem` - after choosing, if nothing shown costs `maxPriceInAverageHits` average
+- `guaranteeCheapItem` - (currently `enabled: false`, so it does not skew the equal chances) after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop
   filling up with things the player can't afford.
 

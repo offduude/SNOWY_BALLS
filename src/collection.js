@@ -21,6 +21,12 @@ const Collection = (() => {
           infinite: true,
         },
         {
+          id: "grenade", // same id as its shop item and its economy.json "projectiles" entry
+          name: "Grenade",
+          description: "no description",
+          image: "assets/snowball/grenade.png",
+        },
+        {
           id: "chestnut", // same id as its shop item and its economy.json "projectiles" entry
           name: "Chestnut",
           description: "Found it in someone's backpack. How convenient!",

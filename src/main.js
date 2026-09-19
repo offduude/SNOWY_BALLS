@@ -176,7 +176,13 @@ function offsetRangeForWeight(weight, zoneAt100) {
   return Math.min(10, W20_SWING_GUARANTEE / Math.max(0.015, offsetZone(weight, zoneAt100)));
 }
 
-const FACE_IMG_X = W20.xFrom - 1; // world x of the texture's left edge
+// The face window textures are the raw 58x50 exports: 2px of grey padding all round (which would paint over the wall) and then
+// the 54x46 picture, whose top-left sits 1px up/left of W20. The padding is cropped away when the overlay is drawn, so the
+// PNGs can be replaced by new exports as they are.
+const FACE_TEX_PAD = 2;
+const FACE_TEX_W = 54;
+const FACE_TEX_H = 46;
+const FACE_IMG_X = W20.xFrom - 1; // world x of the (cropped) texture's left edge
 const FACE_IMG_TOP_HEIGHT = W20.heightTo + 1; // heightClimbed of the texture's top edge
 const FACE_RAW = { xFrom: 1, xTo: 18, yFrom: 28, yTo: 45 }; // face+collar, cropped-texture px
 const FACE_RAW_LEFT_DIVIDER_X = 20; // cropped-texture px - where the left pane ends
@@ -303,8 +309,8 @@ class MainScene extends Phaser.Scene {
     this.load.image("background", "assets/building/background.png?v=2");
     this.load.image("snowball", "assets/snowball/snowball.png");
     this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
-    this.load.image("goal_window_face", "assets/building/goal_window_face.png");
-    this.load.image("goal_window_face_hit", "assets/building/goal_window_face_hit.png");
+    this.load.image("goal_window_face", "assets/building/goal_window_face.png?v=2");
+    this.load.image("goal_window_face_hit", "assets/building/goal_window_face_hit.png?v=2");
     this.load.image("char_idle", "assets/character/character1_idle.png?v=2"); // empty-handed: no snowballs left
     this.load.image("char_idle_snowball", "assets/character/character1_idle_snowball.png"); // a snowball in hand
     this.load.image("char_aiming", "assets/character/character1_aiming.png?v=2");
@@ -397,8 +403,9 @@ class MainScene extends Phaser.Scene {
 
     // Sits over W20, invisible until the banana event triggers - see startBananaEvent().
     this.bananaOverlay = this.add
-      .image(FACE_IMG_X, this.worldY(FACE_IMG_TOP_HEIGHT), "goal_window_face")
-      .setOrigin(0, 0); // native size, 1:1 with the wall - no scaling
+      .image(FACE_IMG_X - FACE_TEX_PAD, this.worldY(FACE_IMG_TOP_HEIGHT) - FACE_TEX_PAD, "goal_window_face")
+      .setOrigin(0, 0) // native size, 1:1 with the wall - no scaling
+      .setCrop(FACE_TEX_PAD, FACE_TEX_PAD, FACE_TEX_W, FACE_TEX_H); // drop the grey padding: what is left lands exactly on W20
     this.bananaOverlay.setDepth(1); // above the building, below marks/ball
     this.bananaOverlay.setAlpha(0);
     this.bananaOverlay.setVisible(false);

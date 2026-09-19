@@ -11,7 +11,7 @@
 //   guideLines       1     shows the green guarantee lines on both sliders (hidden without this buff)
 //   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
-//   coinMultiplier   x     multiplies the coins of a hit
+//   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout)
 //   sliderSpeed      x     both sliders move at x times their speed (0.8 = 20% slower, steadier). Several such buffs can run at once
 //                          (each keeps its timer) but only the BEST counts = the slowest (lowest x); they do not multiply
 //   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Several such buffs can run at once (all keep

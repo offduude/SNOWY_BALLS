@@ -1039,9 +1039,9 @@ class MainScene extends Phaser.Scene {
         this.triggerBananaHit(mark);
       }
 
-      // The coin multiplier of the buffs that were active when the player tapped to aim, rounded down (+1e-9 so a
-      // product like 8 x 1.5 doesn't fall short through floating point).
-      coins = Math.floor(coins * this.aim.coinMultiplier + 1e-9);
+      // The coin multiplier of the buffs that were active when the player tapped to aim. Only whole coins are paid; the fraction
+      // left over (5 x 1.1 = 5.5 pays 5 and keeps 0.5) is carried over to the next payout.
+      coins = Economy.takePayout(coins * this.aim.coinMultiplier); // whole coins; the fraction is carried over to the next payout
 
       // (The streak itself is shown all the time in the top-right STREAK box now.)
       Economy.addCoins(coins);

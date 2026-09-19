@@ -17,6 +17,7 @@ const Economy = (() => {
       projectiles: {}, // how many of each consumable projectile the player has (not the snowball - see regen)
       regen: {}, // projectiles that refill over time (the snowball): id -> { count, next } - `next` is the Date.now() timestamp (device clock) at which the next one arrives, null while the stock is full
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
+      coinCarry: 0, // the fraction of a coin left over from a payout with a coin multiplier (0 <= x < 1), added to the next payout
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
       unlockedCharacters: ["default"],
@@ -69,6 +70,7 @@ const Economy = (() => {
         lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
         bestStreak: p.bestStreak || 0,
         streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
+        coinCarry: typeof p.coinCarry === "number" && p.coinCarry >= 0 && p.coinCarry < 1 ? p.coinCarry : 0,
         aiming: p.aiming === true,
         projectiles: cleanCounts(p.projectiles),
         regen: cleanRegen(p.regen),
@@ -113,6 +115,17 @@ const Economy = (() => {
   }
   function notify() {
     listeners.forEach((fn) => fn(state.coins));
+  }
+
+  // A payout that is not a whole number of coins (a hit x a coin multiplier, e.g. 5 x 1.1 = 5.5): pays the whole coins and keeps the
+  // fraction for the next payout, so a small multiplier is never rounded away - over time the player gets exactly what the
+  // multiplier says. Returns the whole coins to pay out (the caller adds them with addCoins).
+  function takePayout(amount) {
+    const total = Math.round((amount + state.coinCarry) * 1e6) / 1e6; // (rounds away float dust like 5.500000000000001)
+    const whole = Math.floor(total);
+    state.coinCarry = Math.max(0, Math.round((total - whole) * 1e6) / 1e6);
+    save();
+    return whole;
   }
 
   function addCoins(amount) {
@@ -421,6 +434,7 @@ const Economy = (() => {
   return {
     onCoinsChange,
     addCoins,
+    takePayout,
     spendCoins,
     getCoins,
     getLifetimeCoins,

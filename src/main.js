@@ -189,6 +189,14 @@ const PROJECTILE_VISUALS = {
     impactSound: "chestnut_impact",
     impactVolume: 0.5,
   },
+  stone: {
+    ball: "stone",
+    sprites: { idle: "char_idle_stone", aiming: "char_aiming_stone", throwing: "char_throwing" },
+    impactSound: "snowball_impact", // a throw that hits no window: the plain wall thud
+    impactVolume: 0.3,
+    hitSound: "hard_impact", // ... a throw that hits a window (W20 / W21)
+    hitVolume: 0.6,
+  },
   pinecone: {
     ball: "pinecone",
     sprites: { idle: "char_idle_pinecone", aiming: "char_aiming_pinecone", throwing: "char_throwing" },
@@ -249,6 +257,9 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
+    this.load.image("stone", "assets/snowball/stone.png");
+    this.load.image("char_idle_stone", "assets/character/character1_idle_stone.png");
+    this.load.image("char_aiming_stone", "assets/character/character1_aiming_stone.png");
     this.load.image("char_idle_pinecone", "assets/character/character1_idle_pinecone.png");
     this.load.image("char_aiming_pinecone", "assets/character/character1_aiming_pinecone.png");
     this.load.image("grenade_flying", "assets/snowball/grenade_flying.png"); // the ball while it is in the air
@@ -269,6 +280,7 @@ class MainScene extends Phaser.Scene {
     this.load.audio("grenade_launch", "assets/audio/grenade_launch.mp3");
     this.load.audio("grenade_impact", "assets/audio/grenade_impact.mp3");
     this.load.audio("buff_use", "assets/audio/buff_use.mp3");
+    this.load.audio("hard_impact", "assets/audio/hard_impact.mp3");
   }
 
   create() {
@@ -878,7 +890,12 @@ class MainScene extends Phaser.Scene {
     } else {
       this.ball.setVisible(false);
     }
-    if (!escaped) this.sound.play(this.projVisuals.impactSound, { volume: this.projVisuals.impactVolume });
+    if (!escaped) {
+      // A projectile can have its own sound for hitting a window (the stone's hard_impact); otherwise its one impact sound.
+      const v = this.projVisuals;
+      if (hit && v.hitSound) this.sound.play(v.hitSound, { volume: v.hitVolume });
+      else this.sound.play(v.impactSound, { volume: v.impactVolume });
+    }
     // An exploding projectile lights up the wall where it hit (not when it flew out of the top / fell behind the roof).
     if (!escaped && this.projVisuals.explosion) this.playExplosion(stickX, this.worldY(stickHeight), this.projVisuals.explosion);
 

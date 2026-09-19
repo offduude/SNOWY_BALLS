@@ -60,17 +60,17 @@ def check(eco):
     for i in shop["items"]:
         if i.get("category") == "projectile" and i.get("id") not in projectiles:
             problems.append(f"{i['id']}: projectile has no entry in the top-level \"projectiles\" section")
-    # Rarities: every projectile and shop item must name a rarity that exists; chances must be positive.
+    # Rarities: every projectile and shop item that names a rarity must name one that exists (none at all is allowed); chances must be positive.
     rarities = eco.get("rarities", [])
     ids = [r["id"] for r in rarities]
     for r in rarities:
         if r.get("chance", 0) < 0:
             problems.append(f"rarity '{r.get('id')}': chance can't be negative (0 = never in the shop)")
     for pid, pr in projectiles.items():
-        if pr.get("rarity") not in ids:
+        if pr.get("rarity") is not None and pr.get("rarity") not in ids:  # none at all is allowed (common in the shop, last in the tabs)
             problems.append(f"projectile {pid}: rarity '{pr.get('rarity')}' is not in rarities")
     for it in shop["items"]:
-        if it.get("category") == "consumable" and it.get("rarity") not in ids:
+        if it.get("category") == "consumable" and it.get("rarity") is not None and it.get("rarity") not in ids:
             problems.append(f"item {it.get('id')}: rarity '{it.get('rarity')}' is not in rarities")
     return problems
 
@@ -81,8 +81,12 @@ def slot_odds(eco):
     rarities = eco.get("rarities", [])
     items = eco["shop"]["items"]
 
+    sellable = [r["id"] for r in rarities if r["chance"] > 0]
+
     def rarity_of(it):
-        return eco["projectiles"][it["id"]]["rarity"] if it["category"] == "projectile" else it.get("rarity")
+        r = eco["projectiles"][it["id"]].get("rarity") if it["category"] == "projectile" else it.get("rarity")
+        # like the shop: an item with no (or an unsellable) rarity is picked as the first sellable one (common)
+        return r if r in sellable else (sellable[0] if sellable else None)
 
     present = [r for r in rarities if r["chance"] > 0 and any(rarity_of(i) == r["id"] for i in items)]
     total = sum(r["chance"] for r in present) or 1

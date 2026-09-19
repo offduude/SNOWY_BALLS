@@ -457,6 +457,92 @@
     .pick-equip:active { background: #74491f; }
     .pick-equip.on { background: #b9a88f; border-color: #8a7a62; color: #f4ead0; cursor: default; }
 
+    /* Buff cards: top of the screen, right of the live display (its frame spans 4..133 of 432 canvas
+       px across and 4..67 of 243 down - keep in step with createTargetCamera). Cards stack down until the
+       column is as tall as the live display, then wrap into a new column. Taps pass through to the game. */
+    #buff-hud {
+      position: absolute;
+      left: 31.7%;
+      top: 1.65%;
+      height: 25.9%;
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: calc(var(--u) * 0.5);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .buff-card {
+      display: flex;
+      align-items: center;
+      gap: calc(var(--u) * 0.7);
+      height: calc(var(--u) * 4);
+      box-sizing: border-box;
+      padding: 0 calc(var(--u) * 0.9) 0 calc(var(--u) * 0.5);
+      background: rgba(20, 14, 10, 0.4);
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      border-radius: calc(var(--u) * 0.7);
+      font-family: "Press Start 2P", monospace;
+      color: #ffffff;
+    }
+
+    .buff-card img,
+    .buff-noimg {
+      width: calc(var(--u) * 3);
+      height: calc(var(--u) * 3);
+      object-fit: contain;
+      image-rendering: pixelated;
+      flex: none;
+    }
+
+    .buff-timer {
+      font-size: calc(var(--u) * 1.15);
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+    }
+
+    /* BUFFS button: left of the mute button (top-right), same look as the other brown buttons. */
+    #buffs-btn {
+      position: absolute;
+      top: 10px;
+      right: 46px;
+      width: 60px;
+      height: 28px;
+      z-index: 5;
+      transition: opacity 0.25s ease;
+    }
+
+    #game-container.shop-open #buffs-btn {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* The BUFFS list is the projectiles panel, smaller. */
+    #list-panel.small {
+      left: 30%;
+      top: 20%;
+      width: 40%;
+      height: 60%;
+    }
+
+    .pick-timer {
+      flex: none;
+      min-width: calc(var(--u) * 7);
+      text-align: center;
+      font-size: calc(var(--u) * 1.5);
+      color: #3b2412;
+    }
+
+    .list-empty {
+      margin: auto;
+      padding: calc(var(--u) * 2);
+      text-align: center;
+      font-size: calc(var(--u) * 1.3);
+      line-height: 1.6;
+      color: #f4ead0;
+    }
+
     /* Red dot on the SHOP button's top-left corner: a slot restocked while the shop was closed.
        Pops in with an overshoot, then keeps pulsing until the shop is opened. */
     #shop-dot {
@@ -538,6 +624,8 @@
       <div id="list-title"></div>
       <div id="list-scroll"></div>
     </div>
+    <div id="buff-hud"></div>
+    <button id="buffs-btn" class="side-btn" type="button">BUFFS</button>
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
     </div>
@@ -550,17 +638,18 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=6"></script>
-  <script src="src/shop.js?v=9"></script>
-  <script src="src/collection.js?v=4"></script>
-  <script src="src/main.js?v=56"></script>
+  <script src="src/economy.js?v=7"></script>
+  <script src="src/buffs.js?v=1"></script>
+  <script src="src/shop.js?v=10"></script>
+  <script src="src/collection.js?v=5"></script>
+  <script src="src/main.js?v=57"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-btn", "volume-btn", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

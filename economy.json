@@ -41,8 +41,22 @@
       "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
     },
 
-    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. category is 'consumable' (common, can be bought again and again, and can be on sale in two slots at once; needs a duration) or 'projectile' (rare, bought once and kept, never on sale twice).",
+    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (common, can be bought again and again, and can be on sale in two slots at once; needs a duration) or 'projectile' (rare, bought once and kept, never on sale twice).",
     "items": [
+      {
+        "id": "focus_potion",
+        "name": "Focus Potion",
+        "category": "consumable",
+        "price": 1,
+        "duration": { "seconds": 120 },
+        "image": "assets/items/focus_potion.png",
+        "effects": [
+          { "type": "precision", "value": 1.5 },
+          { "type": "strengthControl", "value": 1.5 },
+          { "type": "coinMultiplier", "value": 1.5 }
+        ],
+        "description": "TEST BUFF: +50% precision, +50% strength control, +50% coins for 2 minutes."
+      },
       {
         "id": "chestnut",
         "name": "Chestnut",

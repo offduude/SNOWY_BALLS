@@ -12,6 +12,7 @@ const Economy = (() => {
       bestStreak: 0,
       unlockedCharacters: ["default"],
       equipped: { character: "default", projectile: "snowball" }, // what the player currently uses
+      buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
       shop: {
         stock: null, // array of item ids currently on sale, one per slot; null = not generated yet
         owned: [], // ids of permanent items bought
@@ -36,6 +37,7 @@ const Economy = (() => {
         bestStreak: p.bestStreak || 0,
         unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
         equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
+        buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number") : [],
         shop: {
           stock: Array.isArray(shop.stock) ? shop.stock : null,
           owned: Array.isArray(shop.owned) ? shop.owned : [],
@@ -116,6 +118,15 @@ const Economy = (() => {
     save();
   }
 
+  // The buff list is edited in place by the Buffs module, which then calls saveBuffs().
+  function getBuffList() {
+    return state.buffs;
+  }
+
+  function saveBuffs() {
+    save();
+  }
+
   // The shop mutates this object directly and then calls saveShop().
   function getShopState() {
     return state.shop;
@@ -135,6 +146,8 @@ const Economy = (() => {
     getBestStreak,
     getEquipped,
     setEquipped,
+    getBuffList,
+    saveBuffs,
     getShopState,
     saveShop,
   };

@@ -40,7 +40,7 @@ const Collection = (() => {
     },
   };
 
-  let container, titleEl, scrollEl, buttons;
+  let container, panelEl, titleEl, scrollEl, buttons;
   let openKind = null;
 
   function esc(s) {
@@ -69,8 +69,54 @@ const Collection = (() => {
     });
   }
 
+  // ---- BUFFS list: same panel, smaller, live timers instead of an EQUIP button ----
+
+  function buffRowHtml(b) {
+    return (
+      `<div class="pick-row" data-id="${esc(b.id)}">` +
+      `<img class="pick-pic" src="${esc(b.item.image || "")}" alt="" draggable="false" />` +
+      `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +
+      `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
+      `<div class="pick-timer">${Buffs.formatTime(b.msLeft)}</div>` +
+      `</div>`
+    );
+  }
+
+  // Full redraw (when the set of buffs changes or the list opens)...
+  function renderBuffList() {
+    const list = Buffs.active();
+    scrollEl.innerHTML = list.length
+      ? list.map(buffRowHtml).join("")
+      : `<div class="list-empty">NO BUFFS YET<br /><br />BUY ONE IN THE SHOP FIRST</div>`;
+  }
+
+  // ...and a cheap timer-only refresh twice a second while it's open.
+  function tickBuffList() {
+    if (openKind !== "buff") return;
+    const list = Buffs.active();
+    const shown = [...scrollEl.querySelectorAll(".pick-row")].map((r) => r.dataset.id).join(",");
+    if (shown !== list.map((b) => b.id).join(",")) {
+      renderBuffList();
+      return;
+    }
+    list.forEach((b) => {
+      const t = scrollEl.querySelector(`.pick-row[data-id="${b.id}"] .pick-timer`);
+      if (t) t.textContent = Buffs.formatTime(b.msLeft);
+    });
+  }
+
   function open(kind) {
     openKind = kind;
+    panelEl.classList.toggle("small", kind === "buff");
+    buttons.buff.classList.toggle("active", kind === "buff");
+    if (kind === "buff") {
+      titleEl.textContent = "BUFFS";
+      renderBuffList();
+      scrollEl.scrollTop = 0;
+      container.classList.add("list-open");
+      buttons.projectile.classList.remove("active");
+      return;
+    }
     titleEl.textContent = CATALOG[kind].title;
     scrollEl.innerHTML = CATALOG[kind].items
       .filter((it) => it.free || Economy.getShopState().owned.includes(it.id))
@@ -87,6 +133,7 @@ const Collection = (() => {
     openKind = null;
     container.classList.remove("list-open");
     buttons.projectile.classList.remove("active");
+    buttons.buff.classList.remove("active");
     buttons.character?.classList.remove("active");
   }
 
@@ -119,12 +166,17 @@ const Collection = (() => {
     close,
     init() {
       container = document.getElementById("game-container");
+      panelEl = document.getElementById("list-panel");
       titleEl = document.getElementById("list-title");
       scrollEl = document.getElementById("list-scroll");
       buttons = {
         projectile: document.getElementById("projectiles-btn"),
         character: document.getElementById("characters-btn"),
+        buff: document.getElementById("buffs-btn"),
       };
+      buttons.buff.addEventListener("click", () => toggle("buff"));
+      Buffs.onChange(tickBuffList);
+      setInterval(tickBuffList, 500);
       buttons.projectile.addEventListener("click", () => toggle("projectile"));
       buttons.character?.addEventListener("click", () => toggle("character")); // no CHARACTERS button for now
       scrollEl.addEventListener("click", onEquip);

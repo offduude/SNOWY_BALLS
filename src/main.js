@@ -189,6 +189,7 @@ class MainScene extends Phaser.Scene {
     this.eco = this.cache.json.get("economy");
     if (!this.eco) throw new Error("economy.json failed to load or has a JSON syntax error - check it.");
     Shop.init(this.eco);
+    Buffs.init(this.eco);
 
     this.state = STATE.IDLE;
     this.streak = 0;
@@ -243,6 +244,7 @@ class MainScene extends Phaser.Scene {
     this.bounce = null; // a projectile bouncing off the wall after impact (see startBounce)
     this.pendingProjectile = null; // equipped mid-flight, applied when the throw concludes
     this.applyProjectile(Economy.getEquipped("projectile"));
+    this.takeAimSnapshot();
 
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
@@ -277,6 +279,23 @@ class MainScene extends Phaser.Scene {
     this.projectileId = id;
     this.proj = this.eco.projectiles[id];
     this.projVisuals = PROJECTILE_VISUALS[id];
+  }
+
+  // Freezes everything about the coming throw that a buff (or the projectile) can change - slider ranges,
+  // speeds and the coin multiplier. It is called when the player taps "TAP to aim" and NOT again until the
+  // next tap, so a buff that runs out or is bought mid-aim, mid-flight or on the result screen can never
+  // change the sliders (or the payout) of the throw in progress. The bars, their graduations and the event
+  // dots are all drawn from this snapshot.
+  //  angleRange / powerRange: how much of the full swing / power span the slider covers, edge to edge
+  //    (1 = all of it; smaller = more precise - the graduations spread out like a magnified ruler)
+  takeAimSnapshot() {
+    const b = Buffs.modifiers();
+    this.aim = {
+      angleRange: this.proj.angleRange / b.precision,
+      angleSpeed: this.proj.angleSpeed,
+      powerRange: 1 / b.strengthControl,
+      coinMultiplier: b.coinMultiplier,
+    };
   }
 
   // Called by the PROJECTILES list when the player equips something.
@@ -422,6 +441,7 @@ class MainScene extends Phaser.Scene {
     const cls = document.getElementById("game-container").classList;
     if (cls.contains("shop-open") || cls.contains("list-open")) return;
     if (this.state === STATE.IDLE) {
+      this.takeAimSnapshot(); // the one moment the player's buffs are read for this throw
       this.state = STATE.AIM_ANGLE;
       this.aimStartTime = this.time.now;
       this.showMessage("");
@@ -635,7 +655,9 @@ class MainScene extends Phaser.Scene {
       }
 
       // Projectile handicap/bonus (economy.json "projectiles"), rounded down, on the whole payout.
-      coins = Math.floor(coins * this.proj.coinMultiplier);
+      // Then the coin multiplier of the buffs that were active when the player tapped to aim (+1e-9 so
+      // 5 x 0.8 x 1.5 = 6 doesn't fall to 5 through floating point).
+      coins = Math.floor(coins * this.proj.coinMultiplier * this.aim.coinMultiplier + 1e-9);
 
       const message = "HIT\n+" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
       Economy.addCoins(coins);
@@ -792,8 +814,6 @@ class MainScene extends Phaser.Scene {
   drawEventDot(g, x, y, color) {
     g.fillStyle(color, 1);
     g.fillCircle(Math.round(x), y, EVENT_DOT_RADIUS);
-    g.lineStyle(2, 0x202020, 1);
-    g.strokeCircle(Math.round(x), y, EVENT_DOT_RADIUS);
   }
 
   drawAimBar() {
@@ -816,7 +836,7 @@ class MainScene extends Phaser.Scene {
       // Its graduation lines are fixed swing values (10%, 20%, ... of the snowball's full range, counted
       // from the center outwards), so on a projectile with a smaller range they spread further apart -
       // like a magnified ruler.
-      const range = this.proj.angleRange;
+      const range = this.aim.angleRange;
       markerPos = 0.5 + (this.angleValue - 0.5) / range;
 
       const lineAt = (swing, color, alpha, width, extra) => {
@@ -843,22 +863,26 @@ class MainScene extends Phaser.Scene {
         }
       }
     } else {
-      markerPos = this.powerValue;
+      // The bar covers powerRange of the power span, centered: power p sits at (p - pLo) / range along it.
+      const pRange = this.aim.powerRange;
+      const pLo = 0.5 - pRange / 2;
+      const barPos = (power) => (power - pLo) / pRange;
+      markerPos = barPos(this.powerValue);
 
-      // Same idea for power: a graduation line every 10% of the bar, and two green lines around the power
+      // Same idea for power: a graduation line every 10% of the power span, and two green lines around the power
       // range that puts the apex inside W20's height band (a guaranteed vertical hit). That range depends
       // on the projectile's weight (a lighter one flies higher, so it needs less power); nothing else is
       // drawn between the two lines.
       const lo = this.powerForApex(W20.heightFrom);
       const hi = this.powerForApex(W20.heightTo);
       const lineAtPower = (power, color, alpha, width, extra) => {
-        if (power <= 0 || power >= 1) return; // this projectile can't reach that edge of the band with the bar
-        const x = Math.round(barX + power * barW);
+        if (power <= pLo || power >= pLo + pRange) return; // outside what this bar covers
+        const x = Math.round(barX + barPos(power) * barW);
         g.lineStyle(width, color, alpha);
         g.lineBetween(x, barY - extra, x, barY + barH + extra);
       };
       for (let k = 1; k * AIM_TICK_STEP < 1 - 1e-9; k++) {
-        const power = k * AIM_TICK_STEP;
+        const power = k * AIM_TICK_STEP; // fixed power values: they spread out when the bar zooms in
         if (power < lo || power > hi) lineAtPower(power, 0x202020, 0.85, 1, 3);
       }
       lineAtPower(lo, 0x5cff5c, 1, 2, 5);
@@ -867,7 +891,7 @@ class MainScene extends Phaser.Scene {
       const target = this.activeEventTarget();
       if (target) {
         const power = (target.powerFrom + target.powerTo) / 2;
-        if (power > 0 && power < 1) this.drawEventDot(g, barX + power * barW, barY + barH / 2, target.color);
+        if (power > pLo && power < pLo + pRange) this.drawEventDot(g, barX + barPos(power) * barW, barY + barH / 2, target.color);
       }
     }
 
@@ -889,11 +913,13 @@ class MainScene extends Phaser.Scene {
       // angleRange squeezes the marker's travel toward the middle of the bar (its edge positions),
       // angleSpeed scales how fast the marker moves. The sweep rate is divided by the range so the
       // marker's speed along the bar is exactly angleSpeed x normal.
-      const p = this.proj;
-      this.angleValue = 0.5 + (pingPong((elapsed * ANGLE_HZ * p.angleSpeed) / p.angleRange) - 0.5) * p.angleRange;
+      const a = this.aim;
+      this.angleValue = 0.5 + (pingPong((elapsed * ANGLE_HZ * a.angleSpeed) / a.angleRange) - 0.5) * a.angleRange;
     } else if (this.state === STATE.AIM_POWER) {
       const elapsed = (time - this.aimStartTime) / 1000;
-      this.powerValue = pingPong(elapsed * POWER_HZ);
+      // Same for strength: the marker covers `powerRange` of the power span, centered, at the normal marker speed.
+      const r = this.aim.powerRange;
+      this.powerValue = 0.5 + (pingPong((elapsed * POWER_HZ) / r) - 0.5) * r;
     } else if (this.state === STATE.FLIGHT) {
       this.updateFlight(dt);
     }

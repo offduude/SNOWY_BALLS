@@ -87,10 +87,26 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 | `price` | coins |
 | `image` | optional: picture path shown on the shop card (the chestnut has one; other items show an empty picture box) |
 | `ignorePriceOverride` | optional. `true` = always costs its own `price`, even while `shop.priceOverride` makes everything else 1 coin (the chestnut is 10) |
-| `duration` | consumables only: `{ "throws": N }` |
-| `effect` | `{ "type": ..., "value": ... }` - see below |
+| `duration` | buffs only: `{ "seconds": N }` |
+| `effect` / `effects` | `effect` = `{ "type": ..., "value": ... }`; buffs use an `effects` list of those - see below |
 
-### effect types (planned; nothing applies them yet)
+### buffs (live)
+
+A `consumable` item is a timed **buff**: buying it starts it right away for `duration.seconds` (device clock,
+so the timer keeps running while the app is closed and is saved). Buying an active buff again restarts its timer -
+effects do not stack from the same buff; different buffs multiply. Its `effects` list is what it does:
+
+| type | value means |
+|---|---|
+| `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed), so the graduation lines spread out |
+| `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
+| `coinMultiplier` | multiplies the coins of a hit (multiplies with the projectile's own multiplier, rounded down) |
+
+**When buffs are read:** only at the moment the player taps "TAP to aim". That snapshot is used for the whole throw
+(sliders, graduations, event dots and payout), so a buff expiring or being bought mid-aim never changes anything under the
+player's finger. The buff cards and list always show the live state.
+
+### other effect types (planned; nothing applies them yet)
 
 | type | value means |
 |---|---|

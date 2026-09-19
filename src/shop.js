@@ -21,7 +21,7 @@ const Shop = (() => {
   let root = null;
   let dotEl = null;
 
-  const CATEGORY_LABEL = { consumable: "CONSUMABLE", projectile: "PROJECTILE" };
+  const CATEGORY_LABEL = { consumable: "BUFF", projectile: "PROJECTILE" };
 
   // ---------- rules ----------
 
@@ -164,7 +164,7 @@ const Shop = (() => {
     if (!Economy.spendCoins(price(item))) return { ok: false, reason: "funds" };
 
     if (isPermanent(item)) st.owned.push(item.id);
-    else st.consumables[item.id] = (st.consumables[item.id] || 0) + 1;
+    else Buffs.activate(item); // a consumable is a timed buff: it starts right now (see buffs.js)
 
     st.stock[slot] = null;
     st.restock[slot] = { at: Date.now() + restockMs(), prev: item.id };

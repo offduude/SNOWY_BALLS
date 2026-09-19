@@ -28,9 +28,11 @@ def check(eco):
     shop = eco["shop"]
     seen = set()
     for it in shop["items"]:
-        for field in ("id", "name", "category", "price", "effect"):
+        for field in ("id", "name", "category", "price"):
             if field not in it:
                 problems.append(f"item {it.get('id', '?')}: missing '{field}'")
+        if "effect" not in it and "effects" not in it:
+            problems.append(f"item {it.get('id', '?')}: needs 'effect' or 'effects'")
         if it.get("id") in seen:
             problems.append(f"duplicate id '{it['id']}'")
         seen.add(it.get("id"))

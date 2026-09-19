@@ -216,7 +216,7 @@ const PROJECTILE_VISUALS = {
     sprites: { idle: "char_idle_egg", aiming: "char_aiming_egg", throwing: "char_throwing" },
     impactSound: "egg_impact",
     impactVolume: 0.5,
-    mark: { texture: "egg_impact", size: 40 }, // the splat it leaves on the wall (64px art shown at the same 0.625 scale as the others)
+    mark: { texture: "egg_impact", size: 20 }, // the splat it leaves on the wall (was 40)
   },
   rowan_berry: {
     ball: "rowan_berry",
@@ -905,7 +905,7 @@ class MainScene extends Phaser.Scene {
   }
 
   addMark(x, heightClimbed) {
-    const look = this.projVisuals.mark || { texture: "snowball_mark", size: 20 };
+    const look = this.projVisuals.mark || { texture: "snowball_mark", size: 10 }; // (was 20)
     const mark = this.add.image(x, this.worldY(heightClimbed), look.texture);
     mark.setDisplaySize(look.size, look.size);
     mark.setDepth(5); // above the building, below the live ball (depth 10)

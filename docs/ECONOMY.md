@@ -46,7 +46,7 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 | field | meaning |
 |---|---|
 | `weight` | **not shown to the player.** Heavier projectiles fly lower with the same throw strength: the apex is multiplied by `100 / weight` (snowball = 100 is the reference; chestnut 80 flies 25% higher). A very heavy projectile is clamped so it never ends up below the lowest allowed stick height |
-| `angleRange` | how long the left-right offset bar is, drawn centered. `1` = the full bar; `0.8` = a bar 20% shorter (the marker runs edge to edge of it, so the throw can drift only 80% as far sideways) |
+| `angleRange` | how far the throw can drift sideways. `1` = the full swing; `0.8` = only 80% as far. The offset bar always keeps its full width and shows the projectile's range edge to edge, so its graduation lines (every 10% of the full swing) look stretched on a smaller range. Two green lines mark where a W20 hit is guaranteed sideways |
 | `angleSpeed` | how fast that marker moves along the bar compared with normal. `0.8` = 20% slower |
 | `coinMultiplier` | multiplies the coins of a hit (streak and face bonuses included), rounded **down**. `0.8` on a 6-coin hit = 4 |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |

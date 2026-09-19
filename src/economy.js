@@ -10,6 +10,8 @@ const Economy = (() => {
       coins: 0,
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
+      newBuffs: [], // ids of the buffs that are NEW in the BUFFS tab: each card shows a red dot until the tab is closed
+      newProjectiles: [], // same for the PROJECTILES list
       buffsUnseen: false, // a NEW kind of buff arrived and the player hasn't opened the BUFFS tab yet (red dot)
       buffItems: {}, // how many of each buff the player has bought and not used yet (id -> count); using one starts it (see buffs.js)
       projectiles: {}, // how many of each consumable projectile the player has (not the snowball - see regen)
@@ -39,6 +41,10 @@ const Economy = (() => {
     return out;
   }
 
+  function cleanIds(list) {
+    return Array.isArray(list) ? [...new Set(list.filter((x) => typeof x === "string"))] : [];
+  }
+
   function cleanRegen(obj) {
     const out = {};
     if (obj && typeof obj === "object") {
@@ -66,6 +72,8 @@ const Economy = (() => {
         projectiles: cleanCounts(p.projectiles),
         regen: cleanRegen(p.regen),
         buffItems: cleanCounts(p.buffItems),
+        newBuffs: cleanIds(p.newBuffs),
+        newProjectiles: cleanIds(p.newProjectiles),
         buffsUnseen: p.buffsUnseen === true,
         projectilesUnseen: p.projectilesUnseen === true,
         unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
@@ -225,7 +233,10 @@ const Economy = (() => {
     }
     const before = getProjectileCount(id);
     state.projectiles[id] = before + n;
-    if (before === 0 && n > 0 && !silent) state.projectilesUnseen = true;
+    if (before === 0 && n > 0 && !silent) {
+      state.projectilesUnseen = true;
+      if (!state.newProjectiles.includes(id)) state.newProjectiles.push(id);
+    }
     save();
     projectilesChanged();
   }
@@ -265,7 +276,10 @@ const Economy = (() => {
     const before = getBuffCount(id);
     const running = state.buffs.some((b) => b.id === id && b.endsAt > Date.now());
     state.buffItems[id] = before + n;
-    if (before === 0 && !running && n > 0) state.buffsUnseen = true;
+    if (before === 0 && !running && n > 0) {
+      state.buffsUnseen = true;
+      if (!state.newBuffs.includes(id)) state.newBuffs.push(id);
+    }
     save();
     buffListeners.forEach((fn) => fn());
   }
@@ -300,6 +314,28 @@ const Economy = (() => {
     state.projectilesUnseen = false;
     save();
     projectilesChanged();
+  }
+
+  // The per-card red dots: which projectiles / buffs are NEW. They stay until the player closes the list (the menu
+  // button's dot goes as soon as it is opened, the cards' dots when it is closed again).
+  function isNewProjectile(id) {
+    return state.newProjectiles.includes(id);
+  }
+
+  function isNewBuff(id) {
+    return state.newBuffs.includes(id);
+  }
+
+  function clearNewProjectiles() {
+    if (!state.newProjectiles.length) return;
+    state.newProjectiles = [];
+    save();
+  }
+
+  function clearNewBuffs() {
+    if (!state.newBuffs.length) return;
+    state.newBuffs = [];
+    save();
   }
 
   function wasAiming() {
@@ -377,6 +413,10 @@ const Economy = (() => {
     getProjectileCount,
     addProjectiles,
     useProjectile,
+    isNewProjectile,
+    isNewBuff,
+    clearNewProjectiles,
+    clearNewBuffs,
     hasUnseenProjectiles,
     clearUnseenProjectiles,
     onProjectilesChange,

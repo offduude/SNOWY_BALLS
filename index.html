@@ -433,7 +433,8 @@
 
     #list-title {
       flex: none;
-      padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6);
+      /* the bottom is 8px shorter: #list-scroll starts with 8px of padding, room for the "new" dot that sticks out over the first card's corner */
+      padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6) max(0px, calc(var(--u) * 1.2 - 8px));
       color: #ffffff;
       font-size: calc(var(--u) * 1.5);
       text-align: center;
@@ -452,7 +453,7 @@
       display: flex;
       flex-direction: column;
       gap: calc(var(--u) * 1.2);
-      padding: 0 calc(var(--u) * 1.2) calc(var(--u) * 1.2);
+      padding: 8px calc(var(--u) * 1.2) calc(var(--u) * 1.2);
     }
 
     #list-scroll::-webkit-scrollbar {
@@ -768,6 +769,12 @@
       display: none;
     }
 
+    /* On a card in the PROJECTILES / BUFFS lists: centred on the card's top-left corner. */
+    .pick-new {
+      left: -8px;
+      top: -8px;
+    }
+
     .notif-dot.show {
       opacity: 1;
       animation: dot-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards, dot-pulse 1.3s ease-in-out 0.45s infinite;
@@ -849,12 +856,12 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=13"></script>
+  <script src="src/economy.js?v=14"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=6"></script>
   <script src="src/shop.js?v=19"></script>
-  <script src="src/collection.js?v=20"></script>
-  <script src="src/main.js?v=79"></script>
+  <script src="src/collection.js?v=21"></script>
+  <script src="src/main.js?v=80"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

@@ -129,10 +129,14 @@ const Collection = (() => {
       .map((x) => x.it);
   }
 
+  // The red dot on the top-left corner of a card that is new (see Economy.isNewProjectile / isNewBuff).
+  const NEW_DOT = '<span class="notif-dot pick-new show"></span>';
+
   function rowHtml(kind, item) {
     const stats = statsHtml(kind, item);
     return (
       `<div class="pick-row${stats ? " has-stats" : ""}" data-id="${esc(item.id)}">` +
+      (kind === "projectile" && Economy.isNewProjectile(item.id) ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(item.image)}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description)}</div></div>` +
@@ -164,6 +168,7 @@ const Collection = (() => {
       : `<button class="pick-equip pick-use" type="button" data-id="${esc(b.id)}">USE</button>`;
     return (
       `<div class="pick-row" data-id="${esc(b.id)}">` +
+      (Economy.isNewBuff(b.id) ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(b.item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +
       `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
@@ -203,7 +208,14 @@ const Collection = (() => {
     });
   }
 
+  // The player has looked at the list: its cards are no longer new.
+  function markSeen() {
+    if (openKind === "buff") Economy.clearNewBuffs();
+    else if (openKind === "projectile") Economy.clearNewProjectiles();
+  }
+
   function open(kind) {
+    markSeen(); // switching straight from one list to another
     openKind = kind;
     buttons.buff.classList.toggle("active", kind === "buff");
     if (kind === "buff") {
@@ -228,6 +240,7 @@ const Collection = (() => {
   }
 
   function close() {
+    markSeen();
     openKind = null;
     container.classList.remove("list-open");
     buttons.projectile.classList.remove("active");

@@ -49,6 +49,12 @@ const Collection = (() => {
           description: "Annoyingly imprecise. Not yummy.",
           image: "assets/snowball/rowan_berry.png",
         },
+        {
+          id: "egg", // same id as its shop item and its economy.json "projectiles" entry
+          name: "Egg",
+          description: "No chickens inside. Enough for a 'basic' omelette.",
+          image: "assets/snowball/egg.png",
+        },
       ],
     },
     character: {

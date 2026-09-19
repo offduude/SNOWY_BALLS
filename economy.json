@@ -45,6 +45,7 @@
   "projectiles": {
     "snowball": { "infinite": false, "regen": { "max": 100, "everySeconds": 30 }, "rarity": "default", "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
     "chestnut": { "infinite": false, "rarity": "common", "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
+    "egg": { "infinite": false, "rarity": "rare", "weight": 137, "rewards": { "W20": 41, "W21": 41 }, "leavesMark": true, "spins": false },
     "rowan_berry": { "infinite": false, "rarity": "common", "weight": 60, "rewards": { "W20": 7, "W21": 7 }, "leavesMark": false, "spins": true },
     "stone": { "infinite": false, "rarity": "common", "weight": 145, "rewards": { "W20": 15, "W21": 15 }, "leavesMark": false, "spins": true },
     "pinecone": { "infinite": false, "rarity": "rare", "weight": 126, "rewards": { "W20": 21, "W21": 21 }, "leavesMark": false, "spins": true },
@@ -184,6 +185,17 @@
         "image": "assets/snowball/rowan_berry.png",
         "effect": { "type": "givesProjectile", "value": "rowan_berry" },
         "description": "Annoyingly imprecise. Not yummy."
+      },
+      {
+        "id": "egg",
+        "name": "Egg",
+        "category": "projectile",
+        "amount": { "min": 3, "max": 9 },
+        "unitPrice": { "min": 30, "max": 40 },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/egg.png",
+        "effect": { "type": "givesProjectile", "value": "egg" },
+        "description": "No chickens inside. Enough for a 'basic' omelette."
       }
     ]
   }

@@ -211,6 +211,14 @@ const PROJECTILE_VISUALS = {
     impactSound: "chestnut_impact",
     impactVolume: 0.5,
   },
+  egg: {
+    ball: "egg",
+    // no egg-in-hand character art found yet: the snowball poses stand in (character1_idle_egg / character1_aiming_egg)
+    sprites: { idle: "char_idle_snowball", aiming: "char_aiming", throwing: "char_throwing" },
+    impactSound: "egg_impact",
+    impactVolume: 0.5,
+    mark: { texture: "egg_impact", size: 40 }, // the splat it leaves on the wall (64px art shown at the same 0.625 scale as the others)
+  },
   rowan_berry: {
     ball: "rowan_berry",
     sprites: { idle: "char_idle_rowan_berry", aiming: "char_aiming_rowan_berry", throwing: "char_throwing" },
@@ -286,6 +294,8 @@ class MainScene extends Phaser.Scene {
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
     this.load.image("stone", "assets/snowball/stone.png");
+    this.load.image("egg", "assets/snowball/egg.png");
+    this.load.image("egg_impact", "assets/snowball/egg_impact.png"); // the splat it leaves on the wall
     this.load.image("rowan_berry", "assets/snowball/rowan_berry_projectile.png?v=2"); // the ball in the air (the card / shop icon is rowan_berry.png)
     this.load.image("char_idle_rowan_berry", "assets/character/character1_idle_rowan_berry.png");
     this.load.image("char_aiming_rowan_berry", "assets/character/character1_aiming_rowan_berry.png");
@@ -312,6 +322,7 @@ class MainScene extends Phaser.Scene {
     this.load.audio("grenade_impact", "assets/audio/grenade_impact.mp3");
     this.load.audio("buff_use", "assets/audio/buff_use.mp3");
     this.load.audio("hard_impact", "assets/audio/hard_impact.mp3");
+    this.load.audio("egg_impact", "assets/audio/egg_impact.mp3");
   }
 
   create() {

@@ -217,6 +217,12 @@ const STATE = {
   RESULT: "result",
 };
 
+// 83000 ms -> "01:23"
+function formatClock(ms) {
+  const total = Math.ceil(ms / 1000);
+  return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+}
+
 function pingPong(t) {
   const cycle = t % 2;
   return cycle <= 1 ? cycle : 2 - cycle;
@@ -262,6 +268,12 @@ class MainScene extends Phaser.Scene {
     this.eco = this.cache.json.get("economy");
     if (!this.eco) throw new Error("economy.json failed to load or has a JSON syntax error - check it.");
     Rarity.init(this.eco);
+    // Refilling projectile stocks (the snowball): tell the save their cap and pace before anything reads a count.
+    const regen = {};
+    for (const [id, p] of Object.entries(this.eco.projectiles || {})) {
+      if (p.regen) regen[id] = { max: p.regen.max, everyMs: p.regen.everySeconds * 1000 };
+    }
+    Economy.setRegenConfig(regen);
     Shop.init(this.eco);
     Buffs.init(this.eco);
     Collection.setEconomy(this.eco);
@@ -353,7 +365,8 @@ class MainScene extends Phaser.Scene {
   // or not owned falls back to the snowball.
   applyProjectile(id) {
     const known = PROJECTILE_VISUALS[id] && this.eco.projectiles && this.eco.projectiles[id];
-    const available = known && (this.eco.projectiles[id].infinite || Economy.getProjectileCount(id) > 0);
+    // A projectile is usable if it never runs out, refills (the snowball is always equippable, even at 0), or the player has some.
+    const available = known && (this.eco.projectiles[id].infinite || this.eco.projectiles[id].regen || Economy.getProjectileCount(id) > 0);
     if (!known || !available) {
       id = "snowball"; // the default
       if (Economy.getEquipped("projectile") !== id) Economy.setEquipped("projectile", id); // keep the save honest
@@ -462,9 +475,32 @@ class MainScene extends Phaser.Scene {
     if (this.proj.infinite) return;
     const id = this.projectileId;
     if (!Economy.useProjectile(id)) return;
-    if (Economy.getProjectileCount(id) === 0) {
+    if (id !== "snowball" && Economy.getProjectileCount(id) === 0) {
       Economy.setEquipped("projectile", "snowball");
       this.pendingProjectile = "snowball";
+    }
+  }
+
+  // Can the equipped projectile be thrown? Only a refilling one can be out (the others fall back to the snowball).
+  hasAmmo() {
+    return !this.proj.regen || Economy.getProjectileCount(this.projectileId) > 0;
+  }
+
+  // While the equipped refilling projectile is out, the message in the middle says so and counts down to the next one;
+  // as soon as one arrives it goes back to "TAP to aim".
+  updateStockMessage() {
+    if (this.state !== STATE.IDLE) {
+      this.stockMessageShown = false;
+      return;
+    }
+    if (!this.hasAmmo()) {
+      const info = Economy.regenInfo(this.projectileId);
+      const text = "NO " + this.projectileId.toUpperCase() + "S\nNext in: " + formatClock(info && info.msToNext !== null ? info.msToNext : 0);
+      if (document.getElementById("message").textContent !== text) this.showMessage(text);
+      this.stockMessageShown = true;
+    } else if (this.stockMessageShown) {
+      this.showMessage("TAP to aim");
+      this.stockMessageShown = false;
     }
   }
 
@@ -625,6 +661,7 @@ class MainScene extends Phaser.Scene {
     const cls = document.getElementById("game-container").classList;
     if (cls.contains("shop-open") || cls.contains("list-open")) return;
     if (this.state === STATE.IDLE) {
+      if (!this.hasAmmo()) return; // out of snowballs: nothing to throw (updateStockMessage tells the player when the next one comes)
       this.takeAimSnapshot(); // the one moment the player's buffs are read for this throw
       this.consumeProjectile(); // ... and the moment a consumable projectile is used up
       Economy.setAiming(true); // an aim is open until the ball is thrown (see abandonAim)
@@ -1206,6 +1243,7 @@ class MainScene extends Phaser.Scene {
     }
     this.updateBounce(dt);
 
+    this.updateStockMessage();
     this.updateCharacterPose();
     this.updateFpsReadout(time, delta);
     this.drawAimBar();

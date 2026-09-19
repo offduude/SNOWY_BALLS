@@ -2,8 +2,8 @@
 // name, picture, description and an EQUIP button per entry. Only one list is open at a time.
 // What's equipped is saved (Economy.getEquipped). Equipping a projectile tells the game
 // (MainScene.onProjectileEquipped); characters are not selectable yet (no CHARACTERS button).
-// Only what the player has is listed: `free`/`infinite` entries (the snowball never runs out) and projectiles
-// they still have some of (consumable: one is used per throw, and a kind that runs out leaves the list).
+// Only what the player has is listed: refilling projectiles (the snowball - its card stays even at x0, with a
+// "Next in: 00:xx" timer under EQUIP) and projectiles they still have some of (consumable: one is used per throw, and a kind that runs out leaves the list).
 // A red dot on the PROJECTILES button pops up when the list EXPANDS (a new kind arrives), not on a refill.
 //
 // To add an entry: add an object to the right array below. `id` is stored in saves, so never
@@ -18,7 +18,6 @@ const Collection = (() => {
           name: "Snowball",
           description: "The classic. Cold, round and reliable.",
           image: "assets/snowball/snowball_shop.png",
-          infinite: true,
         },
         {
           id: "grenade", // same id as its shop item and its economy.json "projectiles" entry
@@ -68,12 +67,32 @@ const Collection = (() => {
   function projectileCorner(kind, item) {
     if (kind !== "projectile") return "";
     const p = eco && eco.projectiles && eco.projectiles[item.id];
-    return cornerHtml(p && p.rarity, item.infinite ? "" : `x${Economy.getProjectileCount(item.id)}`);
+    const finite = !(p && p.infinite);
+    return cornerHtml(p && p.rarity, finite ? `x${Economy.getProjectileCount(item.id)}` : "");
+  }
+
+  // "Next in: 00:27" under the EQUIP button of a refilling projectile (nothing while its stock is full).
+  function regenText(id) {
+    const info = Economy.regenInfo(id);
+    return info && info.msToNext !== null ? `Next in: ${clock(info.msToNext)}` : "";
+  }
+
+  function clock(ms) {
+    const total = Math.ceil(ms / 1000);
+    return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+  }
+
+  function regenHtml(kind, item) {
+    const p = kind === "projectile" && eco && eco.projectiles && eco.projectiles[item.id];
+    return p && p.regen ? `<div class="pick-regen">${regenText(item.id)}</div>` : "";
   }
 
   function isListed(kind, it) {
-    if (it.free || it.infinite) return true;
-    return kind === "projectile" && Economy.getProjectileCount(it.id) > 0;
+    if (it.free) return true;
+    if (kind !== "projectile") return false;
+    const p = eco && eco.projectiles && eco.projectiles[it.id];
+    if (p && (p.regen || p.infinite)) return true; // a refilling projectile never leaves the list, not even at x0
+    return Economy.getProjectileCount(it.id) > 0;
   }
 
   // The word for a projectile's weight (never the number): the LAST weightLabels entry whose `from` is <= the weight.
@@ -116,7 +135,7 @@ const Collection = (() => {
       `<img class="pick-pic" src="${esc(item.image)}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description)}</div></div>` +
-      `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>` +
+      `<div class="pick-action"><button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>${regenHtml(kind, item)}</div>` +
       projectileCorner(kind, item) + // rarity label + amount sit in the card's top-right corner
       stats +
       `</div>`
@@ -268,6 +287,18 @@ const Collection = (() => {
       const updateDot = () => dotEl && dotEl.classList.toggle("show", Economy.hasUnseenProjectiles());
       Economy.onProjectilesChange(updateDot);
       updateDot();
+      // While the PROJECTILES tab is open, keep the amounts and the "Next in" timer live.
+      setInterval(() => {
+        if (openKind !== "projectile") return;
+        scrollEl.querySelectorAll(".pick-row").forEach((row) => {
+          const id = row.dataset.id;
+          const p = eco && eco.projectiles && eco.projectiles[id];
+          const count = row.querySelector(".pick-count");
+          if (count && p && !p.infinite) count.textContent = `x${Economy.getProjectileCount(id)}`;
+          const regen = row.querySelector(".pick-regen");
+          if (regen) regen.textContent = regenText(id);
+        });
+      }, 500);
       // Red dot on the top-left corner of the BUFFS button: a new kind of buff arrived (not more of one already there).
       const buffDot = document.getElementById("buffs-dot");
       const updateBuffDot = () => buffDot && buffDot.classList.toggle("show", Economy.hasUnseenBuffs());

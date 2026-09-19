@@ -50,7 +50,7 @@ def check(eco):
     # Empty slots simply show (TBD), so a shop with few or no items is allowed.
     projectiles = eco.get("projectiles", {})
     if "snowball" not in projectiles:
-        problems.append("projectiles: the 'snowball' (the infinite default) is missing")
+        problems.append("projectiles: the 'snowball' (the default projectile) is missing")
     for pid, p in projectiles.items():
         for w in ("W20", "W21"):
             if w not in p.get("rewards", {}):

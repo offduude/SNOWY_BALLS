@@ -12,7 +12,8 @@ const Economy = (() => {
       bestStreak: 0,
       buffsUnseen: false, // a NEW kind of buff arrived and the player hasn't opened the BUFFS tab yet (red dot)
       buffItems: {}, // how many of each buff the player has bought and not used yet (id -> count); using one starts it (see buffs.js)
-      projectiles: {}, // how many of each consumable projectile the player has (the snowball is infinite and not listed)
+      projectiles: {}, // how many of each consumable projectile the player has (not the snowball - see regen)
+      regen: {}, // projectiles that refill over time (the snowball): id -> { count, next } - `next` is the Date.now() timestamp (device clock) at which the next one arrives, null while the stock is full
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
@@ -38,6 +39,16 @@ const Economy = (() => {
     return out;
   }
 
+  function cleanRegen(obj) {
+    const out = {};
+    if (obj && typeof obj === "object") {
+      for (const [id, r] of Object.entries(obj)) {
+        if (r && Number.isInteger(r.count) && r.count >= 0) out[id] = { count: r.count, next: typeof r.next === "number" ? r.next : null };
+      }
+    }
+    return out;
+  }
+
   function load() {
     const base = fresh();
     try {
@@ -53,6 +64,7 @@ const Economy = (() => {
         streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
         aiming: p.aiming === true,
         projectiles: cleanCounts(p.projectiles),
+        regen: cleanRegen(p.regen),
         buffItems: cleanCounts(p.buffItems),
         buffsUnseen: p.buffsUnseen === true,
         projectilesUnseen: p.projectilesUnseen === true,
@@ -135,13 +147,82 @@ const Economy = (() => {
     projectileListeners.forEach((fn) => fn());
   }
 
+  // ---- refilling stocks (the snowball): capped at `max`, +1 every `everyMs`, counted by the device clock so the timer
+  //      keeps running while the app is closed. The numbers come from economy.json via setRegenConfig. ----
+  const regenCfg = {}; // id -> { max, everyMs }
+
+  function setRegenConfig(cfg) {
+    for (const [id, c] of Object.entries(cfg)) {
+      regenCfg[id] = c;
+      // A new player starts with a full stock.
+      if (!state.regen[id]) state.regen[id] = { count: c.max, next: null };
+      if (state.regen[id].count > c.max) state.regen[id].count = c.max;
+    }
+    for (const id of Object.keys(cfg)) syncRegen(id);
+  }
+
+  // Adds whatever arrived since the last look (several may have, if the app was closed for a while). Returns true if
+  // anything changed.
+  function syncRegen(id) {
+    const c = regenCfg[id];
+    const r = state.regen[id];
+    if (!c || !r) return false;
+    const now = Date.now();
+    let changed = false;
+    if (r.count >= c.max) {
+      if (r.count > c.max || r.next !== null) changed = true;
+      r.count = c.max;
+      r.next = null;
+    } else {
+      if (r.next === null) {
+        r.next = now + c.everyMs;
+        changed = true;
+      }
+      // The device clock was set back: never wait longer than one full period.
+      if (r.next - now > c.everyMs + 1000) {
+        r.next = now + c.everyMs;
+        changed = true;
+      }
+      if (now >= r.next) {
+        const n = Math.floor((now - r.next) / c.everyMs) + 1;
+        r.count = Math.min(c.max, r.count + n);
+        r.next = r.count >= c.max ? null : r.next + n * c.everyMs;
+        changed = true;
+      }
+    }
+    if (changed) {
+      save();
+      projectilesChanged();
+    }
+    return changed;
+  }
+
+  // { count, max, msToNext } for a refilling projectile (msToNext is null when it is full).
+  function regenInfo(id) {
+    syncRegen(id);
+    const c = regenCfg[id];
+    const r = state.regen[id];
+    if (!c || !r) return null;
+    return { count: r.count, max: c.max, msToNext: r.next === null ? null : Math.max(0, r.next - Date.now()) };
+  }
+
   function getProjectileCount(id) {
+    if (regenCfg[id]) {
+      syncRegen(id);
+      return state.regen[id].count;
+    }
     return state.projectiles[id] || 0;
   }
 
   // Adds `n` of a projectile. If the player had none of that kind, the list "expands": the red dot is
   // raised (unless `silent`, used for refunds). Getting more of a kind they already have raises nothing.
   function addProjectiles(id, n, silent) {
+    if (regenCfg[id]) {
+      state.regen[id].count = Math.min(regenCfg[id].max, getProjectileCount(id) + n);
+      save();
+      projectilesChanged();
+      return;
+    }
     const before = getProjectileCount(id);
     state.projectiles[id] = before + n;
     if (before === 0 && n > 0 && !silent) state.projectilesUnseen = true;
@@ -153,6 +234,14 @@ const Economy = (() => {
   function useProjectile(id) {
     const n = getProjectileCount(id);
     if (n <= 0) return false;
+    if (regenCfg[id]) {
+      const r = state.regen[id];
+      r.count = n - 1;
+      if (r.next === null) r.next = Date.now() + regenCfg[id].everyMs; // the refill timer starts with the first one used
+      save();
+      projectilesChanged();
+      return true;
+    }
     if (n === 1) delete state.projectiles[id];
     else state.projectiles[id] = n - 1;
     save();
@@ -283,6 +372,8 @@ const Economy = (() => {
     hasUnseenBuffs,
     clearUnseenBuffs,
     takeBuff,
+    setRegenConfig,
+    regenInfo,
     getProjectileCount,
     addProjectiles,
     useProjectile,

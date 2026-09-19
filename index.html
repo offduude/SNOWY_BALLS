@@ -477,7 +477,7 @@
 
     .pick-row.has-stats .pick-pic { grid-column: 1; grid-row: 1 / span 2; }
     .pick-row.has-stats .pick-text { grid-column: 2; grid-row: 1; align-self: start; }
-    .pick-row.has-stats .pick-equip { grid-column: 3; grid-row: 1; }
+    .pick-row.has-stats .pick-action { grid-column: 3; grid-row: 1; }
     .pick-row.has-stats .pick-stats { grid-column: 2 / 4; grid-row: 2; }
 
     /* Two fixed columns: the left one is as wide as the longest weight word ("weight: very heavy" = 18 characters, one
@@ -560,6 +560,24 @@
       font-size: calc(var(--u) * 1.1);
       line-height: 1.6;
       color: #6b4a2a;
+    }
+
+    /* The EQUIP button in its own box, so a line of text can hang under it (the snowball's "Next in: 00:27") without
+       moving the button - it stays at the same height on every card. */
+    .pick-action {
+      position: relative;
+      flex: none;
+    }
+
+    .pick-regen {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: calc(var(--u) * 0.6);
+      font-size: calc(var(--u) * 0.85);
+      color: #8a6a44;
+      white-space: nowrap;
     }
 
     .pick-equip {
@@ -831,12 +849,12 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=12"></script>
+  <script src="src/economy.js?v=13"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=6"></script>
   <script src="src/shop.js?v=19"></script>
-  <script src="src/collection.js?v=18"></script>
-  <script src="src/main.js?v=75"></script>
+  <script src="src/collection.js?v=19"></script>
+  <script src="src/main.js?v=76"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

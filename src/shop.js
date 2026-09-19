@@ -145,19 +145,39 @@ const Shop = (() => {
     return (eco.shop.restockSeconds > 0 ? eco.shop.restockSeconds : 3600) * 1000;
   }
 
+  // How long an item stays on sale before its slot rerolls: by its rarity (economy.json rarities[].availabilitySeconds); an item
+  // with no rarity counts as common, like everywhere else in the shop. 0 = no timer.
+  function availMs(item) {
+    const rarities = eco.rarities || [];
+    let r = rarities.find((x) => x.id === Rarity.ofItem(item));
+    if (!r || !r.availabilitySeconds) r = rarities.find((x) => x.chance > 0) || r;
+    return r && r.availabilitySeconds > 0 ? r.availabilitySeconds * 1000 : 0;
+  }
+
+  // 1799000 ms -> "29:59", 3 h 59 min -> "3:59:00" (the same look as the max time in the BUFFS tab, hours when there are any)
+  function availText(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const mm = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+    const ss = String(total % 60).padStart(2, "0");
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+
   // Make the saved stock valid (right length, real items, nothing owned, no duplicate projectiles), restock
   // slots whose timer has run out, and fill any other gap. Returns how many slots just came back from SOLD OUT.
   function ensureStock() {
     const st = Economy.getShopState();
     const slots = eco.shop.slots;
     const now = Date.now();
-    let restocked = 0; // slots that just came back from a SOLD OUT timer
+    let restocked = 0; // slots that just came back from a SOLD OUT timer or rerolled because their item ran out
     let stock = Array.isArray(st.stock) ? st.stock.slice(0, slots) : [];
     while (stock.length < slots) stock.push(null);
     const restock = Array.isArray(st.restock) ? st.restock.slice(0, slots) : [];
     while (restock.length < slots) restock.push(null);
     const offers = Array.isArray(st.offers) ? st.offers.slice(0, slots) : [];
     while (offers.length < slots) offers.push(null);
+    const expires = Array.isArray(st.expires) ? st.expires.slice(0, slots) : [];
+    while (expires.length < slots) expires.push(null);
 
     // Invalid entries (item removed from economy.json, duplicate unique item) become empty slots.
     stock = stock.map((id) => (id && itemById(id) ? id : null));
@@ -169,8 +189,26 @@ const Shop = (() => {
         const it = itemById(stock[i]);
         if (needsOffer(it) && !offerValid(offers[i], it)) offers[i] = rollOffer(it);
         if (!needsOffer(it)) offers[i] = null;
+        // The availability timer of the item on sale (by its rarity).
+        const dur = availMs(it);
+        if (!dur) {
+          expires[i] = null;
+        } else if (typeof expires[i] !== "number") {
+          expires[i] = now + dur; // freshly stocked, or a save from before this timer existed
+        } else if (expires[i] - now > dur + 1000) {
+          expires[i] = now + dur; // the device clock was set back: never longer than one full timer
+        } else if (now >= expires[i]) {
+          // Ran out: the slot rerolls - a new pick, with a fresh amount, price and timer.
+          const others = stock.filter((id, j) => j !== i && id);
+          stock[i] = pickFor(others);
+          offers[i] = stock[i] !== null ? rollOffer(itemById(stock[i])) : null;
+          const nd = stock[i] !== null ? availMs(itemById(stock[i])) : 0;
+          expires[i] = nd ? now + nd : null;
+          if (stock[i] !== null) restocked++;
+        }
         continue;
       }
+      expires[i] = null;
       const t = restock[i];
       if (t && typeof t.at === "number") {
         // The device clock was set back: never wait longer than one full timer.
@@ -182,10 +220,13 @@ const Shop = (() => {
       offers[i] = stock[i] !== null ? rollOffer(itemById(stock[i])) : null; // a fresh amount and price on every (re)stock
       if (t && stock[i] !== null) restocked++;
       restock[i] = null;
+      const nd2 = stock[i] !== null ? availMs(itemById(stock[i])) : 0;
+      expires[i] = nd2 ? now + nd2 : null; // its availability timer starts now
     }
     st.stock = stock;
     st.restock = restock;
     st.offers = offers;
+    st.expires = expires;
     Economy.saveShop();
     return restocked;
   }
@@ -214,6 +255,7 @@ const Shop = (() => {
 
     st.stock[slot] = null;
     st.offers[slot] = null;
+    if (st.expires) st.expires[slot] = null; // sold: no availability timer, the sold-out timer runs instead
     st.restock[slot] = { at: Date.now() + restockMs(), prev: item.id };
     Economy.saveShop();
     return { ok: true, item };
@@ -235,6 +277,12 @@ const Shop = (() => {
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
 
+  // The availability timer in the top-left of the picture rectangle: how long until this item is replaced.
+  function availHtml(slot) {
+    const at = (Economy.getShopState().expires || [])[slot];
+    return typeof at === "number" ? `<span class="shop-avail" data-at="${at}">${availText(at - Date.now())}</span>` : "";
+  }
+
   function cardHtml(id, slot) {
     const item = id && itemById(id);
     if (!item) {
@@ -251,7 +299,7 @@ const Shop = (() => {
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
       `<span class="shop-top"><span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>${Rarity.labelHtml(Rarity.ofItem(item), "shop-rarity", true)}</span>` +
-      `<span class="shop-pic">${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
+      `<span class="shop-pic">${availHtml(slot)}${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
       `<span class="shop-name">${esc(item.name)}</span>` +
       `<span class="shop-bottom"><span class="shop-price"><i class="coin"></i>${p}</span>${amountHtml}</span>` +
       `</button>`
@@ -302,7 +350,10 @@ const Shop = (() => {
     const now = Date.now();
     const limit = restockMs() + 1000;
     // due = a timer ran out, or the device clock was set back so a deadline is absurdly far away
-    const due = (st.restock || []).some((t) => t && typeof t.at === "number" && (t.at <= now || t.at - now > limit));
+    const due =
+      (st.restock || []).some((t) => t && typeof t.at === "number" && (t.at <= now || t.at - now > limit)) ||
+      // ... or an item's availability ran out (the slot rerolls), or that clock was set back too
+      (st.expires || []).some((x) => typeof x === "number" && (x <= now || x - now > 4 * 3600 * 1000 + 1000));
     if (due) {
       announceRestock(ensureStock(), true);
       if (open) render();
@@ -310,6 +361,9 @@ const Shop = (() => {
     if (open) {
       root.querySelectorAll(".shop-timer").forEach((el) => {
         el.textContent = formatTime(Number(el.dataset.at) - now);
+      });
+      root.querySelectorAll(".shop-avail").forEach((el) => {
+        el.textContent = availText(Number(el.dataset.at) - now);
       });
     }
   }

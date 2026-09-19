@@ -275,12 +275,25 @@
 
     /* Space for the item's picture: takes whatever height is left between the category and the name. */
     .shop-pic {
+      position: relative; /* the availability timer sits in its top-left corner */
       flex: 1;
       align-self: stretch;
       min-height: 0;
       margin: calc(var(--u) * 0.5) 0;
       background: rgba(122, 82, 48, 0.1);
       border-radius: 2px;
+    }
+
+    /* How long until the item on sale is replaced (its slot rerolls): same look as the max time stat in the BUFFS tab. */
+    .shop-avail {
+      position: absolute;
+      top: calc(var(--u) * 0.6);
+      left: calc(var(--u) * 0.8);
+      font-size: calc(var(--u) * 0.85);
+      color: #8a6a44;
+      white-space: nowrap;
+      z-index: 1;
+      pointer-events: none;
     }
 
     .shop-pic img {
@@ -888,10 +901,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=16"></script>
+  <script src="src/economy.js?v=17"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=11"></script>
-  <script src="src/shop.js?v=20"></script>
+  <script src="src/shop.js?v=21"></script>
   <script src="src/collection.js?v=37"></script>
   <script src="src/main.js?v=112"></script>
   <script>

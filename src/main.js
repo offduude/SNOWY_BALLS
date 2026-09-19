@@ -383,7 +383,16 @@ class MainScene extends Phaser.Scene {
       const follow = 1 - Math.exp(-14 * dt);
       // Never show anything above the top of the texture.
       const clampedTarget = Math.max(targetScrollY, -TOP_BOUNDARY_HEIGHT);
-      this.cameras.main.scrollY = Phaser.Math.Linear(this.cameras.main.scrollY, clampedTarget, follow);
+      // Whole pixels only, like scrollX: a fractional scrollY that creeps toward the top limit
+      // (-659.99 ... -660) made the whole picture snap down 1px at the very end, which read as the
+      // camera jumping (worst right after the apex of a ball that falls back behind the roof).
+      // The min 1px step keeps the rounding from stalling the camera a couple of pixels short.
+      const cam = this.cameras.main;
+      const cur = Math.round(cam.scrollY);
+      const goal = Math.round(clampedTarget);
+      let next = Math.round(Phaser.Math.Linear(cur, clampedTarget, follow));
+      if (next === cur && cur !== goal) next = cur + Math.sign(goal - cur);
+      cam.scrollY = next;
     }
 
     // Flew out through the top of the building: no wall to stick to, so end the throw right

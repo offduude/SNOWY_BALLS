@@ -133,7 +133,7 @@
         "amount": { "min": 10, "max": 20 },
         "unitPrice": { "min": 13, "max": 20 },
         "ignorePriceOverride": true,
-        "image": "assets/snowball/pine_cone.png",
+        "image": "assets/snowball/pine_cone.png?v=2",
         "effect": { "type": "givesProjectile", "value": "pinecone" },
         "description": "Feels kinda sticky."
       }

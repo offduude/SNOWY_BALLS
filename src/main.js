@@ -193,8 +193,7 @@ const PROJECTILE_VISUALS = {
   },
   pinecone: {
     ball: "pinecone",
-    // no pinecone-in-hand character art yet: the snowball poses stand in
-    sprites: { idle: "char_idle_snowball", aiming: "char_aiming", throwing: "char_throwing" },
+    sprites: { idle: "char_idle_pinecone", aiming: "char_aiming_pinecone", throwing: "char_throwing" },
     impactSound: "chestnut_impact", // same sound as the chestnut
     impactVolume: 0.5,
   },
@@ -251,7 +250,9 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_aiming", "assets/character/character1_aiming.png");
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
-    this.load.image("pinecone", "assets/snowball/pine_cone.png");
+    this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
+    this.load.image("char_idle_pinecone", "assets/character/character1_idle_pinecone.png");
+    this.load.image("char_aiming_pinecone", "assets/character/character1_aiming_pinecone.png");
     this.load.image("grenade_flying", "assets/snowball/grenade_flying.png"); // the ball while it is in the air
     this.load.image("grenade_impact", "assets/snowball/grenade_impact.png"); // the scorch mark it leaves on the wall
     this.load.image("char_idle_grenade", "assets/character/character1_idle_grenade.png");

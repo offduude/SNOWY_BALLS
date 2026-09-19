@@ -737,6 +737,11 @@
       box-sizing: border-box;
       width: calc(var(--u) * (1.2 * 8 + 2.4) + 4px);
       text-align: center;
+      /* Exactly the height of the USE button (padding 1u + border 2px + a 1.2u line), so the max time under it ("03:00")
+         is at the same place whether the buff is running or not. */
+      padding: calc(var(--u) * 1) 0;
+      border: 2px solid transparent;
+      line-height: calc(var(--u) * 1.2);
       font-size: calc(var(--u) * 1.5);
       color: #3b2412;
     }
@@ -878,7 +883,7 @@
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=10"></script>
   <script src="src/shop.js?v=20"></script>
-  <script src="src/collection.js?v=33"></script>
+  <script src="src/collection.js?v=34"></script>
   <script src="src/main.js?v=94"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

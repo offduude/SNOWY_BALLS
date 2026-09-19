@@ -258,6 +258,11 @@ const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // BALL_REGROW_MS, growing fastest right after the bounce and slower and slower the further it gets from the bounce point.
 // Both are the same curve, a logarithm (fast at first, then flattening): growing follows it forwards in time, shrinking
 // follows it backwards, so the ball leaves the wall the way it arrived, in reverse.
+// MUSIC: the theme plays all the time; while the banana face event is on, it is crossfaded with event_banana_face (the theme fades
+// down to silence - it keeps running underneath - as the event music fades up, and the other way round when the event ends).
+const THEME_VOLUME = 0.5;
+const EVENT_MUSIC_VOLUME = 0.5;
+const MUSIC_FADE_MS = 1500;
 const BALL_SIZE = 16;
 const BALL_APEX_SCALE = 0.5;
 const BALL_REGROW_MS = 450;
@@ -327,6 +332,7 @@ class MainScene extends Phaser.Scene {
     // Timestamp so an edited economy.json is never served from a stale browser/CDN cache.
     this.load.json("economy", "economy.json?t=" + Date.now());
     this.load.audio("theme", "assets/audio/theme.mp3?v=2");
+    this.load.audio("event_banana_face", "assets/audio/event_banana_face.mp3");
     this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
     this.load.audio("window_clink", "assets/audio/window_clink.mp3");
@@ -703,7 +709,7 @@ class MainScene extends Phaser.Scene {
   // suspended (backgrounding, Safari) and leave the theme silent, so also resume it and replay
   // if needed whenever the player returns to the tab or taps - event-driven, no polling.
   startThemeMusic() {
-    this.theme = this.sound.add("theme", { loop: true, volume: 0.5 });
+    this.theme = this.sound.add("theme", { loop: true, volume: THEME_VOLUME });
     this.theme.play();
 
     const ensurePlaying = () => {
@@ -717,6 +723,27 @@ class MainScene extends Phaser.Scene {
       if (!document.hidden) ensurePlaying();
     });
     this.input.on("pointerdown", ensurePlaying);
+  }
+
+  // Crossfades between the theme and the event music. Safe to call at any time and as often as you like: a fade that is still
+  // running is stopped and the new one starts from the volumes the tracks have right now, so nothing ever jumps.
+  setEventMusic(on) {
+    if (this.eventMusicOn === on) return;
+    this.eventMusicOn = on;
+    if (!this.eventMusic) this.eventMusic = this.sound.add("event_banana_face", { loop: true, volume: 0 });
+    if (on && !this.eventMusic.isPlaying) {
+      this.eventMusic.play({ loop: true, volume: 0 }); // (a plain play() would restart it at full volume)
+      this.eventMusic.setVolume(0);
+    }
+    (this.musicTweens || []).forEach((tw) => tw.stop());
+    const fade = (sound, to, onDone) =>
+      this.tweens.add({ targets: sound, volume: to, duration: MUSIC_FADE_MS, ease: "Sine.easeInOut", onComplete: onDone });
+    this.musicTweens = [
+      this.theme ? fade(this.theme, on ? 0 : THEME_VOLUME) : null,
+      fade(this.eventMusic, on ? EVENT_MUSIC_VOLUME : 0, () => {
+        if (!on) this.eventMusic.stop(); // faded out: it starts from the beginning next time
+      }),
+    ].filter(Boolean);
   }
 
   worldY(heightFromGround) {
@@ -1073,6 +1100,7 @@ class MainScene extends Phaser.Scene {
     this.buffEventId = buffId || null;
     this.activeEvent = "face";
     this.bananaActive = true;
+    this.setEventMusic(true);
     this.bananaHitTriggered = false;
 
     for (const mark of this.marks.slice()) {
@@ -1099,6 +1127,7 @@ class MainScene extends Phaser.Scene {
   // was never actually touched, this overlay just sits on top of it).
   endBananaEvent() {
     if (!this.bananaActive) return;
+    this.setEventMusic(false);
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
     this.buffEventId = null;
     this.bananaActive = false;
@@ -1115,6 +1144,7 @@ class MainScene extends Phaser.Scene {
   // then after events.faceWindow.hitRevertMs fades both the texture and the mark that triggered it back
   // to nothing together.
   triggerBananaHit(mark) {
+    this.setEventMusic(false); // the event is over the moment the face is hit: the music fades out while the face fades away
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
     if (this.buffEventId) {
       // The event was made by a buff (Tomato Juice): hitting the face concludes the event AND ends the buff.

@@ -78,25 +78,25 @@ const Shop = (() => {
     return list[Math.floor(Math.random() * list.length)];
   }
 
-  // Every eligible item has the SAME chance - unless economy.json has refill.categoryWeights, which then picks
-  // the item TYPE first (e.g. {"consumable": 9, "projectile": 1} makes projectiles rare) and a random item of
-  // that type after. Types with nothing eligible are skipped. Without categoryWeights (the current setup) this
-  // is a plain uniform pick.
+  // The pick for a slot is by RARITY: first a rarity is rolled by its chance (economy.json "rarities"; only rarities that
+  // have an item in the pool take part, their chances are rescaled to 100%), then one of that rarity's items is picked
+  // at random - so the items of one rarity are equally likely. An item with no rarity counts as the most common one.
   function pickWeighted(pool) {
-    const weights = eco.shop.refill.categoryWeights;
-    if (!weights) return pickRandom(pool);
-    const cats = [...new Set(pool.map((it) => it.category))];
-    const w = cats.map((c) => (weights[c] !== undefined ? weights[c] : 1));
-    let roll = Math.random() * w.reduce((a, b) => a + b, 0);
-    let cat = cats[cats.length - 1];
-    for (let i = 0; i < cats.length; i++) {
-      roll -= w[i];
+    const rarities = eco.rarities || [];
+    if (!rarities.length) return pickRandom(pool);
+    const rid = (it) => (rarities.some((r) => r.id === Rarity.ofItem(it)) ? Rarity.ofItem(it) : rarities[0].id);
+    const present = rarities.filter((r) => pool.some((it) => rid(it) === r.id));
+    const total = present.reduce((sum, r) => sum + r.chance, 0);
+    let roll = Math.random() * total;
+    let chosen = present[present.length - 1];
+    for (const r of present) {
+      roll -= r.chance;
       if (roll < 0) {
-        cat = cats[i];
+        chosen = r;
         break;
       }
     }
-    return pickRandom(pool.filter((it) => it.category === cat));
+    return pickRandom(pool.filter((it) => rid(it) === chosen.id));
   }
 
   // Choose an item for one slot. `shownOthers` = ids in the OTHER slots.
@@ -227,7 +227,7 @@ const Shop = (() => {
     const amountHtml = offer ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
-      `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>` +
+      `<span class="shop-top"><span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>${Rarity.labelHtml(Rarity.ofItem(item), "shop-rarity", true)}</span>` +
       `<span class="shop-pic">${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
       `<span class="shop-name">${esc(item.name)}</span>` +
       `<span class="shop-bottom"><span class="shop-price"><i class="coin"></i>${p}</span>${amountHtml}</span>` +

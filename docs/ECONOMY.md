@@ -58,11 +58,28 @@ not the projectile - those only change how wide the sliders are).
 | `markerHz` | back-and-forth sweeps per second (`0.85` = one sweep in about 1.2s) |
 | `offsetZoneAtWeight100` | the share of the OFFSET slider that is a guaranteed W20 hit for a weight-100 projectile (the snowball). `0.5` = half the slider. See "weight" below |
 
-## rarity (placeholders)
+## rarities (live)
 
-Every projectile (`projectiles.<id>.rarity`) and every buff (the shop item's `rarity`) has a number, **bigger = rarer**. The PROJECTILES and
-BUFFS tabs list the rarest first. Equal rarities keep the older order (projectiles: highest W20 hit value first; buffs: file order).
-Right now the numbers are placeholders in the current order - snowball 1, chestnut 2, grenade 3, Skyr 1 - to be decided later.
+Projectiles and buffs **share** the rarities in `rarities` (from the most common to the rarest): each has an `id`, the `label` shown,
+a `color` (CSS colour, or `rainbow` = animated waves plus a pulsing shine) and a `chance` in percent.
+
+| rarity | colour | chance |
+|---|---|---|
+| common | light blue | 60% |
+| rare | light orange | 30% |
+| epic | purple | 9% |
+| legendary | rainbow | 1% |
+
+**Shop slot pick:** a slot first rolls a **rarity** by these chances, then picks one of that rarity's items at random (so the items of one
+rarity are equally likely). Only rarities that have an item to sell take part - their chances are rescaled to 100% (with a
+common chestnut and epic grenade and skyr on sale: chestnut 87%, grenade 6.5%, skyr 6.5%). `py tools/economy_report.py` prints each item's chance.
+
+**Where a rarity is set:** a projectile's in `projectiles.<id>.rarity` (also used by its shop item), a buff's on the shop item (`rarity`). An
+item without a rarity is treated as common when picked for the shop and sorts last in the tabs.
+
+**Labels:** plain coloured text, no background: top right of a shop card (same text style as PROJECTILE / BUFF), and in the
+PROJECTILES / BUFFS tabs on the amount's row, left of the amount. The tabs list the rarest first. The light colours have a thin
+dark outline so they read on the cream cards.
 
 ## weightLabels (live)
 
@@ -120,7 +137,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 **`refill`** - how a replacement is chosen:
 - `mode: random_from_eligible` - random pick among items the player is allowed to see
 - `excludeOwned` - permanent items already bought never come back
-- **every eligible item has the same chance** to be put in a slot (a plain random pick). Optional `categoryWeights` (e.g. `{ "consumable": 9, "projectile": 1 }`) makes some TYPES rarer: the type is picked by those weights first, then an item of that type at random. It is not set right now
+- **the pick is by rarity** (see "rarities"): a rarity by its chance, then one of its items at random
 - (always on) **any item can be on sale in several slots at once**, projectiles included; every slot rolls its own amount and price
 - `guaranteeCheapItem` - (currently `enabled: false`, so it does not skew the equal chances) after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop

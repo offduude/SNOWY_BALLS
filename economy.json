@@ -32,11 +32,19 @@
     { "from": 150, "label": "very heavy" }
   ],
 
+  "_raritiesNote": "Rarities, from the most common to the rarest. A shop slot first rolls a rarity by chance (percent - only rarities that have an item to sell take part, and their chances are rescaled to 100), then picks one of that rarity's items at random. color is CSS text colour, or rainbow (animated waves + a pulsing shine). Every projectile (in projectiles) and every shop item names one with rarity; the PROJECTILES and BUFFS tabs list the rarest first.",
+  "rarities": [
+    { "id": "common", "label": "common", "color": "#62c0ff", "chance": 60 },
+    { "id": "rare", "label": "rare", "color": "#ffab5c", "chance": 30 },
+    { "id": "epic", "label": "epic", "color": "#a25cff", "chance": 9 },
+    { "id": "legendary", "label": "legendary", "color": "rainbow", "chance": 1 }
+  ],
+
   "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps TAP to aim, and it is NOT given back if the aim is abandoned; when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile. weight: NOT shown to the player (only as a word, see weightLabels). The snowball is always 100 - the reference. It sets two things: (1) STRENGTH: the perfect W20 throw (the middle of the window) is at strength slider position weight / 200 - 100 = the centre of the slider, 200 = the very tip, 0 = the very beginning; (2) OFFSET: the share of the offset slider that hits W20 - 0 = only the exact middle, 200 = anywhere on the slider (see aim.offsetZoneAtWeight100 for the snowball, straight lines in between). leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",
   "projectiles": {
-    "snowball": { "infinite": true, "rarity": 1, "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
-    "chestnut": { "infinite": false, "rarity": 2, "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
-    "grenade": { "infinite": false, "rarity": 3, "weight": 130, "rewards": { "W20": 199, "W21": 199 }, "leavesMark": true, "spins": false }
+    "snowball": { "infinite": true, "rarity": "common", "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
+    "chestnut": { "infinite": false, "rarity": "rare", "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
+    "grenade": { "infinite": false, "rarity": "epic", "weight": 130, "rewards": { "W20": 199, "W21": 199 }, "leavesMark": true, "spins": false }
   },
 
 
@@ -50,7 +58,6 @@
     "refill": {
       "mode": "random_from_eligible",
       "excludeOwned": true,
-      "_equalChanceNote": "Every item has the SAME chance to be put on sale in a slot. To make some kinds rarer again, add \"categoryWeights\": { \"consumable\": 9, \"projectile\": 1 } here (odds of each TYPE; then an item of that type is picked at random).",
       "guaranteeCheapItem": { "enabled": false, "maxPriceInAverageHits": 12 }
     },
 
@@ -60,7 +67,7 @@
         "id": "skyr",
         "name": "Skyr",
         "category": "consumable",
-        "rarity": 1,
+        "rarity": "legendary",
         "price": 10,
         "ignorePriceOverride": true,
         "duration": { "seconds": 180 },

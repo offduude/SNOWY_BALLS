@@ -261,6 +261,7 @@ class MainScene extends Phaser.Scene {
     // fail silently later, so say so loudly right away.
     this.eco = this.cache.json.get("economy");
     if (!this.eco) throw new Error("economy.json failed to load or has a JSON syntax error - check it.");
+    Rarity.init(this.eco);
     Shop.init(this.eco);
     Buffs.init(this.eco);
     Collection.setEconomy(this.eco);

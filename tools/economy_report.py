@@ -59,7 +59,38 @@ def check(eco):
     for i in shop["items"]:
         if i.get("category") == "projectile" and i.get("id") not in projectiles:
             problems.append(f"{i['id']}: projectile has no entry in the top-level \"projectiles\" section")
+    # Rarities: every projectile and shop item must name a rarity that exists; chances must be positive.
+    rarities = eco.get("rarities", [])
+    ids = [r["id"] for r in rarities]
+    for r in rarities:
+        if r.get("chance", 0) <= 0:
+            problems.append(f"rarity '{r.get('id')}': chance must be above 0")
+    for pid, pr in projectiles.items():
+        if pr.get("rarity") not in ids:
+            problems.append(f"projectile {pid}: rarity '{pr.get('rarity')}' is not in rarities")
+    for it in shop["items"]:
+        if it.get("category") == "consumable" and it.get("rarity") not in ids:
+            problems.append(f"item {it.get('id')}: rarity '{it.get('rarity')}' is not in rarities")
     return problems
+
+
+def slot_odds(eco):
+    """Chance that a shop slot is put on sale with each item: pick a rarity by its chance (only rarities that have a
+    shop item take part, rescaled to 100%), then an item of that rarity at random."""
+    rarities = eco.get("rarities", [])
+    items = eco["shop"]["items"]
+
+    def rarity_of(it):
+        return eco["projectiles"][it["id"]]["rarity"] if it["category"] == "projectile" else it.get("rarity")
+
+    present = [r for r in rarities if any(rarity_of(i) == r["id"] for i in items)]
+    total = sum(r["chance"] for r in present) or 1
+    odds = {}
+    for r in present:
+        same = [i for i in items if rarity_of(i) == r["id"]]
+        for i in same:
+            odds[i["id"]] = (r["chance"] / total) / len(same)
+    return odds
 
 
 def main():
@@ -89,6 +120,10 @@ def main():
         row += "".join(f"{hits / a:>8.0f}" for a in ACCURACY)
         print(row)
 
+
+    print("\nChance that a shop slot shows each item (rarity roll, then a random item of that rarity):")
+    for iid, pr in sorted(slot_odds(eco).items(), key=lambda kv: -kv[1]):
+        print(f"  {iid:<12}{pr * 100:5.1f}%")
 
     problems = check(eco)
     print("\nChecks:", "all good" if not problems else "")

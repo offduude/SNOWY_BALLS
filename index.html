@@ -221,6 +221,54 @@
       letter-spacing: 0.05em;
     }
 
+    /* Top row of a shop card: PROJECTILE / BUFF at the left, the rarity at the right (same text style, its own colour). */
+    .shop-top {
+      align-self: stretch;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    /* Rarity labels are plain coloured text, no background; a thin dark outline keeps the light colours readable on the
+       cream cards. */
+    .shop-rarity,
+    .pick-rarity {
+      letter-spacing: 0.05em;
+      text-shadow: 1px 0 #3b2412, -1px 0 #3b2412, 0 1px #3b2412, 0 -1px #3b2412;
+    }
+
+    .shop-rarity { font-size: calc(var(--u) * 0.95); }
+
+    /* LEGENDARY: rainbow waves that keep travelling through the letters, plus a shine that pulses brighter and dimmer.
+       (The text is a clipped gradient, so the outline and the glow are drop-shadow filters, not text-shadow.) */
+    .rarity-rainbow {
+      display: inline-block;
+      text-shadow: none;
+      background: linear-gradient(90deg, #ff4d4d, #ffa84d, #fff04d, #5bff6e, #4dd2ff, #6a6bff, #c14dff, #ff4d4d);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      animation: rarity-wave 2.4s linear infinite, rarity-shine 1.7s ease-in-out infinite;
+    }
+
+    @keyframes rarity-wave {
+      from { background-position: 0% 50%; }
+      to { background-position: 200% 50%; }
+    }
+
+    @keyframes rarity-shine {
+      0%, 100% {
+        filter: drop-shadow(1px 0 0 #3b2412) drop-shadow(-1px 0 0 #3b2412) drop-shadow(0 1px 0 #3b2412) drop-shadow(0 -1px 0 #3b2412)
+          drop-shadow(0 0 1px rgba(255, 255, 255, 0.15)) brightness(1);
+      }
+      50% {
+        filter: drop-shadow(1px 0 0 #3b2412) drop-shadow(-1px 0 0 #3b2412) drop-shadow(0 1px 0 #3b2412) drop-shadow(0 -1px 0 #3b2412)
+          drop-shadow(0 0 5px rgba(255, 255, 255, 0.95)) brightness(1.35);
+      }
+    }
+
     /* Space for the item's picture: takes whatever height is left between the category and the name. */
     .shop-pic {
       flex: 1;
@@ -492,13 +540,20 @@
       margin-bottom: calc(var(--u) * 0.8);
     }
 
-    .pick-count {
+    /* Top-right corner of a card in the lists: the rarity label, then the amount (x22) to its right, on one row. */
+    .pick-corner {
       position: absolute;
       top: calc(var(--u) * 0.9);
       right: calc(var(--u) * 1.2);
-      color: #8a6a44;
+      display: flex;
+      align-items: baseline;
+      gap: calc(var(--u) * 0.9);
       font-size: calc(var(--u) * 1.3);
       line-height: 1;
+    }
+
+    .pick-count {
+      color: #8a6a44;
     }
 
     .pick-desc {
@@ -777,10 +832,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=12"></script>
-  <script src="src/buffs.js?v=5"></script>
-  <script src="src/shop.js?v=16"></script>
-  <script src="src/collection.js?v=17"></script>
-  <script src="src/main.js?v=74"></script>
+  <script src="src/rarity.js?v=1"></script>
+  <script src="src/buffs.js?v=6"></script>
+  <script src="src/shop.js?v=17"></script>
+  <script src="src/collection.js?v=18"></script>
+  <script src="src/main.js?v=75"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

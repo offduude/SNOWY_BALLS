@@ -57,9 +57,18 @@ const Collection = (() => {
   }
 
   // "x12" next to the name of a consumable projectile (the snowball is infinite: nothing).
-  function countHtml(kind, item) {
-    if (kind !== "projectile" || item.infinite) return "";
-    return `<span class="pick-count">x${Economy.getProjectileCount(item.id)}</span>`;
+  // The top-right corner of a card: the rarity label, then the amount ("x22") to its right. Either can be missing (the
+  // snowball is infinite - no amount; an item without a rarity - no label).
+  function cornerHtml(rarityId, countText) {
+    const label = Rarity.labelHtml(rarityId, "pick-rarity", false);
+    if (!label && !countText) return "";
+    return `<span class="pick-corner">${label}${countText ? `<span class="pick-count">${countText}</span>` : ""}</span>`;
+  }
+
+  function projectileCorner(kind, item) {
+    if (kind !== "projectile") return "";
+    const p = eco && eco.projectiles && eco.projectiles[item.id];
+    return cornerHtml(p && p.rarity, item.infinite ? "" : `x${Economy.getProjectileCount(item.id)}`);
   }
 
   function isListed(kind, it) {
@@ -89,14 +98,14 @@ const Collection = (() => {
     );
   }
 
-  // Projectiles are listed by RARITY, the rarest first (economy.json projectiles.<id>.rarity - a number, bigger = rarer;
-  // placeholders for now). Ties keep the older order: highest W20 base value first, then the catalog order.
+  // Projectiles are listed by RARITY, the rarest first (economy.json projectiles.<id>.rarity, see rarity.js; an item
+  // without a rarity goes last). Ties keep the older order: highest W20 base value first, then the catalog order.
   function sortedItems(kind, items) {
     if (kind !== "projectile" || !eco) return items;
-    const p = (it) => eco.projectiles[it.id] || { rarity: 0, rewards: { W20: 0 } };
+    const p = (it) => eco.projectiles[it.id] || { rewards: { W20: 0 } };
     return items
       .map((it, i) => ({ it, i }))
-      .sort((a, b) => (p(b.it).rarity || 0) - (p(a.it).rarity || 0) || p(b.it).rewards.W20 - p(a.it).rewards.W20 || a.i - b.i)
+      .sort((a, b) => Rarity.rank(p(b.it).rarity) - Rarity.rank(p(a.it).rarity) || p(b.it).rewards.W20 - p(a.it).rewards.W20 || a.i - b.i)
       .map((x) => x.it);
   }
 
@@ -108,7 +117,7 @@ const Collection = (() => {
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description)}</div></div>` +
       `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>` +
-      countHtml(kind, item) + // the amount sits in the card's top-right corner
+      projectileCorner(kind, item) + // rarity label + amount sit in the card's top-right corner
       stats +
       `</div>`
     );
@@ -139,7 +148,7 @@ const Collection = (() => {
       `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +
       `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
       control +
-      (b.count > 0 ? `<span class="pick-count">x${b.count}</span>` : "") +
+      cornerHtml(Rarity.ofItem(b.item), b.count > 0 ? `x${b.count}` : "") +
       `</div>`
     );
   }

@@ -766,3 +766,7 @@ not actual play.
 - Weights for reference: snowball 100, chestnut 75, pinecone 126, grenade 130. `main.js?v=83`, `collection.js?v=29`.
 
 - **Pinecone art wired (2026-09-19):** `character1_idle_pinecone.png` and `character1_aiming_pinecone.png` are now the pinecone's idle and aiming poses (`PROJECTILE_VISUALS.pinecone.sprites`; the throwing pose is still the plain one - no pinecone throwing sprite), replacing the snowball stand-ins; the updated `pine_cone.png` (shop / list / ball) loads with `?v=2`. Verified through a full throw: idle `char_idle_pinecone` -> aiming `char_aiming_pinecone` -> throwing `char_throwing` -> idle again. `main.js?v=84`, `collection.js?v=30`.
+
+## Graduation lines removed (2026-09-19)
+
+- The black tick marks on the OFFSET and STRENGTH sliders are gone (`drawAimBar` in `main.js`; the dead `AIM_TICK_STEP` and `aim.angleTickStep` went with them). The green guarantee lines (Skyr) are untouched: verified with Skyr running - green lines on both sliders (on the strength slider only when the locked offset can still hit W20, as before), and plain bars without it. Yellow event dots unchanged. `main.js?v=85`; docs updated (ECONOMY.md guideLines / precision rows).

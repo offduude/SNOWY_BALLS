@@ -175,14 +175,14 @@ when none are left. Effects do not stack from the same buff; different buffs mul
 
 | type | value means |
 |---|---|
-| `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise, and the graduation lines then run unbroken so a gap can't give them away). Does NOT affect the yellow event dots, which always show |
-| `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed), so the graduation lines spread out |
+| `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise). Does NOT affect the yellow event dots, which always show |
+| `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed) |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
 | `coinMultiplier` | multiplies the coins of a hit (rounded down) |
 | `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 60 s). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual x40 |
 
 **When buffs are read:** only at the moment the player taps "TAP to aim". That snapshot is used for the whole throw
-(sliders, graduations, event dots and payout), so a buff expiring or being bought mid-aim never changes anything under the
+(sliders, green lines, event dots and payout), so a buff expiring or being bought mid-aim never changes anything under the
 player's finger. The buff cards and list always show the live state.
 
 ### other effect types (planned; nothing applies them yet)

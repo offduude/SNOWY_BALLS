@@ -154,8 +154,6 @@ function offsetRangeForWeight(weight, zoneAt100) {
   return Math.min(10, W20_SWING_GUARANTEE / Math.max(0.015, offsetZone(weight, zoneAt100)));
 }
 
-const AIM_TICK_STEP = 0.1; // graduation lines on the STRENGTH bar every 10% of its power span
-
 const FACE_IMG_X = W20.xFrom - 1; // world x of the texture's left edge
 const FACE_IMG_TOP_HEIGHT = W20.heightTo + 1; // heightClimbed of the texture's top edge
 const FACE_RAW = { xFrom: 1, xTo: 18, yFrom: 28, yTo: 45 }; // face+collar, cropped-texture px
@@ -391,22 +389,20 @@ class MainScene extends Phaser.Scene {
   // Freezes everything about the coming throw that a buff (or the projectile) can change - slider ranges,
   // speeds and the coin multiplier. It is called when the player taps "TAP to aim" and NOT again until the
   // next tap, so a buff that runs out or is bought mid-aim, mid-flight or on the result screen can never
-  // change the sliders (or the payout) of the throw in progress. The bars, their graduations and the event
+  // change the sliders (or the payout) of the throw in progress. The bars, their green lines and the event
   // dots are all drawn from this snapshot.
   //  angleRange: how far (in swing) the offset marker can drift, edge to edge of the bar - from the weight (see
-  //    "WEIGHT" above), narrowed by a precision buff; smaller = more precise, the graduations spread out.
+  //    "WEIGHT" above), narrowed by a precision buff; smaller = more precise.
   //  powerRange: how much of the power span the strength slider covers (1 = all of it; strength-control buff).
   takeAimSnapshot() {
     const b = Buffs.modifiers();
     const cfg = { ...AIM_DEFAULTS, ...(this.eco.aim || {}) };
     // The offset spread comes from the projectile's WEIGHT (heavier = a wider share of the bar is a hit), then a
-    // precision buff narrows it further. The graduation lines are every 10% of the SNOWBALL's spread, at fixed swing
-    // values, so they look stretched on lighter/heavier projectiles (a magnified ruler).
+    // precision buff narrows it further.
     const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
     this.aim = {
       markerHz: cfg.markerHz, // fixed: the streak no longer speeds it up
       angleRange: offsetRangeForWeight(weight, cfg.offsetZoneAtWeight100) / b.precision,
-      angleTickStep: 0.1 * offsetRangeForWeight(REFERENCE_WEIGHT, cfg.offsetZoneAtWeight100),
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Skyr) gives them
@@ -1182,9 +1178,6 @@ class MainScene extends Phaser.Scene {
     let markerPos; // 0..1 along the bar
     if (isAngle) {
       // The bar always spans the equipped projectile's whole angle range, so the marker runs edge to edge.
-      // Its graduation lines are fixed swing values (10%, 20%, ... of the snowball's full range, counted
-      // from the center outwards), so on a projectile with a smaller range they spread further apart -
-      // like a magnified ruler.
       const range = this.aim.angleRange;
       markerPos = 0.5 + (this.angleValue - 0.5) / range;
 
@@ -1195,14 +1188,8 @@ class MainScene extends Phaser.Scene {
           g.lineBetween(x, barY - extra, x, barY + barH + extra);
         }
       };
-      // Graduations: skip the bar's own edge and everything between the two guarantee lines.
-      // Without the guide-lines buff the ticks are drawn everywhere - a gap in them would give the lines away.
+      // (There are no graduation lines any more - the bar is plain, apart from the green lines below.)
       const guide = this.aim.guideLines;
-      const step = this.aim.angleTickStep;
-      for (let k = 1; k * step < range - 1e-9; k++) {
-        const swing = k * step;
-        if (!guide || swing > W20_SWING_GUARANTEE + 1e-6) lineAt(swing, 0x202020, 0.85, 1, 3);
-      }
       // The two lines that guarantee a hit on W20 (sideways) - nothing else is drawn between them. Buff only.
       if (guide) lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
 
@@ -1221,7 +1208,7 @@ class MainScene extends Phaser.Scene {
       const barPos = (power) => (power - pLo) / pRange;
       markerPos = barPos(this.powerValue);
 
-      // Same idea for power: a graduation line every 10% of the power span, and two green lines around the power
+      // Same idea for power: two green lines around the power
       // range that puts the apex inside W20's height band (a guaranteed vertical hit). That range depends
       // on the projectile's weight (a lighter one flies higher, so it needs less power); nothing else is
       // drawn between the two lines.
@@ -1238,10 +1225,6 @@ class MainScene extends Phaser.Scene {
         g.lineStyle(width, color, alpha);
         g.lineBetween(x, barY - extra, x, barY + barH + extra);
       };
-      for (let k = 1; k * AIM_TICK_STEP < 1 - 1e-9; k++) {
-        const power = k * AIM_TICK_STEP; // fixed power values: they spread out when the bar zooms in
-        if (!band || !this.aim.guideLines || power < lo || power > hi) lineAtPower(power, 0x202020, 0.85, 1, 3);
-      }
       if (band && this.aim.guideLines) {
         lineAtPower(lo, 0x5cff5c, 1, 2, 5);
         lineAtPower(hi, 0x5cff5c, 1, 2, 5);

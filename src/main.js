@@ -356,7 +356,7 @@ class MainScene extends Phaser.Scene {
     // Mobile-only from here on - no keyboard control, tap is the only input.
     this.input.on("pointerdown", () => this.handleFreezeInput());
 
-    this.showMessage("TAP to aim");
+    this.showMessage("TAP to AIM");
     this.setupFpsReadout();
   }
 
@@ -459,7 +459,7 @@ class MainScene extends Phaser.Scene {
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
       this.abandonAim();
       this.state = STATE.IDLE;
-      this.showMessage("TAP to aim");
+      this.showMessage("TAP to AIM");
       if (this.pendingProjectile) {
         // That tap was the last of its kind: the snowball takes over now, since no throw will follow to apply it.
         this.applyProjectile(this.pendingProjectile);
@@ -495,11 +495,11 @@ class MainScene extends Phaser.Scene {
     }
     if (!this.hasAmmo()) {
       const info = Economy.regenInfo(this.projectileId);
-      const text = "Out of " + this.projectileId + "s\n+1 in " + formatClock(info && info.msToNext !== null ? info.msToNext : 0);
+      const text = "OUT of " + this.projectileId.toUpperCase() + "S\n+1 in " + formatClock(info && info.msToNext !== null ? info.msToNext : 0);
       if (document.getElementById("message").textContent !== text) this.showMessage(text);
       this.stockMessageShown = true;
     } else if (this.stockMessageShown) {
-      this.showMessage("TAP to aim");
+      this.showMessage("TAP to AIM");
       this.stockMessageShown = false;
     }
   }
@@ -532,7 +532,7 @@ class MainScene extends Phaser.Scene {
     this.applyProjectile(id);
     if (wasAiming) {
       this.state = STATE.IDLE;
-      this.showMessage("TAP to aim");
+      this.showMessage("TAP to AIM");
     }
   }
 
@@ -1025,7 +1025,7 @@ class MainScene extends Phaser.Scene {
       duration: 500,
       ease: "Sine.easeInOut",
     });
-    this.showMessage("TAP to aim");
+    this.showMessage("TAP to AIM");
   }
 
   showMessage(msg) {

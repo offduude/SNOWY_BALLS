@@ -476,6 +476,13 @@
       align-items: center;
     }
 
+    /* A buff card is as tall as a projectile card, so the length of its description never changes its height (a
+       description of up to 3 lines fits; the USE button / timer is centred, i.e. where EQUIP is on a projectile). */
+    .pick-row.buff-row {
+      box-sizing: border-box;
+      min-height: calc(var(--u) * 13.05);
+    }
+
     .pick-row.has-stats .pick-pic { grid-column: 1; grid-row: 1 / span 2; }
     .pick-row.has-stats .pick-text { grid-column: 2; grid-row: 1; align-self: start; }
     .pick-row.has-stats .pick-action { grid-column: 3; grid-row: 1; }
@@ -858,10 +865,10 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=15"></script>
   <script src="src/rarity.js?v=2"></script>
-  <script src="src/buffs.js?v=6"></script>
+  <script src="src/buffs.js?v=7"></script>
   <script src="src/shop.js?v=19"></script>
-  <script src="src/collection.js?v=23"></script>
-  <script src="src/main.js?v=80"></script>
+  <script src="src/collection.js?v=24"></script>
+  <script src="src/main.js?v=81"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

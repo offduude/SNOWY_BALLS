@@ -43,7 +43,7 @@ it no longer adds coins or speeds the markers up.
 
 | field | meaning |
 |---|---|
-| `chancePerThrow` | chance (0-1) that the event starts after each throw, hit or miss - `0.01` = 1%. It never starts while an event is already running. (It used to start at a streak of 3; the streak no longer matters.) |
+| `chancePerThrow` | chance (0-1) that the event starts after each throw, hit or miss - `0.001` = 0.1% (1 in 1000 throws; it was 1%). It never starts while an event is already running. (It used to start at a streak of 3; the streak no longer matters.) |
 | `durationMs` | how long the face texture stays (20000 = 20s) |
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`40`) |
@@ -176,6 +176,7 @@ when none are left. Effects do not stack from the same buff; different buffs mul
 | `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed), so the graduation lines spread out |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
 | `coinMultiplier` | multiplies the coins of a hit (rounded down) |
+| `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 60 s). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual x40 |
 
 **When buffs are read:** only at the moment the player taps "TAP to aim". That snapshot is used for the whole throw
 (sliders, graduations, event dots and payout), so a buff expiring or being bought mid-aim never changes anything under the

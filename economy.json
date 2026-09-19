@@ -9,7 +9,7 @@
 
   "events": {
     "faceWindow": {
-      "chancePerThrow": 0.01,
+      "chancePerThrow": 0.001,
       "durationMs": 20000,
       "hitRevertMs": 1000,
       "faceMultiplier": 40
@@ -75,6 +75,18 @@
         "image": "assets/items/skyr.png",
         "effects": [{ "type": "guideLines", "value": 1 }],
         "description": "Improves brain function."
+      },
+      {
+        "id": "tomato_juice",
+        "name": "Tomato Juice",
+        "category": "consumable",
+        "rarity": "legendary",
+        "priceRange": { "min": 1200, "max": 2000 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 60 },
+        "image": "assets/items/tomato_juice.png",
+        "effects": [{ "type": "triggerEvent", "value": "face" }],
+        "description": "It's insides carry a scent that few people adore."
       },
       {
         "id": "grenade",

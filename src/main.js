@@ -321,6 +321,7 @@ class MainScene extends Phaser.Scene {
     this.bananaOverlay.setVisible(false);
     this.bananaActive = false;
     this.bananaHitTriggered = false;
+    this.buffEventId = null; // id of the buff (Tomato Juice) that is running the current face event, or null - see syncBuffEvent
     this.activeEvent = null; // name of the running random event, or null - at most ONE runs at a time (see startEvent)
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
@@ -917,6 +918,32 @@ class MainScene extends Phaser.Scene {
     return [{ name: "face", chance: this.eco.events.faceWindow.chancePerThrow, start: () => this.startBananaEvent() }];
   }
 
+  // Tomato Juice (buff effect triggerEvent "face"): while it runs the banana face is on. Checked every frame:
+  //  - the buff runs and no event does -> start the face event for what is left of the buff (only between throws);
+  //  - a natural face event is running -> the buff takes it over (it now lasts as long as the buff);
+  //  - the buff ended (timer ran out, or its card was tapped away) -> the event ends with it.
+  // The end by hitting the face is in triggerBananaHit. The buff is on the device clock, so if the app was closed
+  // meanwhile the event comes back for the time that is left.
+  syncBuffEvent() {
+    const b = Buffs.eventBuff("face");
+    if (this.buffEventId) {
+      if (!b || b.id !== this.buffEventId) {
+        this.buffEventId = null;
+        if (this.bananaActive && !this.bananaHitTriggered) this.endBananaEvent();
+      }
+      return;
+    }
+    if (!b || this.state !== STATE.IDLE) return;
+    if (this.bananaActive && !this.bananaHitTriggered) {
+      this.buffEventId = b.id;
+      if (this.bananaEndTimer) this.bananaEndTimer.remove();
+      this.bananaEndTimer = this.time.delayedCall(b.msLeft, () => this.endBananaEvent());
+      return;
+    }
+    if (this.isEventActive()) return; // the previous face is still fading out: start after it
+    this.startBananaEvent(b.msLeft, b.id);
+  }
+
   // The single way to start an event by name. Refuses (returns false) while another event is running.
   startEvent(name) {
     if (this.isEventActive()) return false;
@@ -943,8 +970,10 @@ class MainScene extends Phaser.Scene {
   // Random face-window event (1% chance after each throw): swaps W20's texture to the banana art for events.faceWindow.durationMs, then fades
   // back on its own. Any existing marks on W20's left section fade out quickly first, so they
   // don't look like they're stuck to a texture that's about to change out from under them.
-  startBananaEvent() {
+  // `durationMs` / `buffId`: given when a buff (Tomato Juice) starts it - then it lasts as long as the buff (see syncBuffEvent).
+  startBananaEvent(durationMs, buffId) {
     if (this.isEventActive()) return; // only one event at a time
+    this.buffEventId = buffId || null;
     this.activeEvent = "face";
     this.bananaActive = true;
     this.bananaHitTriggered = false;
@@ -966,12 +995,15 @@ class MainScene extends Phaser.Scene {
     this.bananaOverlay.setVisible(true);
     this.tweens.add({ targets: this.bananaOverlay, alpha: 1, duration: BANANA_FADE_MS });
 
-    this.bananaEndTimer = this.time.delayedCall(this.eco.events.faceWindow.durationMs, () => this.endBananaEvent());
+    this.bananaEndTimer = this.time.delayedCall(durationMs || this.eco.events.faceWindow.durationMs, () => this.endBananaEvent());
   }
 
   // Normal 20s expiry - fades the banana texture back to nothing (the real W20 art underneath
   // was never actually touched, this overlay just sits on top of it).
   endBananaEvent() {
+    if (!this.bananaActive) return;
+    if (this.bananaEndTimer) this.bananaEndTimer.remove();
+    this.buffEventId = null;
     this.bananaActive = false;
     this.activeEvent = null;
     this.tweens.add({
@@ -987,6 +1019,12 @@ class MainScene extends Phaser.Scene {
   // to nothing together.
   triggerBananaHit(mark) {
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
+    if (this.buffEventId) {
+      // The event was made by a buff (Tomato Juice): hitting the face concludes the event AND ends the buff.
+      const id = this.buffEventId;
+      this.buffEventId = null;
+      Buffs.cancel(id);
+    }
     if (mark && mark.fadeTimer) mark.fadeTimer.remove();
 
     this.bananaOverlay.setTexture("goal_window_face_hit");
@@ -1246,6 +1284,7 @@ class MainScene extends Phaser.Scene {
     this.updateBounce(dt);
 
     this.updateStockMessage();
+    this.syncBuffEvent();
     this.updateCharacterPose();
     this.updateFpsReadout(time, delta);
     this.drawAimBar();

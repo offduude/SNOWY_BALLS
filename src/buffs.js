@@ -12,6 +12,9 @@
 //   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit
+//   triggerEvent     name  while it runs, that event ("face" = the banana face) is on, for as long as the buff lasts; when the event ends
+//                          (the player hits the face) the buff ends with it, and when the buff ends (timer / cancelled) so does the
+//                          event. The game (main.js syncBuffEvent) starts and stops the event; this file only reports the buff.
 // This file also draws the buff cards at the top of the screen (next to the live display); tapping a card cancels its buff.
 const Buffs = (() => {
   let eco = null;
@@ -58,6 +61,12 @@ const Buffs = (() => {
       }
     }
     return m;
+  }
+
+  // The running buff that switches the event `name` on, or null: { id, msLeft }.
+  function eventBuff(name) {
+    const b = active().find((x) => (x.item.effects || []).some((e) => e.type === "triggerEvent" && e.value === name));
+    return b ? { id: b.id, msLeft: b.msLeft } : null;
   }
 
   // Every buff the BUFFS tab shows: the ones in the inventory (count > 0) and the ones running right now, the RAREST
@@ -168,6 +177,7 @@ const Buffs = (() => {
     owned,
     use,
     modifiers,
+    eventBuff,
     activate,
     cancel,
     formatTime,

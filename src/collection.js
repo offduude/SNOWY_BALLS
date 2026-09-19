@@ -167,7 +167,7 @@ const Collection = (() => {
       ? `<div class="pick-timer">${Buffs.formatTime(b.msLeft)}</div>`
       : `<button class="pick-equip pick-use" type="button" data-id="${esc(b.id)}">USE</button>`;
     return (
-      `<div class="pick-row" data-id="${esc(b.id)}">` +
+      `<div class="pick-row buff-row" data-id="${esc(b.id)}">` +
       (Economy.isNewBuff(b.id) ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(b.item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +

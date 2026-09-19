@@ -64,7 +64,7 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 | field | meaning |
 |---|---|
 | `infinite` | `true` = never runs out (the snowball). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim"; when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
-| `rewards` | the base coins for a hit on `W20` / `W21` with this projectile (the streak and face bonuses are added on top) |
+| `rewards` | the base coins for a hit on `W20` / `W21` with this projectile (the face bonus is added on top) |
 | `weight` | **not shown to the player.** Heavier projectiles fly lower with the same throw strength: the apex is multiplied by `100 / weight` (snowball = 100 is the reference; chestnut 80 flies 25% higher). A very heavy projectile is clamped so it never ends up below the lowest allowed stick height |
 | `angleRange` | how far the throw can drift sideways. `1` = the full swing; `0.8` = only 80% as far. The marker's speed is fixed for everything (projectiles and buffs only change the *spread*). The offset bar always keeps its full width and shows the projectile's range edge to edge, so its graduation lines (every 10% of the full swing) look stretched on a smaller range. Two green lines mark where a W20 hit is guaranteed sideways |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
@@ -131,7 +131,6 @@ player's finger. The buff cards and list always show the live state.
 |---|---|
 | `coinMultiplier` | multiplies coins from hits (multiple sources multiply together) |
 | `aimSpeedMultiplier` | multiplies the aim pointers' sweep speed (below 1 = slower = easier) |
-| `streakBonusPerLevelAdd` | added to `rewards.streakBonusPerLevel` |
 | `streakShield` | number of misses that won't reset the streak |
 | `hitPaddingPx` | window hitboxes grow by this many pixels on every side |
 | `markLifetimeMultiplier` | multiplies how long marks stay on the wall |

@@ -750,3 +750,10 @@ not actual play.
 ## Coin counter shortened from a million (2026-09-19)
 
 - 10,000,000 coins ran out of the counter box (7+ digits don't fit its 84px). The counter (`formatCoins` in the inline script of `index.html`) now shows 1M, 2M ... 999M from a million up and 1B, 2B ... from a billion up, rounded down (1,999,999 -> "1M"); below a million the full number (999999 still fits). Verified for 999999, 1M, 12M, 999M, 1B, 5B: the coin icon and text stay inside the box. Only the counter is shortened; the exact amount is still what is saved and what prices are checked against. The user's local save was set to 10,000,000 (shows "10M").
+
+## Kaiser Roll, Skyr price (2026-09-19)
+
+- **Kaiser Roll** (new shop item, `assets/items/kaiser_roll.png`): consumable, **rare**, `priceRange` 30-50, 3 minutes (`duration.seconds` 180), effect `coinMultiplier 1.2` (the existing effect: multiplies the coins of a hit, rounded down, after the x40 face bonus, and it multiplies with other coinMultiplier buffs). Verified with the running buff: multiplier 1.2; snowball hit 5 -> 6, face hit 5 x 40 -> 240, chestnut 8 -> 9, grenade 199 -> 238. Description "Makes Making it Easier." (as written), bottom line "Coins bonus: 1.2x."
+- **Bottom line on a buff card**: a new optional item field `detail` (economy.json) is drawn at the bottom of the buff's card in the BUFFS tab (`.pick-row.buff-row .pick-stats`, same lighter stats font as the projectiles' weight/hit value line). It is positioned over the card's bottom (no room of its own), so every buff card keeps its fixed 13.05u height (Tomato Juice, Skyr and Kaiser Roll all measured 126px, USE button at the same y). Only the Kaiser Roll has one so far. The USE button / timer is now wrapped in `.pick-action` like on projectile cards.
+- **Skyr price** 39-59 -> **140-190**.
+- Balance report (average price / shop odds per slot with all five items on sale: chestnut 60% (the only common), kaiser 30% (the only rare), skyr and grenade 4.5% each (the two epics share 9%), tomato juice 1%): Kaiser Roll 40 (10 snowball hits), Skyr 165 (41 hits). `collection.js?v=28`.

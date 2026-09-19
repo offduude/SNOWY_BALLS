@@ -71,12 +71,25 @@
         "name": "Skyr",
         "category": "consumable",
         "rarity": "epic",
-        "priceRange": { "min": 39, "max": 59 },
+        "priceRange": { "min": 140, "max": 190 },
         "ignorePriceOverride": true,
         "duration": { "seconds": 180 },
         "image": "assets/items/skyr.png",
         "effects": [{ "type": "guideLines", "value": 1 }],
         "description": "Improves brain function."
+      },
+      {
+        "id": "kaiser_roll",
+        "name": "Kaiser Roll",
+        "category": "consumable",
+        "rarity": "rare",
+        "priceRange": { "min": 30, "max": 50 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 180 },
+        "image": "assets/items/kaiser_roll.png",
+        "effects": [{ "type": "coinMultiplier", "value": 1.2 }],
+        "description": "Makes Making it Easier.",
+        "detail": "Coins bonus: 1.2x."
       },
       {
         "id": "tomato_juice",

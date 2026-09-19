@@ -157,6 +157,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 | `name`, `description` | shown in the shop |
 | `category` | `consumable` (a timed buff: used up over `duration`) or `projectile` (a stack of consumable projectiles). Either can be on sale in several slots at once |
 | `price` | coins |
+| `detail` | optional (buffs): a bottom line on the item's card in the BUFFS tab, e.g. `"Coins bonus: 1.2x."` |
 | `priceRange` | optional, instead of `price`: `{ "min": 39, "max": 59 }` - the price is rolled in that range each time the item is put on sale (saved with the stock, so no reroll by leaving) |
 | `amount`, `unitPrice` | **stack items (projectiles)**: `{min, max}` ranges. Each time the item is put on sale (first fill and every restock) an `amount` and the price of ONE are rolled inside the ranges (chestnut: 10-20 pieces at 4-6 coins each); the slot costs `amount x unitPrice` and shows "x14" on its card. Saved with the stock, so leaving the shop can't reroll it. Buying adds the whole stack to the inventory. |
 | `image` | optional: picture path shown on the shop card (the chestnut has one; other items show an empty picture box) |

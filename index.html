@@ -483,6 +483,13 @@
       min-height: calc(var(--u) * 13.05);
     }
 
+    /* A buff's bottom line ("Coins bonus: 1.2x.") sits at the bottom of the card, under the text column (picture: 9u + gap). */
+    .pick-row.buff-row .pick-stats {
+      position: absolute;
+      left: calc(var(--u) * 11.6 + 2px);
+      bottom: calc(var(--u) * 1.2);
+    }
+
     .pick-row.has-stats .pick-pic { grid-column: 1; grid-row: 1 / span 2; }
     .pick-row.has-stats .pick-text { grid-column: 2; grid-row: 1; align-self: start; }
     .pick-row.has-stats .pick-action { grid-column: 3; grid-row: 1; }
@@ -867,7 +874,7 @@
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=7"></script>
   <script src="src/shop.js?v=20"></script>
-  <script src="src/collection.js?v=26"></script>
+  <script src="src/collection.js?v=28"></script>
   <script src="src/main.js?v=82"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

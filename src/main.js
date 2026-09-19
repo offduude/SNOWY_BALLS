@@ -292,7 +292,6 @@ class MainScene extends Phaser.Scene {
     const b = Buffs.modifiers();
     this.aim = {
       angleRange: this.proj.angleRange / b.precision,
-      angleSpeed: this.proj.angleSpeed,
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
     };
@@ -920,12 +919,12 @@ class MainScene extends Phaser.Scene {
 
     if (this.state === STATE.AIM_ANGLE) {
       const elapsed = (time - this.aimStartTime) / 1000;
-      // The marker sweeps the BAR at a fixed speed (angleSpeed x normal) whatever the range: `pos` is where it
+      // The marker sweeps the BAR at ONE fixed speed (ANGLE_HZ) - nothing (projectile, buff) changes it: `pos` is where it
       // is along the bar (0..1), and angleValue is what that position means - the bar shows angleRange of the
       // full swing edge to edge, so a smaller range (chestnut, precision buff) is finer aim but the marker
       // itself never moves faster on screen.
       const a = this.aim;
-      const pos = pingPong(elapsed * ANGLE_HZ * a.angleSpeed);
+      const pos = pingPong(elapsed * ANGLE_HZ);
       this.angleValue = 0.5 + (pos - 0.5) * a.angleRange;
     } else if (this.state === STATE.AIM_POWER) {
       const elapsed = (time - this.aimStartTime) / 1000;

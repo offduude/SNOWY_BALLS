@@ -20,10 +20,10 @@
     }
   },
 
-  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match a shop projectile / the PROJECTILES list). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; a weight of 80 flies 25% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far). The aim bar always keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. angleSpeed: how fast the marker moves along the bar compared with normal (0.8 = 20% slower). coinMultiplier: multiplies the coins for a hit, rounded DOWN. leavesMark: false = no snow mark on the wall, it bounces off instead. spins: the projectile rotates in flight.",
+  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match a shop projectile / the PROJECTILES list). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; a weight of 80 flies 25% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far). The aim bar always keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker itself always moves at the same fixed speed. coinMultiplier: multiplies the coins for a hit, rounded DOWN. leavesMark: false = no snow mark on the wall, it bounces off instead. spins: the projectile rotates in flight.",
   "projectiles": {
-    "snowball": { "weight": 100, "angleRange": 1, "angleSpeed": 1, "coinMultiplier": 1, "leavesMark": true, "spins": false },
-    "chestnut": { "weight": 80, "angleRange": 0.8, "angleSpeed": 0.8, "coinMultiplier": 0.8, "leavesMark": false, "spins": true }
+    "snowball": { "weight": 100, "angleRange": 1, "coinMultiplier": 1, "leavesMark": true, "spins": false },
+    "chestnut": { "weight": 80, "angleRange": 0.8, "coinMultiplier": 0.8, "leavesMark": false, "spins": true }
   },
 
   "shop": {

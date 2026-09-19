@@ -46,13 +46,12 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 | field | meaning |
 |---|---|
 | `weight` | **not shown to the player.** Heavier projectiles fly lower with the same throw strength: the apex is multiplied by `100 / weight` (snowball = 100 is the reference; chestnut 80 flies 25% higher). A very heavy projectile is clamped so it never ends up below the lowest allowed stick height |
-| `angleRange` | how far the throw can drift sideways. `1` = the full swing; `0.8` = only 80% as far. The offset bar always keeps its full width and shows the projectile's range edge to edge, so its graduation lines (every 10% of the full swing) look stretched on a smaller range. Two green lines mark where a W20 hit is guaranteed sideways |
-| `angleSpeed` | how fast that marker moves along the bar compared with normal. `0.8` = 20% slower |
+| `angleRange` | how far the throw can drift sideways. `1` = the full swing; `0.8` = only 80% as far. The marker's speed is fixed for everything (projectiles and buffs only change the *spread*). The offset bar always keeps its full width and shows the projectile's range edge to edge, so its graduation lines (every 10% of the full swing) look stretched on a smaller range. Two green lines mark where a W20 hit is guaranteed sideways |
 | `coinMultiplier` | multiplies the coins of a hit (streak and face bonuses included), rounded **down**. `0.8` on a 6-coin hit = 4 |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
 | `spins` | the projectile rotates in flight |
 
-A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5). Chestnut right now: `weight 80`, `angleRange 0.8`, `angleSpeed 0.8`, `coinMultiplier 0.8`, no mark, spins (placeholder numbers, to be tuned).
+A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5). Chestnut right now: `weight 80`, `angleRange 0.8`, `coinMultiplier 0.8`, no mark, spins (placeholder numbers, to be tuned).
 
 ## shop
 

@@ -11,8 +11,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(HERE, "..", "economy.json")
 
-CATEGORIES = {"accessory", "buff", "projectile"}
-KINDS = {"permanent", "consumable"}
+CATEGORIES = {"consumable", "projectile"}
 ACCURACY = [0.15, 0.30, 0.50]  # share of throws that hit a goal window
 
 
@@ -29,7 +28,7 @@ def check(eco):
     shop = eco["shop"]
     seen = set()
     for it in shop["items"]:
-        for field in ("id", "name", "category", "price", "kind", "effect"):
+        for field in ("id", "name", "category", "price", "effect"):
             if field not in it:
                 problems.append(f"item {it.get('id', '?')}: missing '{field}'")
         if it.get("id") in seen:
@@ -37,9 +36,7 @@ def check(eco):
         seen.add(it.get("id"))
         if it.get("category") not in CATEGORIES:
             problems.append(f"{it.get('id')}: unknown category '{it.get('category')}'")
-        if it.get("kind") not in KINDS:
-            problems.append(f"{it.get('id')}: unknown kind '{it.get('kind')}'")
-        if it.get("kind") == "consumable" and "duration" not in it:
+        if it.get("category") == "consumable" and "duration" not in it:
             problems.append(f"{it.get('id')}: consumable needs a 'duration'")
     if len(shop["items"]) < shop["slots"] * 2:
         problems.append(f"only {len(shop['items'])} items for {shop['slots']} slots - the shop will run dry fast")

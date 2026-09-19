@@ -202,7 +202,7 @@
     }
 
     .shop-card:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
-    .shop-card.empty { opacity: 0.55; cursor: default; justify-content: center; gap: calc(var(--u) * 1.2); }
+    .shop-card.empty { opacity: 0.55; cursor: default; justify-content: center; align-items: center; text-align: center; gap: calc(var(--u) * 1.2); }
     .shop-timer { font-size: calc(var(--u) * 1.8); }
     .shop-card.cant { opacity: 0.7; }
     .shop-card.cant .shop-price { color: #a3261c; }
@@ -442,6 +442,44 @@
     .pick-equip:active { background: #74491f; }
     .pick-equip.on { background: #b9a88f; border-color: #8a7a62; color: #f4ead0; cursor: default; }
 
+    /* Red dot on the SHOP button's top-right corner: a slot restocked while the shop was closed.
+       Pops in with an overshoot, then keeps pulsing until the shop is opened. */
+    #shop-dot {
+      position: absolute;
+      right: 2px;
+      bottom: 32px; /* centered on the button's top-right corner (button: 10px margin + 32px tall) */
+      width: 16px;
+      height: 16px;
+      box-sizing: border-box;
+      background: #ff3b30;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      opacity: 0;
+      transform: scale(0);
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    #shop-dot.show {
+      opacity: 1;
+      animation: dot-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards, dot-pulse 1.3s ease-in-out 0.45s infinite;
+    }
+
+    #game-container.shop-open #shop-dot {
+      display: none;
+    }
+
+    @keyframes dot-pop {
+      0% { transform: scale(0); }
+      60% { transform: scale(1.7); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes dot-pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.75); }
+      50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(255, 59, 48, 0); }
+    }
+
     /* Coin counter: sits right above the SHOP/BACK button and stays put when the shop opens. */
     #coin-counter {
       position: absolute;
@@ -490,16 +528,17 @@
     </div>
     <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
     <button id="shop-btn" type="button">SHOP</button>
+    <span id="shop-dot"></span>
     <button id="volume-btn" type="button" aria-label="Mute">
       <img src="assets/ui/volume_icon.png" alt="" />
     </button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=5"></script>
-  <script src="src/shop.js?v=5"></script>
+  <script src="src/economy.js?v=6"></script>
+  <script src="src/shop.js?v=6"></script>
   <script src="src/collection.js?v=2"></script>
-  <script src="src/main.js?v=48"></script>
+  <script src="src/main.js?v=49"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

@@ -17,6 +17,7 @@ const Economy = (() => {
         owned: [], // ids of permanent items bought
         consumables: {}, // id -> how many bought and not yet used
         restock: [], // per slot: null, or { at: ms timestamp (device clock) the slot restocks, prev: id sold there }
+        unseen: false, // a slot restocked while the shop was closed and the player has not looked yet (SHOP button dot)
       },
     };
   }
@@ -40,6 +41,7 @@ const Economy = (() => {
           owned: Array.isArray(shop.owned) ? shop.owned : [],
           consumables: shop.consumables && typeof shop.consumables === "object" ? shop.consumables : {},
           restock: Array.isArray(shop.restock) ? shop.restock : [],
+          unseen: shop.unseen === true,
         },
       };
     } catch (e) {

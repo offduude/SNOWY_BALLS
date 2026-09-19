@@ -40,7 +40,10 @@ start with "economy.json failed to load or has a JSON syntax error".
 ## shop
 
 The shop always shows `slots` slots. Buying an item empties its slot: it shows SOLD OUT with a countdown,
-and when the timer ends the slot restocks with a different item from the pool.
+and when the timer ends the slot restocks with an item picked by the rules below (it can be the same one again).
+If that happens while the shop is closed, the SHOP button gets a pulsing red dot and `assets/audio/shop_restock.mp3` plays
+(the dot is saved and stays until the shop is opened; a restock that happened while the app was closed shows the dot but
+plays no sound, since browsers only allow sound after a tap).
 
 **`restockSeconds`** - how long a bought slot stays SOLD OUT. `60` while testing, `3600` for the real
 one hour. The deadline is stored as a timestamp from the **device clock** in the save, so it keeps
@@ -51,8 +54,8 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 **`refill`** - how a replacement is chosen:
 - `mode: random_from_eligible` - random pick among items the player is allowed to see
 - `excludeOwned` - permanent items already bought never come back
-- (always on, not a setting) the same item is never on sale in two slots at once
-- a restocked slot never gets the item that was just sold there (it can come back later)
+- `categoryWeights` - odds of each TYPE when a slot is filled (`consumable` 9 vs `projectile` 1 = a projectile about 1 time in 10; measured 10.8%). An item of the chosen type is then picked at random
+- (always on) a **projectile** is never on sale in two slots at once; **consumables can be** (the same one can show in two or more slots)
 - `guaranteeCheapItem` - after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop
   filling up with things the player can't afford.
@@ -63,9 +66,8 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 |---|---|
 | `id` | unique, never change it once players own it (saves refer to it) |
 | `name`, `description` | shown in the shop |
-| `category` | `accessory`, `buff` or `projectile` |
+| `category` | `consumable` (common: buy it as often as you like, used up over `duration`; can be on sale in two slots at once) or `projectile` (rare: bought once and kept, never on sale twice) |
 | `price` | coins |
-| `kind` | `permanent` (bought once, kept) or `consumable` (used up) |
 | `duration` | consumables only: `{ "throws": N }` |
 | `effect` | `{ "type": ..., "value": ... }` - see below |
 

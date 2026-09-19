@@ -137,6 +137,8 @@ class MainScene extends Phaser.Scene {
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
     this.load.audio("window_clink", "assets/audio/window_clink.mp3");
     this.load.audio("click", "assets/audio/click.mp3");
+    // Placeholder (a copy of window_clink.mp3) - overwrite the file with the real sound, then bump the ?v=
+    this.load.audio("shop_restock", "assets/audio/shop_restock.mp3?v=1");
   }
 
   create() {

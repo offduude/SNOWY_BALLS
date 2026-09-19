@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "_readme": "Every reward, price and shop rule lives here. Edit numbers, save, reload the game. The game reads 'rewards' and 'events' TODAY; 'shop' feeds the shop screen. All shop items below are PLACEHOLDER test data - names, prices and effects are just there so the shop has something to show. See docs/ECONOMY.md for what every field means, and run 'py tools/economy_report.py' for a quick balance table.",
+  "version": 2,
+  "_readme": "Every reward, price and shop rule lives here. Edit numbers, save, reload the game. The game reads 'rewards', 'events' and 'shop'. All shop items below are PLACEHOLDER test data - names, prices and effects are just there so the shop has something to show (effects are not applied yet). See docs/ECONOMY.md for what every field means, and run 'py tools/economy_report.py' for a quick balance table.",
 
   "rewards": {
     "windows": {
@@ -30,62 +30,27 @@
     "refill": {
       "mode": "random_from_eligible",
       "excludeOwned": true,
+      "_categoryWeightsNote": "Odds of each TYPE when a slot is (re)stocked: projectile 1 vs consumable 9 = a projectile shows up about 1 time in 10. Then an item of that type is picked at random.",
+      "categoryWeights": { "consumable": 9, "projectile": 1 },
       "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
     },
 
+    "_itemsNote": "category is 'consumable' (common, can be bought again and again, and can be on sale in two slots at once; needs a duration) or 'projectile' (rare, bought once and kept, never on sale twice).",
     "items": [
-      {
-        "id": "lucky_gloves",
-        "name": "Lucky Gloves",
-        "category": "accessory",
-        "price": 60,
-        "kind": "permanent",
-        "effect": { "type": "coinMultiplier", "value": 1.1 },
-        "description": "+10% coins from every hit."
-      },
-      {
-        "id": "snow_goggles",
-        "name": "Snow Goggles",
-        "category": "accessory",
-        "price": 90,
-        "kind": "permanent",
-        "effect": { "type": "aimSpeedMultiplier", "value": 0.92 },
-        "description": "Aim pointers sweep 8% slower."
-      },
-      {
-        "id": "pocket_warmer",
-        "name": "Pocket Warmer",
-        "category": "accessory",
-        "price": 110,
-        "kind": "permanent",
-        "effect": { "type": "coinMultiplier", "value": 1.05 },
-        "description": "+5% coins from every hit."
-      },
       {
         "id": "lucky_penny",
         "name": "Lucky Penny",
-        "category": "buff",
+        "category": "consumable",
         "price": 25,
-        "kind": "consumable",
         "duration": { "throws": 2 },
         "effect": { "type": "coinMultiplier", "value": 1.5 },
         "description": "1.5x coins for your next 2 throws."
       },
       {
-        "id": "icy_snowball",
-        "name": "Icy Snowball",
-        "category": "projectile",
-        "price": 70,
-        "kind": "permanent",
-        "effect": { "type": "markLifetimeMultiplier", "value": 1.5 },
-        "description": "Marks stay on the wall 50% longer."
-      },
-      {
         "id": "hot_cocoa",
         "name": "Hot Cocoa",
-        "category": "buff",
+        "category": "consumable",
         "price": 35,
-        "kind": "consumable",
         "duration": { "throws": 3 },
         "effect": { "type": "aimSpeedMultiplier", "value": 0.8 },
         "description": "Pointers sweep 20% slower for 3 throws."
@@ -93,47 +58,17 @@
       {
         "id": "snack_break",
         "name": "Snack Break",
-        "category": "buff",
+        "category": "consumable",
         "price": 45,
-        "kind": "consumable",
         "duration": { "throws": 4 },
         "effect": { "type": "coinMultiplier", "value": 1.25 },
         "description": "1.25x coins for your next 4 throws."
       },
       {
-        "id": "steady_hand",
-        "name": "Steady Hand",
-        "category": "accessory",
-        "price": 220,
-        "kind": "permanent",
-        "effect": { "type": "aimSpeedMultiplier", "value": 0.85 },
-        "description": "Aim pointers sweep 15% slower."
-      },
-      {
-        "id": "streak_scarf",
-        "name": "Streak Scarf",
-        "category": "accessory",
-        "price": 300,
-        "kind": "permanent",
-        "effect": { "type": "streakBonusPerLevelAdd", "value": 0.05 },
-        "description": "Streaks pay +5% more per level."
-      },
-      {
-        "id": "banana_charm",
-        "name": "Banana Charm",
-        "category": "accessory",
-        "price": 900,
-        "kind": "permanent",
-        "effect": { "type": "faceWindowDurationAddMs", "value": 10000 },
-        "description": "The face window stays 10s longer."
-      },
-
-      {
         "id": "double_coins",
         "name": "Double Coins",
-        "category": "buff",
+        "category": "consumable",
         "price": 40,
-        "kind": "consumable",
         "duration": { "throws": 3 },
         "effect": { "type": "coinMultiplier", "value": 2 },
         "description": "2x coins for your next 3 throws."
@@ -141,9 +76,8 @@
       {
         "id": "slow_pointer",
         "name": "Slow Pointer",
-        "category": "buff",
+        "category": "consumable",
         "price": 30,
-        "kind": "consumable",
         "duration": { "throws": 5 },
         "effect": { "type": "aimSpeedMultiplier", "value": 0.6 },
         "description": "Pointers sweep much slower for 5 throws."
@@ -151,9 +85,8 @@
       {
         "id": "streak_shield",
         "name": "Streak Shield",
-        "category": "buff",
+        "category": "consumable",
         "price": 180,
-        "kind": "consumable",
         "duration": { "throws": 1 },
         "effect": { "type": "streakShield", "value": 1 },
         "description": "Your next miss won't reset your streak."
@@ -161,47 +94,50 @@
       {
         "id": "jackpot_hour",
         "name": "Jackpot",
-        "category": "buff",
+        "category": "consumable",
         "price": 700,
-        "kind": "consumable",
         "duration": { "throws": 10 },
         "effect": { "type": "coinMultiplier", "value": 3 },
         "description": "3x coins for your next 10 throws."
       },
 
       {
+        "id": "icy_snowball",
+        "name": "Icy Snowball",
+        "category": "projectile",
+        "price": 70,
+        "effect": { "type": "markLifetimeMultiplier", "value": 1.5 },
+        "description": "Marks stay on the wall 50% longer."
+      },
+      {
         "id": "big_snowball",
         "name": "Big Snowball",
         "category": "projectile",
         "price": 80,
-        "kind": "permanent",
         "effect": { "type": "hitPaddingPx", "value": 3 },
         "description": "Forgiving: counts as a hit up to 3px outside a window."
-      },
-      {
-        "id": "golden_snowball",
-        "name": "Golden Snowball",
-        "category": "projectile",
-        "price": 350,
-        "kind": "permanent",
-        "effect": { "type": "coinMultiplier", "value": 1.25 },
-        "description": "Every hit pays 25% more."
       },
       {
         "id": "ice_ball",
         "name": "Ice Ball",
         "category": "projectile",
         "price": 280,
-        "kind": "permanent",
         "effect": { "type": "markLifetimeMultiplier", "value": 2 },
         "description": "Marks stay on the wall twice as long."
+      },
+      {
+        "id": "golden_snowball",
+        "name": "Golden Snowball",
+        "category": "projectile",
+        "price": 350,
+        "effect": { "type": "coinMultiplier", "value": 1.25 },
+        "description": "Every hit pays 25% more."
       },
       {
         "id": "rocket_snowball",
         "name": "Rocket Snowball",
         "category": "projectile",
         "price": 1100,
-        "kind": "permanent",
         "effect": { "type": "launchSpeedMultiplier", "value": 1.3 },
         "description": "Flies 30% faster - careful, it can leave the building."
       }

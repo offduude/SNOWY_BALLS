@@ -220,13 +220,18 @@ const Shop = (() => {
   // shop is opened. The sound plays whenever it's live, open or not.
   function announceRestock(count, live) {
     if (!count) return;
-    if (!isShopOpen()) {
-      Economy.getShopState().unseen = true;
+    const st = Economy.getShopState();
+    const open = isShopOpen();
+    // The dot is already up and nobody has opened the shop yet: this restock is just more of the
+    // same news, so no second sound (however much later it happens).
+    const alreadyAnnounced = !open && st.unseen;
+    if (!open) {
+      st.unseen = true;
       Economy.saveShop();
       setDot(true);
     }
     const game = window.snowyBallsGame;
-    if (live && game) game.sound.play("shop_restock", { volume: 0.9 });
+    if (live && game && !alreadyAnnounced) game.sound.play("shop_restock", { volume: 0.9 });
   }
 
   // Once a second (and when the app returns to the foreground): restock any slot whose time is up,

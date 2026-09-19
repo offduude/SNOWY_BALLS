@@ -43,7 +43,7 @@ The shop always shows `slots` slots. Buying an item empties its slot: it shows S
 and when the timer ends the slot restocks with an item picked by the rules below (it can be the same one again).
 If that happens while the shop is closed, the SHOP button gets a pulsing red dot and `assets/audio/shop_restock.mp3` plays
 (the dot is saved and stays until the shop is opened; a restock that happened while the app was closed shows the dot but
-plays no sound, since browsers only allow sound after a tap).
+plays no sound, since browsers only allow sound after a tap). Only the first restock after you last looked at the shop makes a sound: if more slots restock later while the dot is still showing, they stay silent.
 
 **`restockSeconds`** - how long a bought slot stays SOLD OUT. `60` while testing, `3600` for the real
 one hour. The deadline is stored as a timestamp from the **device clock** in the save, so it keeps

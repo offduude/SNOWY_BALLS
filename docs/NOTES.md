@@ -470,3 +470,9 @@ not actual play.
 - **Sound**: `assets/audio/shop_restock.mp3` is a PLACEHOLDER (copy of window_clink.mp3). To use the real one: overwrite that file and bump the `?v=` on its load line in `main.js` (`preload`).
 - Verified in the browser: buy -> timer -> restock with shop closed gives dot + exactly 1 restock sound, `unseen` saved; opening the shop clears both; reload with an expired timer shows the dot with no sound; no dot while buying inside the shop.
 - Not done yet: bought projectiles are recorded in `shop.owned` but do not appear in the PROJECTILES list yet.
+
+## Dot moved, one sound per unseen batch (2026-09-19)
+
+- `#shop-dot` moved to the SHOP button's **top-left** corner (`right: 86px` = 10px margin + 84px button width - half the 16px dot).
+- **One sound per batch**: `announceRestock` only plays `shop_restock` on the transition from "no dot" to "dot" (`alreadyAnnounced = shop closed && shop.unseen`). Further restocks while the dot is still showing - in the same second or an hour later - are silent. Opening the shop resets it, so the next restock plays the sound again. If the shop is open the sound still plays for each restock (the player is looking at it). Because `unseen` is saved, this also holds across reloads.
+- Verified: 3 slots restocking at +1.5s / +4.5s / +7.5s with the shop closed -> 1 sound total, dot up the whole time; after opening the shop and buying again, the next restock -> a 2nd sound (2 total).

@@ -902,13 +902,14 @@ class MainScene extends Phaser.Scene {
       Economy.reportStreak(this.streak);
       Economy.setStreak(this.streak);
       this.updateStreakHud();
-      this.showMessage("HIT\n+" + coins + " coins", this.savedBy);
+      // (a buff that saved the projectile - Water Bottle - adds a "Saved Projectile" line at the bottom)
+      this.showMessage("HIT\n+" + coins + " coins" + (this.savedBy ? "\nSaved Projectile" : ""), true);
     } else {
       this.streak = 0;
       Economy.setStreak(0);
       if (this.eco.rewards.missCoins) Economy.addCoins(this.eco.rewards.missCoins);
       this.updateStreakHud();
-      this.showMessage("MISS", this.savedBy);
+      this.showMessage("MISS" + (this.savedBy ? "\nSaved Projectile" : ""), true);
     }
 
     this.maybeStartRandomEvent();
@@ -1081,19 +1082,14 @@ class MainScene extends Phaser.Scene {
     this.showMessage("TAP to AIM");
   }
 
-  // `savedBy`: id of a buff that saved this throw's projectile - its icon and "+1" go one row above the text.
-  showMessage(msg, savedBy) {
+  // `result`: the HIT / MISS text - drawn bigger with a thick outline (see #message.result).
+  showMessage(msg, result) {
     // Text lives in HTML now (see index.html #message), not as a Phaser Text object - canvas
     // text at this resolution renders as blurry upscaled pixels, an HTML element with a real
     // web font doesn't.
     const el = document.getElementById("message");
-    const item = savedBy && this.eco.shop.items.find((it) => it.id === savedBy);
     el.textContent = msg;
-    if (!item) return;
-    const row = document.createElement("div");
-    row.className = "msg-saved";
-    row.innerHTML = `<img src="${item.image}" alt="" draggable="false" /><span>+1</span>`;
-    el.appendChild(row);
+    el.classList.toggle("result", !!result);
   }
 
   // The power-bar range that lands the throw's apex inside `box` ({xFrom, xTo, heightFrom, heightTo}) GIVEN the

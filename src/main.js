@@ -394,6 +394,7 @@ class MainScene extends Phaser.Scene {
 
     this.drawCharacter();
 
+    this.fallingBalls = []; // projectiles still falling after their bounce when the result screen ended - see releaseBounce
     this.marks = []; // stuck-snowball sprites; each one schedules its own fade-out in addMark()
 
     // Sits over W20, invisible until the banana event triggers - see startBananaEvent().
@@ -913,6 +914,37 @@ class MainScene extends Phaser.Scene {
     };
   }
 
+  // The result screen can be skipped (or ends) while a bounced-off projectile is still falling. It must not vanish on the
+  // spot: it is handed over to a sprite of its own (the main ball is needed for the next throw) that keeps falling, in the
+  // same way, and is removed only once it has dropped below the bottom edge of the default (idle) camera view.
+  releaseBounce() {
+    const b = this.bounce;
+    if (!b || b.resting || !this.ball.visible) return;
+    const img = this.add.image(b.x, this.worldY(b.h), this.ball.texture.key);
+    img.setDisplaySize(this.ball.displayWidth, this.ball.displayHeight).setRotation(this.ball.rotation).setDepth(10);
+    this.fallingBalls.push({ img, b: { ...b }, spins: !!this.proj.spins });
+  }
+
+  updateFallingBalls(dt) {
+    const edge = INITIAL_SCROLL_Y + GAME_HEIGHT; // world y of the bottom edge of the default camera view
+    this.fallingBalls = this.fallingBalls.filter((f) => {
+      const b = f.b;
+      b.age += dt * 1000;
+      const grow = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * logCurve(b.age / BALL_REGROW_MS);
+      f.img.setDisplaySize(BALL_SIZE * grow, BALL_SIZE * grow);
+      b.vh -= GRAVITY * dt;
+      b.h += b.vh * dt;
+      b.x += b.vx * dt; // (no ground for it: it keeps falling out of the picture)
+      f.img.setPosition(b.x, this.worldY(b.h));
+      if (f.spins) f.img.setRotation(f.img.rotation + b.spin * SPIN_RATE * dt);
+      if (f.img.y - f.img.displayHeight / 2 >= edge) {
+        f.img.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
   updateBounce(dt) {
     const b = this.bounce;
     if (!b) return;
@@ -1182,8 +1214,9 @@ class MainScene extends Phaser.Scene {
 
   resetForNextThrow() {
     this.state = STATE.IDLE;
+    this.releaseBounce(); // (a projectile still on its way down is not cut off - see releaseBounce)
     this.bounce = null;
-    this.ball.setVisible(false); // a bouncing projectile is done by now
+    this.ball.setVisible(false);
     this.ball.setPosition(ORIGIN_X, this.worldY(ORIGIN_Y));
     if (this.pendingProjectile) {
       // equipped mid-flight: the throw is over, switch now
@@ -1401,6 +1434,7 @@ class MainScene extends Phaser.Scene {
       this.updateFlight(dt);
     }
     this.updateBounce(dt);
+    this.updateFallingBalls(dt);
 
     this.updateStockMessage();
     this.syncBuffEvent();

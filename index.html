@@ -885,8 +885,15 @@
     Collection.init();
 
     // Live coin counter (above the SHOP/BACK button, visible in the game and in the shop).
+    // From a million up the number is shortened so it always fits the box: 1M 2M ... 999M, then 1B 2B ... (rounded down).
+    function formatCoins(n) {
+      if (n >= 1e9) return Math.floor(n / 1e9) + "B";
+      if (n >= 1e6) return Math.floor(n / 1e6) + "M";
+      return String(n);
+    }
+
     Economy.onCoinsChange((coins) => {
-      document.getElementById("coin-count").textContent = coins;
+      document.getElementById("coin-count").textContent = formatCoins(coins);
     });
 
     // Toggles Phaser's global sound mute - waits for the game to exist since this can fire

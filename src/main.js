@@ -791,15 +791,39 @@ class MainScene extends Phaser.Scene {
     document.getElementById("message").textContent = msg;
   }
 
+  // The power-bar range that lands the throw's apex inside `box` ({xFrom, xTo, heightFrom, heightTo}) GIVEN the
+  // offset (swing, -1..1) that was already chosen - or null if no strength can hit it from there.
+  // The ball drifts swing x MAX_SWING_SPEED x apexTime sideways, and the apex time grows with the apex height,
+  // so an offset that is a little off can still hit the box - but only with a lower (shorter) throw. That
+  // limits the flight time to an interval, which is then turned back into apex heights and power values.
+  powerBandFor(swing, box) {
+    const v = MAX_SWING_SPEED * swing; // sideways speed
+    let tLo = Math.sqrt((2 * box.heightFrom) / GRAVITY);
+    let tHi = Math.sqrt((2 * box.heightTo) / GRAVITY);
+    if (Math.abs(v) < 1e-9) {
+      if (ORIGIN_X < box.xFrom || ORIGIN_X > box.xTo) return null; // thrown straight and the box isn't straight ahead
+    } else {
+      const t1 = (box.xFrom - ORIGIN_X) / v;
+      const t2 = (box.xTo - ORIGIN_X) / v;
+      tLo = Math.max(tLo, Math.min(t1, t2));
+      tHi = Math.min(tHi, Math.max(t1, t2));
+    }
+    if (tLo > tHi) return null;
+    return { from: this.powerForApex((GRAVITY * tLo * tLo) / 2), to: this.powerForApex((GRAVITY * tHi * tHi) / 2) };
+  }
+
   // Where the sliders must be released to hit the running event's target, or null if no event has one.
   // Each event has its own color; the aim bars show a dot of that color at the middle of the range.
   // Currently only the face window (yellow): its face box needs the apex inside the face's height band and
   // the sideways position inside its width. The sideways drift is swing x MAX_SWING_SPEED x apexTime and
   // apexTime changes a little across the band, so the swing range returned is the one that works for EVERY
   // apex in the band; the power range is the band itself. Anywhere the marker overlaps the dot is a hit.
-  activeEventTarget() {
+  //  `swing` (optional): the offset already chosen. With it, powerFrom/powerTo are the strengths that hit FROM
+  //  THAT OFFSET (null if none does); without it they are just the height band.
+  activeEventTarget(swing) {
     if (!(this.bananaActive && !this.bananaHitTriggered)) return null;
     const b = BANANA_FACE_BOX;
+    const band = swing === undefined ? { from: this.powerForApex(b.heightFrom), to: this.powerForApex(b.heightTo) } : this.powerBandFor(swing, b);
     const tMin = Math.sqrt((2 * b.heightFrom) / GRAVITY);
     const tMax = Math.sqrt((2 * b.heightTo) / GRAVITY);
     const dxFrom = b.xFrom - ORIGIN_X;
@@ -808,8 +832,8 @@ class MainScene extends Phaser.Scene {
       color: EVENT_COLOR_FACE,
       swingFrom: Math.max(dxFrom / (MAX_SWING_SPEED * tMin), dxFrom / (MAX_SWING_SPEED * tMax)),
       swingTo: Math.min(dxTo / (MAX_SWING_SPEED * tMin), dxTo / (MAX_SWING_SPEED * tMax)),
-      powerFrom: this.powerForApex(b.heightFrom),
-      powerTo: this.powerForApex(b.heightTo),
+      powerFrom: band ? band.from : null,
+      powerTo: band ? band.to : null,
     };
   }
 
@@ -882,8 +906,13 @@ class MainScene extends Phaser.Scene {
       // range that puts the apex inside W20's height band (a guaranteed vertical hit). That range depends
       // on the projectile's weight (a lighter one flies higher, so it needs less power); nothing else is
       // drawn between the two lines.
-      const lo = this.powerForApex(W20.heightFrom);
-      const hi = this.powerForApex(W20.heightTo);
+      // The offset is already frozen, so the lines show what actually hits W20 FROM THAT OFFSET: the same band as
+      // before when it is well aimed, a shorter one when it is a little off, and no lines (nothing to aim for)
+      // when no strength can hit.
+      const swingNow = (this.angleValue - 0.5) * 2;
+      const band = this.powerBandFor(swingNow, W20);
+      const lo = band ? band.from : NaN;
+      const hi = band ? band.to : NaN;
       const lineAtPower = (power, color, alpha, width, extra) => {
         if (power <= pLo || power >= pLo + pRange) return; // outside what this bar covers
         const x = Math.round(barX + barPos(power) * barW);
@@ -892,13 +921,15 @@ class MainScene extends Phaser.Scene {
       };
       for (let k = 1; k * AIM_TICK_STEP < 1 - 1e-9; k++) {
         const power = k * AIM_TICK_STEP; // fixed power values: they spread out when the bar zooms in
-        if (power < lo || power > hi) lineAtPower(power, 0x202020, 0.85, 1, 3);
+        if (!band || power < lo || power > hi) lineAtPower(power, 0x202020, 0.85, 1, 3);
       }
-      lineAtPower(lo, 0x5cff5c, 1, 2, 5);
-      lineAtPower(hi, 0x5cff5c, 1, 2, 5);
+      if (band) {
+        lineAtPower(lo, 0x5cff5c, 1, 2, 5);
+        lineAtPower(hi, 0x5cff5c, 1, 2, 5);
+      }
 
-      const target = this.activeEventTarget();
-      if (target) {
+      const target = this.activeEventTarget(swingNow);
+      if (target && target.powerFrom !== null) {
         const power = (target.powerFrom + target.powerTo) / 2;
         if (power > pLo && power < pLo + pRange) this.drawEventDot(g, barX + barPos(power) * barW, barY + barH / 2, target.color);
       }

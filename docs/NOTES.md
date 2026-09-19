@@ -791,3 +791,5 @@ not actual play.
 - **HIT / MISS text bigger and easier to read:** `showMessage(msg, result)` puts the `result` class on `#message`: 16px instead of 12px and a thick black outline (8 hard 2px text-shadows + a soft one, `#message.result` in `index.html`). Only the result text - "TAP to AIM", "OUT of SNOWBALLS" etc. keep the 12px look (verified: back to 12px, no class, at idle). `main.js?v=89`.
 
 - **Result text revised:** back to the original size (12px, line-height 1.8); `#message.result` now only adds a **thin black outline** (8 hard 1px text-shadows). The "Saved Projectile" line stays. Other messages unchanged.
+
+- **All middle text has the thin outline:** the outline moved from `#message.result` onto `#message` itself (8 hard 1px black text-shadows, the old soft glow is gone), so "TAP to AIM", "OUT of SNOWBALLS", HIT / MISS and everything else in the middle share exactly the same size (12px, line-height 1.8) and outline. The `result` class / second `showMessage` argument were removed. `main.js?v=90`.

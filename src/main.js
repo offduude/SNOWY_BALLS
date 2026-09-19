@@ -50,6 +50,10 @@ const MIN_STICK_HEIGHT = IMG_GROUND_Y - 486 + 10; // 184
 // Max power now throws PAST the top of the texture on purpose (2026-09-19) so a ball can escape the
 // building - later accessories may make that routine. Apex at full power:
 const MAX_APEX_HEIGHT = 800;
+// Where the wall ends and the sky starts: background.png rows 0-14 are sky, row 15 is the dark roof
+// edge. Nothing can stick above this line - a ball whose apex is higher falls back down and sinks
+// behind the roofline instead (see updateFlight), and marks are clipped at it (see addMark).
+const ROOF_EDGE_HEIGHT = IMG_GROUND_Y - 15; // 645
 const MIN_POWER_SPEED = Math.sqrt(2 * GRAVITY * MIN_STICK_HEIGHT); // ~575.6
 const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_APEX_HEIGHT); // ~1200
 
@@ -351,7 +355,10 @@ class MainScene extends Phaser.Scene {
     this.ballVY0 = MIN_POWER_SPEED + this.powerValue * (MAX_POWER_SPEED - MIN_POWER_SPEED);
     this.ballStartX = ORIGIN_X;
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
+    // An apex above the roof edge would be a stick in the sky: that ball doesn't stick, it falls back.
+    this.fallsBehind = (this.ballVY0 * this.ballVY0) / (2 * GRAVITY) > ROOF_EDGE_HEIGHT;
     this.cameraFollowing = true;
+    this.ball.setCrop(); // no crop while it's in front of the wall
     this.ball.setVisible(true);
     this.flightWorst = 0;
     this.sound.play("throw_whoosh", { volume: 0.6 });
@@ -360,7 +367,9 @@ class MainScene extends Phaser.Scene {
   updateFlight(dt) {
     this.flightTime += dt;
     const reachedApex = this.flightTime >= this.apexTime;
-    const t = reachedApex ? this.apexTime : this.flightTime;
+    // Normally the flight freezes at the apex (the ball sticks there); a ball that fell behind the
+    // roof keeps following its arc back down.
+    const t = reachedApex && !this.fallsBehind ? this.apexTime : this.flightTime;
 
     const x = this.ballStartX + this.ballVX * t;
     const heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
@@ -386,6 +395,20 @@ class MainScene extends Phaser.Scene {
 
     if (!reachedApex) return;
 
+    if (this.fallsBehind) {
+      // Coming down past the roof: everything below the roof edge is behind the building, so clip
+      // the ball there. Once it's fully hidden the throw is over - a miss with no mark or impact.
+      const half = this.ball.displayHeight / 2;
+      const visible = Math.min(y + half, this.worldY(ROOF_EDGE_HEIGHT)) - (y - half); // display px above the roof edge
+      if (visible <= 0) {
+        this.finishThrow(false, null, x, heightClimbed, false, true);
+        return;
+      }
+      const frameH = this.ball.frame.height;
+      this.ball.setCrop(0, 0, this.ball.frame.width, Math.min(frameH, (visible / this.ball.displayHeight) * frameH));
+      return;
+    }
+
     // The snowball always sticks to the wall at the top of its arc - a hit only counts if
     // that exact point lands inside W20 or W21.
     for (const win of WINDOWS) {
@@ -410,6 +433,12 @@ class MainScene extends Phaser.Scene {
     const mark = this.add.image(x, this.worldY(heightClimbed), "snowball_mark");
     mark.setDisplaySize(20, 20);
     mark.setDepth(5); // above the building, below the live ball (depth 10)
+    // A mark stuck right under the roof must not overhang into the sky: clip off the part above the roof edge.
+    const overhang = this.worldY(ROOF_EDGE_HEIGHT) - (mark.y - mark.displayHeight / 2);
+    if (overhang > 0) {
+      const cut = Math.min(mark.frame.height, (overhang / mark.displayHeight) * mark.frame.height);
+      mark.setCrop(0, cut, mark.frame.width, mark.frame.height - cut);
+    }
     this.marks.push(mark);
 
     // Starts fading MARK_LIFETIME_MS after it's placed, regardless of what the camera's doing -

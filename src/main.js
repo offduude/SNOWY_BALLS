@@ -495,7 +495,7 @@ class MainScene extends Phaser.Scene {
     }
     if (!this.hasAmmo()) {
       const info = Economy.regenInfo(this.projectileId);
-      const text = "NO " + this.projectileId.toUpperCase() + "S\nNext in: " + formatClock(info && info.msToNext !== null ? info.msToNext : 0);
+      const text = "Out of " + this.projectileId + "s\n+1 in " + formatClock(info && info.msToNext !== null ? info.msToNext : 0);
       if (document.getElementById("message").textContent !== text) this.showMessage(text);
       this.stockMessageShown = true;
     } else if (this.stockMessageShown) {

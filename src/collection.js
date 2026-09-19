@@ -3,7 +3,7 @@
 // What's equipped is saved (Economy.getEquipped). Equipping a projectile tells the game
 // (MainScene.onProjectileEquipped); characters are not selectable yet (no CHARACTERS button).
 // Only what the player has is listed: refilling projectiles (the snowball - its card stays even at x0, with a
-// "Next in: 00:xx" timer under EQUIP) and projectiles they still have some of (consumable: one is used per throw, and a kind that runs out leaves the list).
+// "+1 in 00:xx" timer under EQUIP) and projectiles they still have some of (consumable: one is used per throw, and a kind that runs out leaves the list).
 // A red dot on the PROJECTILES button pops up when the list EXPANDS (a new kind arrives), not on a refill.
 //
 // To add an entry: add an object to the right array below. `id` is stored in saves, so never
@@ -71,10 +71,11 @@ const Collection = (() => {
     return cornerHtml(p && p.rarity, finite ? `x${Economy.getProjectileCount(item.id)}` : "");
   }
 
-  // "Next in: 00:27" under the EQUIP button of a refilling projectile (nothing while its stock is full).
+  // "+1 in 00:27" under the EQUIP button of a refilling projectile ("MAX" while its stock is full).
   function regenText(id) {
     const info = Economy.regenInfo(id);
-    return info && info.msToNext !== null ? `Next in: ${clock(info.msToNext)}` : "";
+    if (!info) return "";
+    return info.msToNext !== null ? `+1 in ${clock(info.msToNext)}` : "MAX";
   }
 
   function clock(ms) {
@@ -287,7 +288,7 @@ const Collection = (() => {
       const updateDot = () => dotEl && dotEl.classList.toggle("show", Economy.hasUnseenProjectiles());
       Economy.onProjectilesChange(updateDot);
       updateDot();
-      // While the PROJECTILES tab is open, keep the amounts and the "Next in" timer live.
+      // While the PROJECTILES tab is open, keep the amounts and the "+1 in" timer live.
       setInterval(() => {
         if (openKind !== "projectile") return;
         scrollEl.querySelectorAll(".pick-row").forEach((row) => {

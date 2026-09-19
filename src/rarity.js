@@ -32,7 +32,9 @@ const Rarity = (() => {
       return list.find((r) => r.id === id) || null;
     },
 
-    // 0 for the most common, higher = rarer, -1 for an item without a (known) rarity - it sorts last.
+    // Position in the list (0 = the lowest tier, "default"; higher = rarer). -1 for an item with no (or an unknown)
+    // rarity: the lists sort by this, rarest first, so such an item ends up after EVERY rarity, "default" and "common"
+    // included, however many of those there are.
     rank(id) {
       return list.findIndex((r) => r.id === id);
     },

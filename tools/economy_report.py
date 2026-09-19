@@ -63,8 +63,8 @@ def check(eco):
     rarities = eco.get("rarities", [])
     ids = [r["id"] for r in rarities]
     for r in rarities:
-        if r.get("chance", 0) <= 0:
-            problems.append(f"rarity '{r.get('id')}': chance must be above 0")
+        if r.get("chance", 0) < 0:
+            problems.append(f"rarity '{r.get('id')}': chance can't be negative (0 = never in the shop)")
     for pid, pr in projectiles.items():
         if pr.get("rarity") not in ids:
             problems.append(f"projectile {pid}: rarity '{pr.get('rarity')}' is not in rarities")
@@ -83,7 +83,7 @@ def slot_odds(eco):
     def rarity_of(it):
         return eco["projectiles"][it["id"]]["rarity"] if it["category"] == "projectile" else it.get("rarity")
 
-    present = [r for r in rarities if any(rarity_of(i) == r["id"] for i in items)]
+    present = [r for r in rarities if r["chance"] > 0 and any(rarity_of(i) == r["id"] for i in items)]
     total = sum(r["chance"] for r in present) or 1
     odds = {}
     for r in present:

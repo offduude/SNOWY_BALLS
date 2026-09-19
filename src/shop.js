@@ -82,7 +82,8 @@ const Shop = (() => {
   // have an item in the pool take part, their chances are rescaled to 100%), then one of that rarity's items is picked
   // at random - so the items of one rarity are equally likely. An item with no rarity counts as the most common one.
   function pickWeighted(pool) {
-    const rarities = eco.rarities || [];
+    // Only rarities with a chance above 0 can be rolled (the "default" one has 0: it is the snowball's, not for sale).
+    const rarities = (eco.rarities || []).filter((r) => r.chance > 0);
     if (!rarities.length) return pickRandom(pool);
     const rid = (it) => (rarities.some((r) => r.id === Rarity.ofItem(it)) ? Rarity.ofItem(it) : rarities[0].id);
     const present = rarities.filter((r) => pool.some((it) => rid(it) === r.id));

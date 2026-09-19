@@ -65,6 +65,7 @@ a `color` (CSS colour, or `rainbow` = animated waves plus a pulsing shine) and a
 
 | rarity | colour | chance |
 |---|---|---|
+| default | light grey | 0% (never in the shop - the snowball's) |
 | common | light blue | 60% |
 | rare | light orange | 30% |
 | epic | purple | 9% |
@@ -74,8 +75,10 @@ a `color` (CSS colour, or `rainbow` = animated waves plus a pulsing shine) and a
 rarity are equally likely). Only rarities that have an item to sell take part - their chances are rescaled to 100% (with a
 common chestnut and epic grenade and skyr on sale: chestnut 87%, grenade 6.5%, skyr 6.5%). `py tools/economy_report.py` prints each item's chance.
 
-**Where a rarity is set:** a projectile's in `projectiles.<id>.rarity` (also used by its shop item), a buff's on the shop item (`rarity`). An
-item without a rarity is treated as common when picked for the shop and sorts last in the tabs.
+**Where a rarity is set:** a projectile's in `projectiles.<id>.rarity` (also used by its shop item), a buff's on the shop item (`rarity`).
+Snowball = default, chestnut = common, grenade = epic, Skyr = epic. A rarity with `chance` 0 (default) is never rolled for the shop.
+An item with **no rarity** is treated as common when the shop picks, and in the tabs it always goes at the very end - after every
+rarity, default and common included, however many of those there are (the tabs list: legendary, epic, rare, common, default, then no rarity).
 
 **Labels:** plain coloured text, no background: top right of a shop card (same text style as PROJECTILE / BUFF), and in the
 PROJECTILES / BUFFS tabs on the amount's row, left of the amount. The tabs list the rarest first. The light colours have a thin

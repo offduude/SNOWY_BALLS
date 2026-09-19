@@ -818,7 +818,7 @@
       50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(255, 59, 48, 0); }
     }
 
-    /* Coin counter: sits right above the SHOP/BACK button and stays put when the shop opens. */
+    /* Coin counter: sits right above the SHOP/BACK button; in the shop it moves to the top centre (see below). */
     #coin-counter {
       position: absolute;
       right: 10px;
@@ -838,6 +838,15 @@
       font-size: 9px;
       pointer-events: auto; /* same: tapping the coin counter must not start a throw */
       z-index: 4;
+    }
+
+    /* In the shop the counter moves to the top centre of the screen, in the middle of the board's top frame. */
+    #game-container.shop-open #coin-counter {
+      right: auto;
+      bottom: auto;
+      left: 50%;
+      top: calc(var(--u) * 2.8 - 11px); /* the frame band is ~5.6u tall: the 22px counter sits in its middle */
+      transform: translateX(-50%);
     }
 
     #coin-counter .coin {

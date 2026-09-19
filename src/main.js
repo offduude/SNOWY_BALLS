@@ -99,6 +99,8 @@ const W20 = WINDOWS[0];
 // two lines (see drawAimBar). It depends on the window and the physics only, not on the projectile.
 const W20_SWING_GUARANTEE =
   Math.min(ORIGIN_X - W20.xFrom, W20.xTo - ORIGIN_X) / (MAX_SWING_SPEED * Math.sqrt((2 * W20.heightTo) / GRAVITY));
+const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's dot on the aim bars
+const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit range, so a marker on the dot always hits)
 const AIM_TICK_STEP = 0.1; // graduation lines on both aim bars every 10% (offset: of the full swing, from the center out)
 
 const FACE_IMG_X = W20.xFrom - 1; // world x of the texture's left edge
@@ -758,11 +760,40 @@ class MainScene extends Phaser.Scene {
     document.getElementById("message").textContent = msg;
   }
 
+  // Where the sliders must be released to hit the running event's target, or null if no event has one.
+  // Each event has its own color; the aim bars show a dot of that color at the middle of the range.
+  // Currently only the face window (yellow): its face box needs the apex inside the face's height band and
+  // the sideways position inside its width. The sideways drift is swing x MAX_SWING_SPEED x apexTime and
+  // apexTime changes a little across the band, so the swing range returned is the one that works for EVERY
+  // apex in the band; the power range is the band itself. Anywhere the marker overlaps the dot is a hit.
+  activeEventTarget() {
+    if (!(this.bananaActive && !this.bananaHitTriggered)) return null;
+    const b = BANANA_FACE_BOX;
+    const tMin = Math.sqrt((2 * b.heightFrom) / GRAVITY);
+    const tMax = Math.sqrt((2 * b.heightTo) / GRAVITY);
+    const dxFrom = b.xFrom - ORIGIN_X;
+    const dxTo = b.xTo - ORIGIN_X;
+    return {
+      color: EVENT_COLOR_FACE,
+      swingFrom: Math.max(dxFrom / (MAX_SWING_SPEED * tMin), dxFrom / (MAX_SWING_SPEED * tMax)),
+      swingTo: Math.min(dxTo / (MAX_SWING_SPEED * tMin), dxTo / (MAX_SWING_SPEED * tMax)),
+      powerFrom: this.powerForApex(b.heightFrom),
+      powerTo: this.powerForApex(b.heightTo),
+    };
+  }
+
   // The power-bar value (0..1) whose throw peaks at `apex` (a world height) with the equipped projectile.
   // Inverse of the launch speed in launchBall(): apex = ((MIN + power x (MAX - MIN)) x sqrt(100/weight))^2 / 2g.
   powerForApex(apex) {
     const apexScale = REFERENCE_WEIGHT / (this.proj.weight || REFERENCE_WEIGHT);
     return (Math.sqrt((2 * GRAVITY * apex) / apexScale) - MIN_POWER_SPEED) / (MAX_POWER_SPEED - MIN_POWER_SPEED);
+  }
+
+  drawEventDot(g, x, y, color) {
+    g.fillStyle(color, 1);
+    g.fillCircle(Math.round(x), y, EVENT_DOT_RADIUS);
+    g.lineStyle(2, 0x202020, 1);
+    g.strokeCircle(Math.round(x), y, EVENT_DOT_RADIUS);
   }
 
   drawAimBar() {
@@ -802,6 +833,15 @@ class MainScene extends Phaser.Scene {
       }
       // The two lines that guarantee a hit on W20 (sideways) - nothing else is drawn between them.
       lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
+
+      const target = this.activeEventTarget();
+      if (target) {
+        const swing = (target.swingFrom + target.swingTo) / 2;
+        if (Math.abs(swing) < range) {
+          const x = barX + (0.5 + swing / 2 / range) * barW;
+          this.drawEventDot(g, x, barY + barH / 2, target.color);
+        }
+      }
     } else {
       markerPos = this.powerValue;
 
@@ -823,6 +863,12 @@ class MainScene extends Phaser.Scene {
       }
       lineAtPower(lo, 0x5cff5c, 1, 2, 5);
       lineAtPower(hi, 0x5cff5c, 1, 2, 5);
+
+      const target = this.activeEventTarget();
+      if (target) {
+        const power = (target.powerFrom + target.powerTo) / 2;
+        if (power > 0 && power < 1) this.drawEventDot(g, barX + power * barW, barY + barH / 2, target.color);
+      }
     }
 
     g.fillStyle(isAngle ? 0x6fb1ff : 0xff6f6f, 1);

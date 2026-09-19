@@ -525,3 +525,11 @@ not actual play.
 - The band moves with the projectile: snowball 0.622-0.762 (tick 0.7 removed), chestnut (weight 80, flies higher) 0.378-0.503 (ticks 0.4 and 0.5 removed). A line is only drawn if it lies inside the bar.
 - Verified with the real `launchBall`: 5 powers spread across each band all give an apex inside 344-387; 0.01 below/above gives 341/390.2 (snowball) and 340.7/390.5 (chestnut). Screenshot of the snowball bar. `main.js?v=55`.
 - With this the two bars together cover W20: stay between the green lines on both and the throw hits W20 (sideways guarantee assumes the apex is inside the band - see the offset-bar note above).
+
+## Event dots on the aim bars (2026-09-19)
+
+- While the face-window event is running (and its face not yet hit), both aim bars show a **yellow dot** (`EVENT_COLOR_FACE`, `0xffd52e`) where the marker must be released to hit the face. `activeEventTarget()` returns the running event's color and target ranges - **new events add their own color and ranges there**, and `drawEventDot` draws them.
+- **Power bar**: the dot sits at the middle of the power range that puts the apex inside the face box's height band (343-360): snowball 0.619-0.675 (dot 0.647), chestnut 0.375-0.425 (dot 0.400; lighter flies higher). **Offset bar**: the sideways drift is `swing x MAX_SWING_SPEED x apexTime` and apexTime shifts slightly across the band, so the dot is the middle of the swing range that keeps x inside the face's width (385-402) for EVERY apex in the band: -0.158 to -0.054 (dot -0.106, i.e. left of center). The dot is drawn at the range's middle with a 6px radius, smaller than the range, so any marker overlapping the dot is a hit.
+- The dot disappears when the event ends or the face is hit (`bananaActive && !bananaHitTriggered`).
+- Verified: for both projectiles, all 9 combinations of marker offsets (-6px, 0, +6px on each bar) around the dot centers land inside the face box (9/9 each); a real throw released on the dots gave "HIT +15 coins" (5 + the 10 face bonus) and the dots vanished. Screenshots of both bars with the event running. `main.js?v=56`.
+- The green W20 guarantee lines are still drawn during the event; the face sits inside W20, so the yellow dot is within the green range on the power bar and next to it on the offset bar.

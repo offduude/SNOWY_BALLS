@@ -105,7 +105,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 
 ## Balancing notes
 
-- Average base reward is ~4.5 coins per hit (W20 6 / W21 3); `tools/economy_report.py` prints how many
+- Average base reward is ~4 coins per hit (W20 5 / W21 3); `tools/economy_report.py` prints how many
   hits and throws each item costs. There are no tiers right now: every item can appear from the start.
 - Multiplier effects stack, so keep `coinMultiplier` values modest or a few purchases make the
   prices meaningless. Effects that make the *game itself* easier (`aimSpeedMultiplier`,

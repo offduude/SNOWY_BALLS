@@ -92,6 +92,15 @@ const WINDOWS = [
 // lands 1px up/left of W20 (image-x 384, image-y 272). The face box and left-pane divider were
 // found by flood-filling the texture for non-curtain pixels, in cropped-texture pixels.
 const W20 = WINDOWS[0];
+// Offset (angle) swing, as a share of the full -1..1 range, that is GUARANTEED to land inside W20's width for
+// any throw whose apex is inside W20's height band. The ball drifts sideways for the whole flight, so the
+// sideways offset is swing x MAX_SWING_SPEED x apexTime, and the longest flight that still hits W20 is the
+// one that peaks at its top edge (apexTime = sqrt(2 x height / gravity)). The aim bar marks +-this with
+// two lines (see drawAimBar). It depends on the window and the physics only, not on the projectile.
+const W20_SWING_GUARANTEE =
+  Math.min(ORIGIN_X - W20.xFrom, W20.xTo - ORIGIN_X) / (MAX_SWING_SPEED * Math.sqrt((2 * W20.heightTo) / GRAVITY));
+const AIM_TICK_STEP = 0.1; // graduation lines on the offset bar every 10% of the full swing, from the center out
+
 const FACE_IMG_X = W20.xFrom - 1; // world x of the texture's left edge
 const FACE_IMG_TOP_HEIGHT = W20.heightTo + 1; // heightClimbed of the texture's top edge
 const FACE_RAW = { xFrom: 1, xTo: 18, yFrom: 28, yTo: 45 }; // face+collar, cropped-texture px
@@ -759,23 +768,43 @@ class MainScene extends Phaser.Scene {
     const barW = GAME_WIDTH - 40;
     const barH = 8;
 
-    // The offset (angle) bar is drawn as long as the projectile's angleRange says, centered - the chestnut
-    // gets a bar 20% shorter, and its marker runs edge to edge of it. The power bar is always full length.
-    const angleBar = this.state === STATE.AIM_ANGLE;
-    const trackW = angleBar ? barW * this.proj.angleRange : barW;
-    const trackX = barX + (barW - trackW) / 2;
-
     g.fillStyle(0x000000, 0.4);
-    g.fillRect(trackX, barY, trackW, barH);
+    g.fillRect(barX, barY, barW, barH);
 
-    const value = this.state === STATE.AIM_ANGLE ? this.angleValue : this.powerValue;
-    const color = this.state === STATE.AIM_ANGLE ? 0x6fb1ff : 0xff6f6f;
-    g.fillStyle(color, 1);
-    const markerX = barX + value * barW;
+    const isAngle = this.state === STATE.AIM_ANGLE;
+    let markerPos; // 0..1 along the bar
+    if (isAngle) {
+      // The bar always spans the equipped projectile's whole angle range, so the marker runs edge to edge.
+      // Its graduation lines are fixed swing values (10%, 20%, ... of the snowball's full range, counted
+      // from the center outwards), so on a projectile with a smaller range they spread further apart -
+      // like a magnified ruler.
+      const range = this.proj.angleRange;
+      markerPos = 0.5 + (this.angleValue - 0.5) / range;
+
+      const lineAt = (swing, color, alpha, width, extra) => {
+        for (const sign of [-1, 1]) {
+          const x = Math.round(barX + (0.5 + (sign * swing) / 2 / range) * barW);
+          g.lineStyle(width, color, alpha);
+          g.lineBetween(x, barY - extra, x, barY + barH + extra);
+        }
+      };
+      // Graduations: skip the bar's own edge and everything between the two guarantee lines.
+      for (let k = 1; k * AIM_TICK_STEP < range - 1e-9; k++) {
+        const swing = k * AIM_TICK_STEP;
+        if (swing > W20_SWING_GUARANTEE) lineAt(swing, 0x202020, 0.85, 1, 3);
+      }
+      // The two lines that guarantee a hit on W20 (sideways) - nothing else is drawn between them.
+      lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
+    } else {
+      markerPos = this.powerValue;
+    }
+
+    g.fillStyle(isAngle ? 0x6fb1ff : 0xff6f6f, 1);
+    const markerX = barX + markerPos * barW;
     g.fillRect(markerX - 2, barY - 4, 4, barH + 8);
 
     g.lineStyle(1, 0xffffff, 0.6);
-    g.strokeRect(trackX, barY, trackW, barH);
+    g.strokeRect(barX, barY, barW, barH);
   }
 
   update(time, delta) {

@@ -824,3 +824,5 @@ not actual play.
 - The four commons now share the 60%: chestnut, stone, water bottle, rowan berry 15% each. `collection.js?v=36`, `main.js?v=95`.
 
 - **Rowan Berry ball art** (2026-09-19): the projectile in the air now uses `assets/snowball/rowan_berry_projectile.png` (moved in from the project root); the card / shop icon stays `rowan_berry.png`. Note the new file is a 32x32 image with only **4 opaque pixels** (a 2x2 dot at x 15-16, y 13-14), and every projectile is drawn at 16x16 (half scale), so the berry in flight is about 1 px on the 432-wide canvas - almost invisible (the chestnut fills ~25x18 of its 32x32). Left as delivered. `main.js?v=96`.
+
+- **Rowan Berry ball art updated** (2026-09-19): the new `rowan_berry_projectile.png` has 16 opaque pixels (a 4x4 dot at x 14-17, y 13-16), so the berry in flight is about 2 px on the canvas (was 1 px). Loads with `?v=2` (verified the game loads the new file: 16 opaque pixels). `main.js?v=97`.

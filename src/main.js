@@ -286,7 +286,7 @@ class MainScene extends Phaser.Scene {
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
     this.load.image("stone", "assets/snowball/stone.png");
-    this.load.image("rowan_berry", "assets/snowball/rowan_berry_projectile.png"); // the ball in the air (the card / shop icon is rowan_berry.png)
+    this.load.image("rowan_berry", "assets/snowball/rowan_berry_projectile.png?v=2"); // the ball in the air (the card / shop icon is rowan_berry.png)
     this.load.image("char_idle_rowan_berry", "assets/character/character1_idle_rowan_berry.png");
     this.load.image("char_aiming_rowan_berry", "assets/character/character1_aiming_rowan_berry.png");
     this.load.image("char_idle_stone", "assets/character/character1_idle_stone.png");

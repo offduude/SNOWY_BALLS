@@ -3,8 +3,7 @@
   "_readme": "Every reward, price and shop rule lives here. Edit numbers, save, reload the game. The game reads 'rewards', 'events' and 'shop'. All shop items below are PLACEHOLDER test data - names, prices and effects are just there so the shop has something to show (effects are not applied yet). See docs/ECONOMY.md for what every field means, and run 'py tools/economy_report.py' for a quick balance table.",
 
   "rewards": {
-    "_note": "The base coins for hitting each window now come from the projectile in use - see 'projectiles' below (rewards.W20 / rewards.W21).",
-    "streakBonusPerLevel": 0.15,
+    "_note": "The base coins for hitting each window come from the projectile in use - see 'projectiles' below (rewards.W20 / rewards.W21). The streak is only a counter now: it adds no coins.",
     "missCoins": 0
   },
 
@@ -17,11 +16,9 @@
     }
   },
 
-  "_aimNote": "Speed of the two aim markers (offset and strength - always the same speed). markerHz = full back-and-forth sweeps per second at streak 0 (0.85 = one sweep in ~1.2s). Every consecutive hit of the current streak speeds BOTH markers up by streakSpeedUp (0.1 = +10% of the base speed per streak level, so streak 10 is 2x and the 3x cap comes at streak 20), never above maxSpeedMultiplier. The streak is read when the player taps 'TAP to aim', so the speed is fixed during a throw. Buffs and projectiles do NOT change it.",
+  "_aimNote": "Speed of the two aim markers (offset and strength - always the same, fixed speed). markerHz = full back-and-forth sweeps per second (0.85 = one sweep in ~1.2s). Nothing changes it: not the streak, not buffs, not the projectile.",
   "aim": {
-    "markerHz": 0.85,
-    "streakSpeedUp": 0.1,
-    "maxSpeedMultiplier": 3
+    "markerHz": 0.85
   },
 
   "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match its shop item / its entry in the PROJECTILES list). infinite: true = never runs out (the snowball); every other projectile is a CONSUMABLE: one is used up the moment the player taps 'TAP to aim', and when the last one is gone the snowball is equipped again. rewards: the BASE coins for a hit on W20 / W21 with this projectile (streak and face bonuses are added on top). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; 75 flies 33% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far); the aim bar keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker speed is the same for everything. leavesMark: false = no snow mark, it bounces off instead. spins: it rotates in flight.",

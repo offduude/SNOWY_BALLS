@@ -63,8 +63,8 @@ const MIN_POWER_SPEED = Math.sqrt(2 * GRAVITY * MIN_STICK_HEIGHT); // ~575.6
 const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_APEX_HEIGHT); // ~1200
 
 // Marker speed (full back-and-forth sweeps per second) - the numbers live in economy.json under "aim".
-// ONE speed for both sliders; it only grows with the current streak (see takeAimSnapshot).
-const AIM_DEFAULTS = { markerHz: 0.85, streakSpeedUp: 0.05, maxSpeedMultiplier: 3 };
+// ONE fixed speed for both sliders - nothing (streak, buffs, projectiles) changes it.
+const AIM_DEFAULTS = { markerHz: 0.85 };
 
 const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
 const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed
@@ -293,12 +293,9 @@ class MainScene extends Phaser.Scene {
   //    (1 = all of it; smaller = more precise - the graduations spread out like a magnified ruler)
   takeAimSnapshot() {
     const b = Buffs.modifiers();
-    // Marker speed: the base speed, +streakSpeedUp per hit of the current streak (linear), capped. The streak is
-    // read right here, at the tap - so the speed is fixed for the whole throw and never changes mid-aim.
     const cfg = { ...AIM_DEFAULTS, ...(this.eco.aim || {}) };
-    const speedUp = Math.min(cfg.maxSpeedMultiplier, 1 + cfg.streakSpeedUp * this.streak);
     this.aim = {
-      markerHz: cfg.markerHz * speedUp,
+      markerHz: cfg.markerHz, // fixed: the streak no longer speeds it up
       angleRange: this.proj.angleRange / b.precision,
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
@@ -708,8 +705,7 @@ class MainScene extends Phaser.Scene {
     if (hit) {
       this.streak += 1;
       let coins = this.proj.rewards[win.name]; // the base coins for this window come from the projectile in use
-      const streakBonus = Math.floor(coins * this.eco.rewards.streakBonusPerLevel * (this.streak - 1));
-      coins += streakBonus;
+      // (The streak is only counted and shown - it no longer adds coins.)
 
       if (faceHit) {
         this.bananaHitTriggered = true;

@@ -22,29 +22,18 @@ start with "economy.json failed to load or has a JSON syntax error".
 
 | field | meaning |
 |---|---|
-| `streakBonusPerLevel` | each hit in a streak beyond the first adds this fraction of the base, rounded down. `0.15` = +15% per level. Set `0` to turn streak bonuses off |
 | `missCoins` | coins for a miss (or a ball that flies out the top). `0` normally |
 
-### How a hit is paid (the streak bonus)
+### How a hit is paid
 
-`coins = floor( (base + streakBonus + faceBonus) x buffs.coinMultiplier )`
+`coins = floor( (base + faceBonus) x buffs.coinMultiplier )`
 
 - `base` = the equipped projectile's `rewards.W20` / `rewards.W21` (see "projectiles": snowball 5 / 3, chestnut 8 / 5)
-- `streakBonus = floor( base x streakBonusPerLevel x (streak - 1) )` - with `streakBonusPerLevel` 0.15, every hit beyond
-  the first in a streak adds 15% of the base per level, **rounded down**. The streak is the number of hits in a row (a miss resets it to 0)
 - `faceBonus` = `events.faceWindow.faceBonusCoins` (10) when the banana face is hit
-- then the buffs' multiplier (read when the player tapped to aim), rounded down once at the end (projectiles no longer have a coin multiplier - their own `rewards` are the numbers)
+- then the buffs' multiplier (read when the player tapped to aim), rounded down once at the end
 
-| streak | W20 (base 5) | W21 (base 3) |
-|---|---|---|
-| 1 | 5 | 3 |
-| 2 | 5 (bonus 0.75 -> 0) | 3 (0.45 -> 0) |
-| 3 | 6 (1.5 -> 1) | 3 (0.9 -> 0) |
-| 4 | 7 (2.25 -> 2) | 4 (1.35 -> 1) |
-| 5 | 8 (3.0 -> 3) | 4 (1.8 -> 1) |
-| 10 | 11 (6.75 -> 6) | 6 (4.05 -> 4) |
-
-Because the bonus rounds down, the first level of a streak pays nothing at these small bases.
+**The streak adds nothing.** It is only a counter (STREAK: n under the top-right buttons, saved across reloads, reset by a miss);
+it no longer adds coins or speeds the markers up.
 
 ## events (live)
 
@@ -59,17 +48,12 @@ Because the bonus rounds down, the first level of a streak pays nothing at these
 
 ## aim (live)
 
-The speed of the two aim markers. **Both sliders always run at the same speed**, and nothing but the streak changes it
-(projectiles and buffs only change how wide the sliders are).
+The speed of the two aim markers: **fixed, the same for both sliders**, and nothing changes it (not the streak, not buffs,
+not the projectile - those only change how wide the sliders are).
 
 | field | meaning |
 |---|---|
-| `markerHz` | back-and-forth sweeps per second at streak 0 (`0.85` = one sweep in about 1.2s) |
-| `streakSpeedUp` | each hit of the current streak adds this fraction of the base speed: `0.1` = +10% per level, so streak 10 = 2x, streak 20 = 3x |
-| `maxSpeedMultiplier` | the speed never goes above this multiple of the base (`3` = reached at streak 20 with the current 0.1) |
-
-`speed = markerHz x min(maxSpeedMultiplier, 1 + streakSpeedUp x streak)`. The streak is saved (it survives closing the app and changing projectile) and is read when the player taps "TAP to aim", so
-the speed is fixed for that whole throw; a miss resets the streak and the speed with it.
+| `markerHz` | back-and-forth sweeps per second (`0.85` = one sweep in about 1.2s) |
 
 ## projectiles (live)
 

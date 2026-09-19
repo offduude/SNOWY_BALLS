@@ -52,7 +52,7 @@ const Collection = (() => {
   // "x12" next to the name of a consumable projectile (the snowball is infinite: nothing).
   function countHtml(kind, item) {
     if (kind !== "projectile" || item.infinite) return "";
-    return ` <span class="pick-count">x${Economy.getProjectileCount(item.id)}</span>`;
+    return `<span class="pick-count">x${Economy.getProjectileCount(item.id)}</span>`;
   }
 
   function isListed(kind, it) {
@@ -64,9 +64,10 @@ const Collection = (() => {
     return (
       `<div class="pick-row" data-id="${esc(item.id)}">` +
       `<img class="pick-pic" src="${esc(item.image)}" alt="" draggable="false" />` +
-      `<div class="pick-text"><div class="pick-name">${esc(item.name)}${countHtml(kind, item)}</div>` +
+      `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description)}</div></div>` +
       `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>` +
+      countHtml(kind, item) + // the amount sits in the card's top-right corner
       `</div>`
     );
   }

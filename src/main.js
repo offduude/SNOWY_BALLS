@@ -251,29 +251,15 @@ const PROJECTILE_VISUALS = {
     explosion: { flashMs: 340, flashScale: 4.6, shakeMs: 330, shakeX: 0.014, shakeY: 0.008 },
   },
 };
-// HOW A THROW LOOKS (visual only - where it lands, hit/miss and the coins come from the apex physics in launchBall, unchanged):
-// a throw that sticks to the wall does not slow down towards its apex any more. It flies from the hand to the point where it
-// will stick at flightSpeed(weight) (px/s, nearly straight, with only a small upward arc) and hits the wall at full speed.
-// The lighter the projectile the faster it flies: FLIGHT_SPEED_W0 at weight 0 down to FLIGHT_SPEED_W200 at weight 200 (a
-// straight line between; the snowball, weight 100, is 1100).
-const FLIGHT_SPEED_W0 = 1600;
-const FLIGHT_SPEED_W200 = 600;
-function flightSpeed(weight) {
-  const w = Math.min(200, Math.max(0, weight));
-  return FLIGHT_SPEED_W0 + ((FLIGHT_SPEED_W200 - FLIGHT_SPEED_W0) * w) / 200;
-}
-const FLIGHT_MIN_S = 0.08; // shortest / longest flight time whatever the distance (only there to stop absurd values)
-const FLIGHT_MAX_S = 1.5;
-const FLIGHT_ARC = 0.08; // the upward bulge of the path, as a share of its length (max FLIGHT_ARC_MAX px)
-const FLIGHT_ARC_MAX = 26;
-const FLIGHT_EASE = 1.25; // > 1: it picks up speed on the way (1 = constant speed)
-const IMPACT_SHAKE = { ms: 90, x: 0.003, y: 0.003 }; // a tiny jolt of the game picture when it hits the wall (the UI does not shake)
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
-// A projectile that bounces off the wall leaves with a share of the velocity it arrived with (so a faster / lighter throw
-// bounces harder, and the angle follows the way it was flying): BOUNCE_KEEP_X of its sideways speed, BOUNCE_KEEP_UP of its
-// upward speed.
-const BOUNCE_KEEP_X = 0.3;
-const BOUNCE_KEEP_UP = 0.18;
+// PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
+// apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex. A projectile that bounces off comes back
+// towards the player: it grows back to full size over BALL_REGROW_MS.
+const BALL_SIZE = 16;
+const BALL_APEX_SCALE = 0.5;
+const BALL_REGROW_MS = 450;
+const BOUNCE_OFF_SPEED = 90; // px/s a bouncing projectile is kicked away from where it hit
+const BOUNCE_POP_SPEED = 130; // px/s upward pop of that bounce
 const BOUNCE_RESTITUTION = 0.35; // how much speed it keeps when it lands on the ground
 
 const STATE = {
@@ -785,25 +771,10 @@ class MainScene extends Phaser.Scene {
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     // An apex above the roof edge would be a stick in the sky: that ball doesn't stick, it falls back.
     this.fallsBehind = (this.ballVY0 * this.ballVY0) / (2 * GRAVITY) > ROOF_EDGE_HEIGHT;
-    // The visual path of a throw that sticks: from the hand to the exact point where the physics say it lands (the apex).
-    if (!this.fallsBehind) {
-      const dx = this.ballVX * this.apexTime;
-      const dh = apex - ORIGIN_Y;
-      const dist = Math.hypot(dx, dh);
-      const weightNow = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
-      const dur = Math.min(FLIGHT_MAX_S, Math.max(FLIGHT_MIN_S, dist / flightSpeed(weightNow)));
-      const arc = Math.min(FLIGHT_ARC_MAX, FLIGHT_ARC * dist);
-      // The velocity it hits the wall with (the derivative of the drawn path at its end), used for the bounce.
-      const impactVX = (dx * FLIGHT_EASE) / dur;
-      const impactVH = ((dh - 4 * arc) * FLIGHT_EASE) / dur;
-      this.flightVis = { dx, dh, dur, arc, impactVX, impactVH };
-    } else {
-      this.flightVis = null;
-    }
     this.cameraFollowing = true;
     this.bounce = null;
     this.ball.setTexture(this.projVisuals.ball);
-    this.ball.setDisplaySize(16, 16);
+    this.ball.setDisplaySize(BALL_SIZE, BALL_SIZE);
     this.ball.clearMask(); // in front of the wall until (and unless) it falls back behind the roof
     this.ball.setRotation(0);
     this.ball.setAlpha(1);
@@ -814,38 +785,25 @@ class MainScene extends Phaser.Scene {
 
   updateFlight(dt) {
     this.flightTime += dt;
-    const vis = this.flightVis; // a throw that sticks: the fast visual path (see flightSpeed); null for one that flies over the roof
-    const reachedApex = vis ? this.flightTime >= vis.dur : this.flightTime >= this.apexTime;
+    const reachedApex = this.flightTime >= this.apexTime;
     // Normally the flight freezes at the apex (the ball sticks there); a ball that fell behind the
     // roof keeps following its arc back down.
     const t = reachedApex && !this.fallsBehind ? this.apexTime : this.flightTime;
 
-    // Where the throw LANDS is always the physics apex point: (x, heightClimbed) below is what hit / miss is decided from.
-    let x = this.ballStartX + this.ballVX * t;
-    let heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
-    let drawX = x;
-    let drawHeight = heightClimbed;
-    if (vis) {
-      // Fast, nearly straight path to the same point, speeding up a little instead of slowing down.
-      const u = Math.min(1, this.flightTime / vis.dur);
-      const s = Math.pow(u, FLIGHT_EASE);
-      drawX = this.ballStartX + vis.dx * s;
-      drawHeight = ORIGIN_Y + vis.dh * s + vis.arc * 4 * s * (1 - s);
-      if (reachedApex) {
-        drawX = x;
-        drawHeight = heightClimbed;
-      }
-      if (drawHeight > ROOF_EDGE_HEIGHT) drawHeight = ROOF_EDGE_HEIGHT; // never a peek above the roof line
-    }
-    const y = this.worldY(drawHeight);
-    this.ball.setPosition(drawX, y);
-    if (this.proj.spins) this.ball.setRotation((vis ? Math.min(1, this.flightTime / vis.dur) * this.apexTime : t) * SPIN_RATE); // same turns as before, stops where it hits the wall
+    const x = this.ballStartX + this.ballVX * t;
+    const heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
+    const y = this.worldY(heightClimbed);
+    this.ball.setPosition(x, y);
+    // Smaller and smaller on the way to the apex (progress 0..1 of the flight up to it; it stays small for a ball that goes on over the roof).
+    const shrink = 1 - (1 - BALL_APEX_SCALE) * Math.min(1, t / this.apexTime);
+    this.ball.setDisplaySize(BALL_SIZE * shrink, BALL_SIZE * shrink);
+    if (this.proj.spins) this.ball.setRotation(t * SPIN_RATE); // stops turning at the apex, where it hits the wall
 
     if (this.cameraFollowing) {
       const targetScrollY = y - GAME_HEIGHT * 0.6;
       // Frame-rate independent smoothing: a fixed per-frame fraction (the old 0.12) moves the
       // camera by different amounts on uneven frames, which reads as the whole screen shaking.
-      const follow = 1 - Math.exp(-(vis ? 24 : 14) * dt); // a faster throw needs a snappier camera
+      const follow = 1 - Math.exp(-14 * dt);
       // Never show anything above the top of the texture.
       const clampedTarget = Math.max(targetScrollY, -TOP_BOUNDARY_HEIGHT);
       // Whole pixels only, like scrollX: a fractional scrollY that creeps toward the top limit
@@ -862,7 +820,7 @@ class MainScene extends Phaser.Scene {
 
     // Flew out through the top of the building: no wall to stick to, so end the throw right
     // here as if it had landed (camera goes back to the character via the normal result flow).
-    if (!vis && heightClimbed >= TOP_BOUNDARY_HEIGHT) {
+    if (heightClimbed >= TOP_BOUNDARY_HEIGHT) {
       this.finishThrow(false, null, x, heightClimbed, false, true);
       return;
     }
@@ -900,29 +858,30 @@ class MainScene extends Phaser.Scene {
     this.finishThrow(false, null, x, heightClimbed, false);
   }
 
-  // A projectile that leaves no mark hits the wall and glances off with a share of the velocity it hit with: it keeps
-  // going the way it was thrown sideways (right stays right, left stays left, a straight throw drops straight down) and
-  // pops up by a share of its upward speed - so a faster (lighter) throw bounces harder - then falls, hops on the ground and
-  // settles, all while the result shows. It is purely visual: the hit/miss and the coins were already decided at the
-  // moment of impact.
+  // A projectile that leaves no mark hits the wall at its apex, glances off further the way it was
+  // thrown (right stays right, left stays left) with a little pop upward, then falls, hops on the ground and settles - all while the result shows. It is
+  // purely visual: the hit/miss and the coins were already decided at the moment of impact.
   startBounce(x, heightClimbed) {
-    const vis = this.flightVis;
-    const inVX = vis ? vis.impactVX : this.ballVX;
-    const inVH = vis ? vis.impactVH : 0;
-    const dir = inVX > 1 ? 1 : inVX < -1 ? -1 : Math.random() < 0.5 ? -1 : 1; // (only the way it spins when thrown straight)
+    const dir = this.ballVX > 1 ? 1 : this.ballVX < -1 ? -1 : Math.random() < 0.5 ? -1 : 1; // thrown straight: either way
     this.bounce = {
       x,
       h: heightClimbed,
-      vx: BOUNCE_KEEP_X * inVX,
-      vh: BOUNCE_KEEP_UP * Math.max(0, inVH),
+      vx: dir * (BOUNCE_OFF_SPEED + 0.3 * Math.abs(this.ballVX)),
+      vh: BOUNCE_POP_SPEED,
       spin: dir,
       resting: false,
+      age: 0,
     };
   }
 
   updateBounce(dt) {
     const b = this.bounce;
-    if (!b || b.resting) return;
+    if (!b) return;
+    // Bouncing back towards the player: it grows from its apex size back to full size.
+    b.age += dt * 1000;
+    const grow = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * Math.min(1, b.age / BALL_REGROW_MS);
+    this.ball.setDisplaySize(BALL_SIZE * grow, BALL_SIZE * grow);
+    if (b.resting) return;
     b.vh -= GRAVITY * dt;
     b.h += b.vh * dt;
     b.x += b.vx * dt;
@@ -995,8 +954,6 @@ class MainScene extends Phaser.Scene {
       if (v.hitSound && (hit || hitsAnyWindow(stickX, stickHeight))) this.sound.play(v.hitSound, { volume: v.hitVolume });
       else this.sound.play(v.impactSound, { volume: v.impactVolume });
     }
-    // The impact: a tiny jolt of the game picture so it reads as hitting the wall with force (the grenade has its own, bigger one).
-    if (!escaped && !this.projVisuals.explosion) this.cameras.main.shake(IMPACT_SHAKE.ms, new Phaser.Math.Vector2(IMPACT_SHAKE.x, IMPACT_SHAKE.y));
     // An exploding projectile lights up the wall where it hit (not when it flew out of the top / fell behind the roof).
     if (!escaped && this.projVisuals.explosion) this.playExplosion(stickX, this.worldY(stickHeight), this.projVisuals.explosion);
 

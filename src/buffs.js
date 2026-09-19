@@ -1,6 +1,7 @@
-// Timed buffs: bought in the shop (a consumable item with `effects` and a `duration.seconds` in
-// economy.json), active for that long, and saved as device-clock timestamps (Economy.getBuffList()) so
-// they keep counting down while the app is closed.
+// Timed buffs: a consumable item with `effects` and a `duration.seconds` in economy.json. Buying one only puts
+// it in the inventory (Economy.getBuffCount); it is USED from the BUFFS tab (Buffs.use), which takes one out of the
+// inventory and starts it for that long. Running buffs are saved as device-clock timestamps (Economy.getBuffList())
+// so they keep counting down while the app is closed.
 //
 // The game only reads the buffs at ONE moment - when the player taps "TAP to aim" - via
 // Buffs.modifiers(); that snapshot is used for the whole throw, so a buff running out (or being bought)
@@ -59,7 +60,30 @@ const Buffs = (() => {
     return m;
   }
 
-  // Buying an active buff again restarts its timer (it does not stack the effect).
+  // Every buff the BUFFS tab shows: the ones in the inventory (count > 0) and the ones running right now, in the order
+  // of economy.json: [{ id, item, count, active, msLeft }]
+  function owned() {
+    const running = new Map(active().map((b) => [b.id, b]));
+    return eco.shop.items
+      .filter((it) => it.category === "consumable")
+      .map((it) => {
+        const r = running.get(it.id);
+        return { id: it.id, item: it, count: Economy.getBuffCount(it.id), active: !!r, msLeft: r ? r.msLeft : 0 };
+      })
+      .filter((b) => b.count > 0 || b.active);
+  }
+
+  // USE: takes one from the inventory and starts it. Refused while the same buff is already running (its button is
+  // a timer then) or when there is none left.
+  function use(id) {
+    const item = itemById(id);
+    if (!item || active().some((b) => b.id === id)) return false;
+    if (!Economy.takeBuff(id)) return false;
+    activate(item);
+    return true;
+  }
+
+  // Starts the buff (a running one restarts its timer - it does not stack the effect).
   function activate(item) {
     const list = Economy.getBuffList();
     const at = Date.now() + durationMs(item);
@@ -139,6 +163,8 @@ const Buffs = (() => {
       });
     },
     active,
+    owned,
+    use,
     modifiers,
     activate,
     cancel,

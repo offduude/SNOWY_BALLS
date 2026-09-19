@@ -248,6 +248,19 @@
       margin-bottom: calc(var(--u) * 0.6);
     }
 
+    /* Bottom row of a shop card: the amount of a stack at the left, the price at the right. */
+    .shop-bottom {
+      align-self: stretch;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .shop-amount {
+      font-size: calc(var(--u) * 1.8);
+      color: #8a6a44; /* the lighter brown used for amounts elsewhere */
+    }
+
     .shop-price {
       display: flex;
       align-items: center;
@@ -402,7 +415,11 @@
        the name/description and the EQUIP button on the first row, and the weight / hit value stats in ONE row along the
        bottom, starting right after the picture and running under the text and the button. */
     .pick-row.has-stats {
+      /* Every projectile card is at least as tall as one with a 3-line description, so the EQUIP button (centred in
+         the first row) is at the same height on every card. */
+      min-height: calc(var(--u) * 21.5);
       display: grid;
+      grid-template-rows: 1fr auto;
       grid-template-columns: auto minmax(0, 1fr) auto;
       column-gap: calc(var(--u) * 1.4);
       row-gap: calc(var(--u) * 0.9);
@@ -620,9 +637,12 @@
       pointer-events: none;
     }
 
+    /* The running timer sits exactly where the USE / EQUIP button is (same width), so nothing shifts when a button
+       turns into a timer. */
     .pick-timer {
       flex: none;
-      min-width: calc(var(--u) * 7);
+      box-sizing: border-box;
+      width: calc(var(--u) * (1.2 * 8 + 2.4) + 4px);
       text-align: center;
       font-size: calc(var(--u) * 1.5);
       color: #3b2412;
@@ -744,10 +764,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=10"></script>
-  <script src="src/buffs.js?v=3"></script>
-  <script src="src/shop.js?v=14"></script>
-  <script src="src/collection.js?v=15"></script>
+  <script src="src/economy.js?v=11"></script>
+  <script src="src/buffs.js?v=4"></script>
+  <script src="src/shop.js?v=15"></script>
+  <script src="src/collection.js?v=16"></script>
   <script src="src/main.js?v=74"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

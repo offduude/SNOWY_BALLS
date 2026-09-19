@@ -186,7 +186,7 @@ const Shop = (() => {
       // list expands and its red dot comes on (Economy raises it; more of a kind they already have doesn't).
       Economy.addProjectiles(item.id, offer ? offer.amount : 1);
     } else {
-      Buffs.activate(item); // a consumable is a timed buff: it starts right now (see buffs.js)
+      Economy.addBuffs(item.id, 1); // a buff goes into the inventory; it is USED from the BUFFS tab (see buffs.js)
     }
 
     st.stock[slot] = null;
@@ -223,13 +223,14 @@ const Shop = (() => {
     const offer = (Economy.getShopState().offers || [])[slot] || null;
     const p = price(item, offer);
     const afford = Economy.getCoins() >= p;
-    const amountLabel = offer ? ` x${offer.amount}` : ""; // a stack: "PROJECTILE x14"
+    // Bottom row: the amount of a stack ("x14") at the left, the price at the right (a single item has no amount).
+    const amountHtml = offer ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
-      `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}${amountLabel}</span>` +
+      `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>` +
       `<span class="shop-pic">${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
       `<span class="shop-name">${esc(item.name)}</span>` +
-      `<span class="shop-price"><i class="coin"></i>${p}</span>` +
+      `<span class="shop-bottom">${amountHtml}<span class="shop-price"><i class="coin"></i>${p}</span></span>` +
       `</button>`
     );
   }

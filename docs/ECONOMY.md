@@ -136,9 +136,11 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 
 ### buffs (live)
 
-A `consumable` item is a timed **buff**: buying it starts it right away for `duration.seconds` (device clock,
-so the timer keeps running while the app is closed and is saved). Buying an active buff again restarts its timer -
-effects do not stack from the same buff; different buffs multiply. Its `effects` list is what it does:
+A `consumable` item is a timed **buff**. Buying one only puts it in the **inventory** (saved, shown as "x3" on its card in the BUFFS tab).
+It is **used from the BUFFS tab**: the USE button takes one out of the inventory and starts it for `duration.seconds`, and the button
+turns into the running timer (device clock, so it keeps running while the app is closed and is saved). While a buff is running it
+can't be used again (its button is a timer); when it ends the USE button comes back if there are more, and the card leaves the list
+when none are left. Effects do not stack from the same buff; different buffs multiply. Its `effects` list is what it does:
 
 | type | value means |
 |---|---|

@@ -121,22 +121,36 @@ const Collection = (() => {
     });
   }
 
-  // ---- BUFFS list: same panel, smaller, live timers instead of an EQUIP button ----
+  // ---- BUFFS list: the buffs the player has (bought, waiting) or is running. Same cards as the projectiles list without
+  //      the bottom line: picture, name, description, the amount (x3) in the top-right corner, and where EQUIP would be
+  //      a USE button - which turns into the running timer once the buff is used. ----
 
   function buffRowHtml(b) {
+    const control = b.active
+      ? `<div class="pick-timer">${Buffs.formatTime(b.msLeft)}</div>`
+      : `<button class="pick-equip pick-use" type="button" data-id="${esc(b.id)}">USE</button>`;
     return (
       `<div class="pick-row" data-id="${esc(b.id)}">` +
       `<img class="pick-pic" src="${esc(b.item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +
       `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
-      `<div class="pick-timer">${Buffs.formatTime(b.msLeft)}</div>` +
+      control +
+      (b.count > 0 ? `<span class="pick-count">x${b.count}</span>` : "") +
       `</div>`
     );
   }
 
-  // Full redraw (when the set of buffs changes or the list opens)...
+  // What the list shows, as a string: when it changes (used, expired, bought) the list is redrawn.
+  function buffKey(list) {
+    return list.map((b) => `${b.id}:${b.active ? 1 : 0}:${b.count}`).join("|");
+  }
+
+  let buffKeyShown = "";
+
+  // Full redraw...
   function renderBuffList() {
-    const list = Buffs.active();
+    const list = Buffs.owned();
+    buffKeyShown = buffKey(list);
     scrollEl.innerHTML = list.length
       ? list.map(buffRowHtml).join("")
       : `<div class="list-empty">NO BUFFS YET<br /><br />BUY ONE IN THE SHOP FIRST</div>`;
@@ -145,9 +159,8 @@ const Collection = (() => {
   // ...and a cheap timer-only refresh twice a second while it's open.
   function tickBuffList() {
     if (openKind !== "buff") return;
-    const list = Buffs.active();
-    const shown = [...scrollEl.querySelectorAll(".pick-row")].map((r) => r.dataset.id).join(",");
-    if (shown !== list.map((b) => b.id).join(",")) {
+    const list = Buffs.owned();
+    if (buffKey(list) !== buffKeyShown) {
       renderBuffList();
       return;
     }
@@ -200,6 +213,12 @@ const Collection = (() => {
   }
 
   function onEquip(e) {
+    const use = e.target.closest(".pick-use");
+    if (use) {
+      click();
+      Buffs.use(use.dataset.id); // takes one from the inventory and starts it; the list redraws itself (Buffs.onChange)
+      return;
+    }
     const btn = e.target.closest(".pick-equip");
     if (!btn || btn.classList.contains("on")) return;
     Economy.setEquipped(openKind, btn.dataset.id);

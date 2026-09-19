@@ -10,6 +10,7 @@ const Economy = (() => {
       coins: 0,
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
+      buffItems: {}, // how many of each buff the player has bought and not used yet (id -> count); using one starts it (see buffs.js)
       projectiles: {}, // how many of each consumable projectile the player has (the snowball is infinite and not listed)
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
@@ -51,6 +52,7 @@ const Economy = (() => {
         streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
         aiming: p.aiming === true,
         projectiles: cleanCounts(p.projectiles),
+        buffItems: cleanCounts(p.buffItems),
         projectilesUnseen: p.projectilesUnseen === true,
         unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
         equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
@@ -156,6 +158,26 @@ const Economy = (() => {
     return true;
   }
 
+  // ---- buff inventory (bought buffs waiting to be used) ----
+  function getBuffCount(id) {
+    return state.buffItems[id] || 0;
+  }
+
+  function addBuffs(id, n) {
+    state.buffItems[id] = getBuffCount(id) + n;
+    save();
+  }
+
+  // Takes one out of the inventory. Returns false (and changes nothing) if there is none.
+  function takeBuff(id) {
+    const n = getBuffCount(id);
+    if (n <= 0) return false;
+    if (n === 1) delete state.buffItems[id];
+    else state.buffItems[id] = n - 1;
+    save();
+    return true;
+  }
+
   function hasUnseenProjectiles() {
     return state.projectilesUnseen;
   }
@@ -231,6 +253,9 @@ const Economy = (() => {
     setStreak,
     wasAiming,
     setAiming,
+    getBuffCount,
+    addBuffs,
+    takeBuff,
     getProjectileCount,
     addProjectiles,
     useProjectile,

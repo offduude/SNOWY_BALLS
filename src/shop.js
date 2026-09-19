@@ -33,17 +33,31 @@ const Shop = (() => {
 
   // Items that come in stacks have an `amount` and a `unitPrice` range; each time one is put on sale a concrete
   // offer is rolled: { amount, unitPrice }. Saved with the stock so leaving the shop can't reroll it.
+  // A single item can have a `priceRange` {min, max} instead of a fixed price: each time it is put on sale its price is
+  // rolled in that range (the offer is then { price }).
   function rollOffer(item) {
-    if (!item || !item.amount || !item.unitPrice) return null;
-    return { amount: randInt(item.amount.min, item.amount.max), unitPrice: randInt(item.unitPrice.min, item.unitPrice.max) };
+    if (!item) return null;
+    if (item.amount && item.unitPrice) {
+      return { amount: randInt(item.amount.min, item.amount.max), unitPrice: randInt(item.unitPrice.min, item.unitPrice.max) };
+    }
+    if (item.priceRange) return { price: randInt(item.priceRange.min, item.priceRange.max) };
+    return null;
   }
 
   function needsOffer(item) {
-    return !!(item && item.amount && item.unitPrice);
+    return !!(item && ((item.amount && item.unitPrice) || item.priceRange));
+  }
+
+  // Is the saved offer a usable one for this item (an old save, or an edited economy.json, may not match)?
+  function offerValid(offer, item) {
+    if (!offer) return false;
+    if (item.amount && item.unitPrice) return offer.amount > 0 && offer.unitPrice > 0;
+    return offer.price > 0;
   }
 
   // What the slot costs. `offer` is the rolled offer for stack items.
   function price(item, offer) {
+    if (offer && offer.price) return offer.price;
     if (offer) return offer.amount * offer.unitPrice;
     if (item.ignorePriceOverride) return item.price;
     const o = eco.shop.priceOverride; // placeholder pricing switch, see economy.json
@@ -52,7 +66,9 @@ const Shop = (() => {
 
   // The cheapest a stack item can be (for the "always show something affordable" safety net).
   function minPrice(item) {
-    return needsOffer(item) ? item.amount.min * item.unitPrice.min : price(item);
+    if (item.amount && item.unitPrice) return item.amount.min * item.unitPrice.min;
+    if (item.priceRange) return item.priceRange.min;
+    return price(item);
   }
 
   function itemById(id) {
@@ -151,7 +167,7 @@ const Shop = (() => {
         restock[i] = null;
         // A stack item on sale needs its rolled offer (an old save from before offers existed has none).
         const it = itemById(stock[i]);
-        if (needsOffer(it) && !(offers[i] && offers[i].amount > 0 && offers[i].unitPrice > 0)) offers[i] = rollOffer(it);
+        if (needsOffer(it) && !offerValid(offers[i], it)) offers[i] = rollOffer(it);
         if (!needsOffer(it)) offers[i] = null;
         continue;
       }
@@ -225,7 +241,7 @@ const Shop = (() => {
     const p = price(item, offer);
     const afford = Economy.getCoins() >= p;
     // Bottom row: the price at the left, the amount of a stack ("x14") at the right (a single item has no amount).
-    const amountHtml = offer ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
+    const amountHtml = offer && offer.amount ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
       `<span class="shop-top"><span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>${Rarity.labelHtml(Rarity.ofItem(item), "shop-rarity", true)}</span>` +

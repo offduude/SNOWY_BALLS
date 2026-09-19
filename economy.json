@@ -62,14 +62,14 @@
       "guaranteeCheapItem": { "enabled": false, "maxPriceInAverageHits": 12 }
     },
 
-    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (guideLines, precision, strengthControl, coinMultiplier - see src/buffs.js). category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; the same stack can be on sale in several slots at once, each with its own roll).",
+    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (guideLines, precision, strengthControl, coinMultiplier - see src/buffs.js). a single item can have priceRange {min, max} instead of price: its price is rolled in that range each time it is put on sale. category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; the same stack can be on sale in several slots at once, each with its own roll).",
     "items": [
       {
         "id": "skyr",
         "name": "Skyr",
         "category": "consumable",
         "rarity": "epic",
-        "price": 10,
+        "priceRange": { "min": 39, "max": 59 },
         "ignorePriceOverride": true,
         "duration": { "seconds": 180 },
         "image": "assets/items/skyr.png",

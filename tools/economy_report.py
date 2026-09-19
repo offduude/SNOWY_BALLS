@@ -30,7 +30,8 @@ def check(eco):
     for it in shop["items"]:
         # A stack item (projectiles) has amount + unitPrice ranges instead of a fixed price.
         stack = "amount" in it or "unitPrice" in it
-        for field in ("id", "name", "category") + (("amount", "unitPrice") if stack else ("price",)):
+        ranged = "priceRange" in it
+        for field in ("id", "name", "category") + (("amount", "unitPrice") if stack else (() if ranged else ("price",))):
             if field not in it:
                 problems.append(f"item {it.get('id', '?')}: missing '{field}'")
         for rng in ("amount", "unitPrice"):
@@ -109,6 +110,8 @@ def main():
     print(header + "   (throws needed to afford it, from zero)")
     print("-" * len(header))
     def avg_price(i):
+        if "priceRange" in i:  # a single item with a rolled price: the middle of the range
+            return (i["priceRange"]["min"] + i["priceRange"]["max"]) / 2
         if "amount" in i:  # a stack: average amount x average price of one
             return (i["amount"]["min"] + i["amount"]["max"]) / 2 * (i["unitPrice"]["min"] + i["unitPrice"]["max"]) / 2
         return i["price"]

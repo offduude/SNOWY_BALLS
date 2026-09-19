@@ -579,3 +579,10 @@ not actual play.
 ## HIGHEST box removed (2026-09-19)
 
 - Removed the `HIGHEST: n` box (HTML, CSS, `updateStreakHud`). Only `STREAK: n` remains under the top-right buttons (96px wide, unchanged). The best streak is still tracked in the save (`Economy.reportStreak` / `getBestStreak`), just not displayed - useful later for achievements. `main.js?v=64`.
+
+## One marker speed, faster with the streak (2026-09-19)
+
+- **Strength marker = offset marker speed.** The old `ANGLE_HZ = 0.85` / `POWER_HZ = 0.65` constants are gone; both sliders use `aim.markerHz` (0.85) from `economy.json` - so the strength marker is 30% faster than before by default.
+- **Streak speed-up**: `takeAimSnapshot()` sets `this.aim.markerHz = markerHz x min(maxSpeedMultiplier, 1 + streakSpeedUp x streak)` (0.05 per streak level, capped at 3x - both in economy.json `aim`). The streak is read at the tap like the buffs, so the speed is fixed for the throw (verified: changing the streak mid-aim leaves the snapshot alone) and a miss resets it. Applies to both sliders equally.
+- Measured on screen (bar lengths per second, angle / power): streak 0 = 0.84 / 0.84, streak 5 = 1.06 / 1.05, streak 10 = 1.27 / 1.27, streak 40 = 2.5 / 2.49, streak 100 = 2.52 / 2.47 (cap 2.55). `main.js?v=65`.
+- With linear +5%/level the marker is 1.5x at streak 10 and 2x at streak 20; tune `streakSpeedUp` / `maxSpeedMultiplier` to taste. Nothing shows the player the speed yet.

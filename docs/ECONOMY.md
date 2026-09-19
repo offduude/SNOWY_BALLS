@@ -58,6 +58,20 @@ Because the bonus rounds down, the first level of a streak pays nothing at these
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceBonusCoins` | extra coins for hitting the face, on top of the normal hit reward |
 
+## aim (live)
+
+The speed of the two aim markers. **Both sliders always run at the same speed**, and nothing but the streak changes it
+(projectiles and buffs only change how wide the sliders are).
+
+| field | meaning |
+|---|---|
+| `markerHz` | back-and-forth sweeps per second at streak 0 (`0.85` = one sweep in about 1.2s) |
+| `streakSpeedUp` | each hit of the current streak adds this fraction of the base speed: `0.05` = +5% per level, so streak 10 = 1.5x, streak 20 = 2x |
+| `maxSpeedMultiplier` | the speed never goes above this multiple of the base (`3` = reached at streak 40) |
+
+`speed = markerHz x min(maxSpeedMultiplier, 1 + streakSpeedUp x streak)`. The streak is read when the player taps "TAP to aim", so
+the speed is fixed for that whole throw; a miss resets the streak and the speed with it.
+
 ## projectiles (live)
 
 Gameplay numbers for each projectile you can equip, keyed by its id (the same id as its shop item and its

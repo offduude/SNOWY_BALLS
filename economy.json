@@ -20,6 +20,13 @@
     }
   },
 
+  "_aimNote": "Speed of the two aim markers (offset and strength - always the same speed). markerHz = full back-and-forth sweeps per second at streak 0 (0.85 = one sweep in ~1.2s). Every consecutive hit of the current streak speeds BOTH markers up by streakSpeedUp (0.05 = +5% of the base speed per streak level, so streak 10 is 1.5x), never above maxSpeedMultiplier. The streak is read when the player taps 'TAP to aim', so the speed is fixed during a throw. Buffs and projectiles do NOT change it.",
+  "aim": {
+    "markerHz": 0.85,
+    "streakSpeedUp": 0.05,
+    "maxSpeedMultiplier": 3
+  },
+
   "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match a shop projectile / the PROJECTILES list). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; a weight of 80 flies 25% higher). angleRange: how far the throw can drift sideways (1 = the full swing, 0.8 = only 80% as far). The aim bar always keeps its width and shows this range edge to edge, so its graduation lines look stretched on a smaller range. The marker itself always moves at the same fixed speed. coinMultiplier: multiplies the coins for a hit, rounded DOWN. leavesMark: false = no snow mark on the wall, it bounces off instead. spins: the projectile rotates in flight.",
   "projectiles": {
     "snowball": { "weight": 100, "angleRange": 1, "coinMultiplier": 1, "leavesMark": true, "spins": false },

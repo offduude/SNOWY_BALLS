@@ -62,8 +62,9 @@ const ROOF_EDGE_HEIGHT = IMG_GROUND_Y - 15; // 645
 const MIN_POWER_SPEED = Math.sqrt(2 * GRAVITY * MIN_STICK_HEIGHT); // ~575.6
 const MAX_POWER_SPEED = Math.sqrt(2 * GRAVITY * MAX_APEX_HEIGHT); // ~1200
 
-const ANGLE_HZ = 0.85; // full sweep cycles per second (placeholder feel, tune later)
-const POWER_HZ = 0.65;
+// Marker speed (full back-and-forth sweeps per second) - the numbers live in economy.json under "aim".
+// ONE speed for both sliders; it only grows with the current streak (see takeAimSnapshot).
+const AIM_DEFAULTS = { markerHz: 0.85, streakSpeedUp: 0.05, maxSpeedMultiplier: 3 };
 
 const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
 const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed
@@ -291,7 +292,12 @@ class MainScene extends Phaser.Scene {
   //    (1 = all of it; smaller = more precise - the graduations spread out like a magnified ruler)
   takeAimSnapshot() {
     const b = Buffs.modifiers();
+    // Marker speed: the base speed, +streakSpeedUp per hit of the current streak (linear), capped. The streak is
+    // read right here, at the tap - so the speed is fixed for the whole throw and never changes mid-aim.
+    const cfg = { ...AIM_DEFAULTS, ...(this.eco.aim || {}) };
+    const speedUp = Math.min(cfg.maxSpeedMultiplier, 1 + cfg.streakSpeedUp * this.streak);
     this.aim = {
+      markerHz: cfg.markerHz * speedUp,
       angleRange: this.proj.angleRange / b.precision,
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
@@ -973,18 +979,19 @@ class MainScene extends Phaser.Scene {
 
     if (this.state === STATE.AIM_ANGLE) {
       const elapsed = (time - this.aimStartTime) / 1000;
-      // The marker sweeps the BAR at ONE fixed speed (ANGLE_HZ) - nothing (projectile, buff) changes it: `pos` is where it
+      // The marker sweeps the BAR at one fixed speed for the whole throw (aim.markerHz) - nothing but the streak
+      // (read at the tap) changes it, and it is the same for both sliders: `pos` is where it
       // is along the bar (0..1), and angleValue is what that position means - the bar shows angleRange of the
       // full swing edge to edge, so a smaller range (chestnut, precision buff) is finer aim but the marker
       // itself never moves faster on screen.
       const a = this.aim;
-      const pos = pingPong(elapsed * ANGLE_HZ);
+      const pos = pingPong(elapsed * a.markerHz);
       this.angleValue = 0.5 + (pos - 0.5) * a.angleRange;
     } else if (this.state === STATE.AIM_POWER) {
       const elapsed = (time - this.aimStartTime) / 1000;
       // Same for strength: fixed marker speed along the bar, the bar covers `powerRange` of the power span (centered).
       const r = this.aim.powerRange;
-      this.powerValue = 0.5 + (pingPong(elapsed * POWER_HZ) - 0.5) * r;
+      this.powerValue = 0.5 + (pingPong(elapsed * this.aim.markerHz) - 0.5) * r;
     } else if (this.state === STATE.FLIGHT) {
       this.updateFlight(dt);
     }

@@ -105,12 +105,9 @@ function hitsAnyWindow(x, heightClimbed) {
   return WALL_WINDOWS.some(([x0, x1, y0, y1]) => x >= x0 && x <= x1 && imageY >= y0 && imageY <= y1);
 }
 
-// "Banana window" streak bonus (2026-09-19). goal_window_face.png / goal_window_face_hit.png are
-// 54x46 (cropped from the 58x50 exports - the outer 2px grey padding would otherwise paint over
-// the wall). They map 1:1 onto the building with NO scaling: the glass area is 52x44 px, exactly
-// W20's 52x44 pixel box, and the white frame edge sits 1px outside it, so the image's top-left
-// lands 1px up/left of W20 (image-x 384, image-y 272). The face box and left-pane divider were
-// found by flood-filling the texture for non-curtain pixels, in cropped-texture pixels.
+// "Banana window" streak bonus (2026-09-19). goal_window_face.png / goal_window_face_hit.png are 58x50: exactly W20's whole
+// window in the building art - the 52x44 glass plus its 3px frame - so they are drawn 1:1 over it, top-left 3px up/left of the
+// glass (see FACE_FRAME). The face box and left-pane divider were found by flood-filling the texture for non-curtain pixels.
 const W20 = WINDOWS[0];
 // Offset (angle) swing, as a share of the full -1..1 range, that is GUARANTEED to land inside W20's width for
 // any throw whose apex is inside W20's height band. The ball drifts sideways for the whole flight, so the
@@ -176,16 +173,14 @@ function offsetRangeForWeight(weight, zoneAt100) {
   return Math.min(10, W20_SWING_GUARANTEE / Math.max(0.015, offsetZone(weight, zoneAt100)));
 }
 
-// The face window textures are the raw 58x50 exports: 2px of grey padding all round (which would paint over the wall) and then
-// the 54x46 picture, whose top-left sits 1px up/left of W20. The padding is cropped away when the overlay is drawn, so the
-// PNGs can be replaced by new exports as they are.
-const FACE_TEX_PAD = 2;
-const FACE_TEX_W = 54;
-const FACE_TEX_H = 46;
-const FACE_IMG_X = W20.xFrom - 1; // world x of the (cropped) texture's left edge
-const FACE_IMG_TOP_HEIGHT = W20.heightTo + 1; // heightClimbed of the texture's top edge
-const FACE_RAW = { xFrom: 1, xTo: 18, yFrom: 28, yTo: 45 }; // face+collar, cropped-texture px
-const FACE_RAW_LEFT_DIVIDER_X = 20; // cropped-texture px - where the left pane ends
+// The face window textures are exactly the size of the building's window INCLUDING its frame: 58x50 = W20's 52x44 glass plus a
+// 3px frame all round (1px white, then 2px light grey - the same frame the building art draws). They are drawn 1:1, no crop and
+// no scaling, right over the building window: their top-left corner sits 3px up/left of W20's glass.
+const FACE_FRAME = 3;
+const FACE_IMG_X = W20.xFrom - FACE_FRAME; // world x of the texture's left edge
+const FACE_IMG_TOP_HEIGHT = W20.heightTo + FACE_FRAME; // heightClimbed of the texture's top edge
+const FACE_RAW = { xFrom: 3, xTo: 20, yFrom: 30, yTo: 47 }; // face+collar, in texture px (from the texture's top-left corner)
+const FACE_RAW_LEFT_DIVIDER_X = 22; // texture px - where the left pane ends
 
 const BANANA_FACE_BOX = {
   xFrom: FACE_IMG_X + FACE_RAW.xFrom,
@@ -403,9 +398,8 @@ class MainScene extends Phaser.Scene {
 
     // Sits over W20, invisible until the banana event triggers - see startBananaEvent().
     this.bananaOverlay = this.add
-      .image(FACE_IMG_X - FACE_TEX_PAD, this.worldY(FACE_IMG_TOP_HEIGHT) - FACE_TEX_PAD, "goal_window_face")
-      .setOrigin(0, 0) // native size, 1:1 with the wall - no scaling
-      .setCrop(FACE_TEX_PAD, FACE_TEX_PAD, FACE_TEX_W, FACE_TEX_H); // drop the grey padding: what is left lands exactly on W20
+      .image(FACE_IMG_X, this.worldY(FACE_IMG_TOP_HEIGHT), "goal_window_face")
+      .setOrigin(0, 0); // native size, 1:1 with the wall - no scaling, no crop
     this.bananaOverlay.setDepth(1); // above the building, below marks/ball
     this.bananaOverlay.setAlpha(0);
     this.bananaOverlay.setVisible(false);
@@ -693,8 +687,11 @@ class MainScene extends Phaser.Scene {
 
     this.targetCam = this.cameras.add(TARGET_CAM_X, TARGET_CAM_Y, viewW, viewH);
     this.targetCam.setBackgroundColor(0x65bfd5);
-    this.targetCam.scrollX = worldXFrom;
-    this.targetCam.scrollY = this.worldY(heightTo);
+    // A camera whose width / height is ODD gets a half-pixel offset in that direction (its matrix translates by -0.5), and with
+    // roundPixels on, the vertices of a sprite then round unevenly: a picture such as the face window came out 1px stretched and
+    // shifted in this window. Scrolling by the same half pixel puts everything back on whole pixels.
+    this.targetCam.scrollX = worldXFrom - (viewW % 2 ? 0.5 : 0);
+    this.targetCam.scrollY = this.worldY(heightTo) - (viewH % 2 ? 0.5 : 0);
     this.targetCam.roundPixels = true;
 
     // Real rounded corners on the live feed itself via a geometry mask - the mask graphics is

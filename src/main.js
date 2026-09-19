@@ -103,6 +103,29 @@ const BANANA_LEFT_SECTION_XTO = FACE_IMG_X + FACE_RAW_LEFT_DIVIDER_X;
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
 
+// What each equippable projectile LOOKS and SOUNDS like (texture / sound keys from preload). Its
+// gameplay numbers (aim range/speed, coin multiplier, mark or bounce, spin) live in economy.json
+// under "projectiles", keyed by the same id. Character sprites that aren't listed fall back to the
+// normal ones - there is no chestnut "throwing" sprite yet, so that pose uses the plain one.
+const PROJECTILE_VISUALS = {
+  snowball: {
+    ball: "snowball",
+    sprites: { idle: "char_idle", aiming: "char_aiming", throwing: "char_throwing" },
+    impactSound: "snowball_impact",
+    impactVolume: 0.3, // halved from 0.6
+  },
+  chestnut: {
+    ball: "chestnut",
+    sprites: { idle: "char_idle_chestnut", aiming: "char_aiming_chestnut", throwing: "char_throwing" },
+    impactSound: "chestnut_impact",
+    impactVolume: 0.5,
+  },
+};
+const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
+const BOUNCE_OFF_SPEED = 90; // px/s a bouncing projectile is kicked away from where it hit
+const BOUNCE_POP_SPEED = 130; // px/s upward pop of that bounce
+const BOUNCE_RESTITUTION = 0.35; // how much speed it keeps when it lands on the ground
+
 const STATE = {
   IDLE: "idle",
   AIM_ANGLE: "aim_angle",
@@ -130,6 +153,9 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_idle", "assets/character/character1_idle.png");
     this.load.image("char_aiming", "assets/character/character1_aiming.png");
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
+    this.load.image("chestnut", "assets/snowball/chestnut.png");
+    this.load.image("char_idle_chestnut", "assets/character/character1_idle_chestnut.png");
+    this.load.image("char_aiming_chestnut", "assets/character/character1_aiming_chestnut.png");
     // Timestamp so an edited economy.json is never served from a stale browser/CDN cache.
     this.load.json("economy", "economy.json?t=" + Date.now());
     this.load.audio("theme", "assets/audio/theme.mp3?v=2");
@@ -137,8 +163,8 @@ class MainScene extends Phaser.Scene {
     this.load.audio("snowball_impact", "assets/audio/snowball_impact.mp3");
     this.load.audio("window_clink", "assets/audio/window_clink.mp3");
     this.load.audio("click", "assets/audio/click.mp3");
-    // Placeholder (a copy of window_clink.mp3) - overwrite the file with the real sound, then bump the ?v=
-    this.load.audio("shop_restock", "assets/audio/shop_restock.mp3?v=1");
+    this.load.audio("shop_restock", "assets/audio/shop_restock.mp3?v=2");
+    this.load.audio("chestnut_impact", "assets/audio/chestnut_impact.mp3");
   }
 
   create() {
@@ -191,6 +217,17 @@ class MainScene extends Phaser.Scene {
     this.ball.setDepth(10);
     this.ball.setVisible(false); // only shown mid-flight - see launchBall/finishThrow
 
+    // Everything above the roof edge: a ball falling back behind the building is masked to this shape,
+    // so it sinks behind the roofline at any rotation (see updateFlight).
+    const roofShape = this.make.graphics({ x: 0, y: 0, add: false });
+    roofShape.fillStyle(0xffffff);
+    roofShape.fillRect(-4000, -4000, 8000, 4000 + this.worldY(ROOF_EDGE_HEIGHT));
+    this.roofMask = new Phaser.Display.Masks.GeometryMask(this, roofShape);
+
+    this.bounce = null; // a projectile bouncing off the wall after impact (see startBounce)
+    this.pendingProjectile = null; // equipped mid-flight, applied when the throw concludes
+    this.applyProjectile(Economy.getEquipped("projectile"));
+
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
 
@@ -209,6 +246,36 @@ class MainScene extends Phaser.Scene {
 
     this.showMessage("TAP to aim");
     this.setupFpsReadout();
+  }
+
+  // Makes `id` the projectile in use: the ball texture, the character sprites and every gameplay
+  // number (aim range/speed, coin multiplier, mark vs bounce, spin) follow from it. Anything unknown
+  // or not owned falls back to the snowball.
+  applyProjectile(id) {
+    const known = PROJECTILE_VISUALS[id] && this.eco.projectiles && this.eco.projectiles[id];
+    const owned = id === "snowball" || Economy.getShopState().owned.includes(id);
+    if (!known || !owned) id = "snowball";
+    this.projectileId = id;
+    this.proj = this.eco.projectiles[id];
+    this.projVisuals = PROJECTILE_VISUALS[id];
+  }
+
+  // Called by the PROJECTILES list when the player equips something.
+  //  - aiming: the aim is thrown away (different aim range/speed) and we go back to "TAP to aim"
+  //  - mid-flight: the current throw (its result, bounce and message) finishes with the old projectile;
+  //    the new one applies when the game goes back to "TAP to aim" (see resetForNextThrow)
+  //  - otherwise: applies immediately
+  onProjectileEquipped(id) {
+    if (this.state === STATE.FLIGHT) {
+      this.pendingProjectile = id;
+      return;
+    }
+    this.pendingProjectile = null;
+    this.applyProjectile(id);
+    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
+      this.state = STATE.IDLE;
+      this.showMessage("TAP to aim");
+    }
   }
 
   // Diagnostic only: open the game with ?fps on the URL to show live frame stats (helps track
@@ -324,9 +391,10 @@ class MainScene extends Phaser.Scene {
   }
 
   updateCharacterPose() {
-    let key = "char_idle";
-    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) key = "char_aiming";
-    else if (this.state === STATE.FLIGHT && this.flightTime < 0.35) key = "char_throwing";
+    const sprites = this.projVisuals.sprites; // the equipped projectile's set (chestnut in hand, etc.)
+    let key = sprites.idle;
+    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) key = sprites.aiming;
+    else if (this.state === STATE.FLIGHT && this.flightTime < 0.35) key = sprites.throwing;
     if (this.character.texture.key !== key) this.character.setTexture(key);
   }
 
@@ -360,7 +428,12 @@ class MainScene extends Phaser.Scene {
     // An apex above the roof edge would be a stick in the sky: that ball doesn't stick, it falls back.
     this.fallsBehind = (this.ballVY0 * this.ballVY0) / (2 * GRAVITY) > ROOF_EDGE_HEIGHT;
     this.cameraFollowing = true;
-    this.ball.setCrop(); // no crop while it's in front of the wall
+    this.bounce = null;
+    this.ball.setTexture(this.projVisuals.ball);
+    this.ball.setDisplaySize(16, 16);
+    this.ball.clearMask(); // in front of the wall until (and unless) it falls back behind the roof
+    this.ball.setRotation(0);
+    this.ball.setAlpha(1);
     this.ball.setVisible(true);
     this.flightWorst = 0;
     this.sound.play("throw_whoosh", { volume: 0.6 });
@@ -377,6 +450,7 @@ class MainScene extends Phaser.Scene {
     const heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
     const y = this.worldY(heightClimbed);
     this.ball.setPosition(x, y);
+    if (this.proj.spins) this.ball.setRotation(t * SPIN_RATE); // stops turning at the apex, where it hits the wall
 
     if (this.cameraFollowing) {
       const targetScrollY = y - GAME_HEIGHT * 0.6;
@@ -407,16 +481,13 @@ class MainScene extends Phaser.Scene {
     if (!reachedApex) return;
 
     if (this.fallsBehind) {
-      // Coming down past the roof: everything below the roof edge is behind the building, so clip
-      // the ball there. Once it's fully hidden the throw is over - a miss with no mark or impact.
-      const half = this.ball.displayHeight / 2;
-      const visible = Math.min(y + half, this.worldY(ROOF_EDGE_HEIGHT)) - (y - half); // display px above the roof edge
-      if (visible <= 0) {
+      // Coming down past the roof: everything below the roof edge is behind the building, so mask the
+      // ball to the part above it (works at any rotation). Once it's fully hidden the throw is over -
+      // a miss with no mark or impact.
+      if (!this.ball.mask) this.ball.setMask(this.roofMask);
+      if (y - this.ball.displayHeight / 2 >= this.worldY(ROOF_EDGE_HEIGHT)) {
         this.finishThrow(false, null, x, heightClimbed, false, true);
-        return;
       }
-      const frameH = this.ball.frame.height;
-      this.ball.setCrop(0, 0, this.ball.frame.width, Math.min(frameH, (visible / this.ball.displayHeight) * frameH));
       return;
     }
 
@@ -438,6 +509,38 @@ class MainScene extends Phaser.Scene {
     }
 
     this.finishThrow(false, null, x, heightClimbed, false);
+  }
+
+  // A projectile that leaves no mark hits the wall at its apex, is kicked back the way it came with a
+  // little pop upward, then falls, hops on the ground and settles - all while the result shows. It is
+  // purely visual: the hit/miss and the coins were already decided at the moment of impact.
+  startBounce(x, heightClimbed) {
+    const dir = this.ballVX > 1 ? -1 : this.ballVX < -1 ? 1 : Math.random() < 0.5 ? -1 : 1;
+    this.bounce = {
+      x,
+      h: heightClimbed,
+      vx: dir * (BOUNCE_OFF_SPEED + 0.3 * Math.abs(this.ballVX)),
+      vh: BOUNCE_POP_SPEED,
+      spin: dir,
+      resting: false,
+    };
+  }
+
+  updateBounce(dt) {
+    const b = this.bounce;
+    if (!b || b.resting) return;
+    b.vh -= GRAVITY * dt;
+    b.h += b.vh * dt;
+    b.x += b.vx * dt;
+    const GROUND_CONTACT = 8; // ball radius: it rests on the ground, not in it
+    if (b.h <= GROUND_CONTACT && b.vh < 0) {
+      b.h = GROUND_CONTACT;
+      b.vh = -b.vh * BOUNCE_RESTITUTION;
+      b.vx *= 0.6;
+      if (b.vh < 40) b.resting = true;
+    }
+    this.ball.setPosition(b.x, this.worldY(b.h));
+    if (this.proj.spins && !b.resting) this.ball.setRotation(this.ball.rotation + b.spin * SPIN_RATE * dt);
   }
 
   addMark(x, heightClimbed) {
@@ -479,10 +582,19 @@ class MainScene extends Phaser.Scene {
   finishThrow(hit, win, stickX, stickHeight, faceHit, escaped) {
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
-    this.ball.setVisible(false); // the mark now represents where it stuck
-    // An escaped ball never touched the wall: no mark, no impact sound.
-    const mark = escaped ? null : this.addMark(stickX, stickHeight);
-    if (!escaped) this.sound.play("snowball_impact", { volume: 0.3 }); // halved from 0.6
+    // An escaped ball never touched the wall: no mark, no bounce, no impact sound.
+    // Otherwise the projectile either leaves a mark (the ball disappears into it) or, if it leaves
+    // none (chestnut), stays visible and bounces off the wall.
+    let mark = null;
+    if (!escaped && this.proj.leavesMark) {
+      mark = this.addMark(stickX, stickHeight);
+      this.ball.setVisible(false); // the mark now represents where it stuck
+    } else if (!escaped) {
+      this.startBounce(stickX, stickHeight);
+    } else {
+      this.ball.setVisible(false);
+    }
+    if (!escaped) this.sound.play(this.projVisuals.impactSound, { volume: this.projVisuals.impactVolume });
 
     if (hit) {
       this.streak += 1;
@@ -497,6 +609,9 @@ class MainScene extends Phaser.Scene {
       } else if (this.streak === this.eco.events.faceWindow.streakTrigger && !this.bananaActive) {
         this.startBananaEvent();
       }
+
+      // Projectile handicap/bonus (economy.json "projectiles"), rounded down, on the whole payout.
+      coins = Math.floor(coins * this.proj.coinMultiplier);
 
       const message = "HIT\n+" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
       Economy.addCoins(coins);
@@ -557,20 +672,20 @@ class MainScene extends Phaser.Scene {
   // to nothing together.
   triggerBananaHit(mark) {
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
-    if (mark.fadeTimer) mark.fadeTimer.remove();
+    if (mark && mark.fadeTimer) mark.fadeTimer.remove();
 
     this.bananaOverlay.setTexture("goal_window_face_hit");
     this.bananaOverlay.setAlpha(1);
 
     this.time.delayedCall(this.eco.events.faceWindow.hitRevertMs, () => {
       this.tweens.add({
-        targets: [this.bananaOverlay, mark],
+        targets: mark ? [this.bananaOverlay, mark] : [this.bananaOverlay],
         alpha: 0,
         duration: BANANA_FADE_MS,
         onComplete: () => {
           this.bananaOverlay.setVisible(false);
           this.bananaActive = false;
-          if (mark.active) {
+          if (mark && mark.active) {
             mark.destroy();
             const idx = this.marks.indexOf(mark);
             if (idx !== -1) this.marks.splice(idx, 1);
@@ -582,7 +697,14 @@ class MainScene extends Phaser.Scene {
 
   resetForNextThrow() {
     this.state = STATE.IDLE;
+    this.bounce = null;
+    this.ball.setVisible(false); // a bouncing projectile is done by now
     this.ball.setPosition(ORIGIN_X, this.worldY(ORIGIN_Y));
+    if (this.pendingProjectile) {
+      // equipped mid-flight: the throw is over, switch now
+      this.applyProjectile(this.pendingProjectile);
+      this.pendingProjectile = null;
+    }
     this.tweens.add({
       targets: this.cameras.main,
       scrollY: INITIAL_SCROLL_Y,
@@ -629,13 +751,18 @@ class MainScene extends Phaser.Scene {
 
     if (this.state === STATE.AIM_ANGLE) {
       const elapsed = (time - this.aimStartTime) / 1000;
-      this.angleValue = pingPong(elapsed * ANGLE_HZ);
+      // angleRange squeezes the marker's travel toward the middle of the bar (its edge positions),
+      // angleSpeed scales how fast the marker moves. The sweep rate is divided by the range so the
+      // marker's speed along the bar is exactly angleSpeed x normal.
+      const p = this.proj;
+      this.angleValue = 0.5 + (pingPong((elapsed * ANGLE_HZ * p.angleSpeed) / p.angleRange) - 0.5) * p.angleRange;
     } else if (this.state === STATE.AIM_POWER) {
       const elapsed = (time - this.aimStartTime) / 1000;
       this.powerValue = pingPong(elapsed * POWER_HZ);
     } else if (this.state === STATE.FLIGHT) {
       this.updateFlight(dt);
     }
+    this.updateBounce(dt);
 
     this.updateCharacterPose();
     this.updateFpsReadout(time, delta);

@@ -37,6 +37,22 @@ start with "economy.json failed to load or has a JSON syntax error".
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceBonusCoins` | extra coins for hitting the face, on top of the normal hit reward |
 
+## projectiles (live)
+
+Gameplay numbers for each projectile you can equip, keyed by its id (the same id as its shop item and its
+entry in the PROJECTILES list). How each one *looks and sounds* (textures, character sprites, impact sound)
+is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
+
+| field | meaning |
+|---|---|
+| `angleRange` | how far the left-right offset marker travels. `1` = the whole bar; `0.8` = its edge positions pulled in 20% (the marker runs 10%-90% of the bar, so the throw can drift only 80% as far sideways) |
+| `angleSpeed` | how fast that marker moves along the bar compared with normal. `0.8` = 20% slower |
+| `coinMultiplier` | multiplies the coins of a hit (streak and face bonuses included), rounded **down**. `0.8` on a 6-coin hit = 4 |
+| `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
+| `spins` | the projectile rotates in flight |
+
+Chestnut right now: `angleRange 0.8`, `angleSpeed 0.8`, `coinMultiplier 0.8`, no mark, spins (placeholder numbers, to be tuned).
+
 ## shop
 
 The shop always shows `slots` slots. Buying an item empties its slot: it shows SOLD OUT with a countdown,
@@ -68,6 +84,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 | `name`, `description` | shown in the shop |
 | `category` | `consumable` (common: buy it as often as you like, used up over `duration`; can be on sale in two slots at once) or `projectile` (rare: bought once and kept, never on sale twice) |
 | `price` | coins |
+| `ignorePriceOverride` | optional. `true` = always costs its own `price`, even while `shop.priceOverride` makes everything else 1 coin (the chestnut is 10) |
 | `duration` | consumables only: `{ "throws": N }` |
 | `effect` | `{ "type": ..., "value": ... }` - see below |
 

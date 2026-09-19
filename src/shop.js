@@ -19,6 +19,7 @@ const Shop = (() => {
   // ---------- rules ----------
 
   function price(item) {
+    if (item.ignorePriceOverride) return item.price; // e.g. the chestnut always costs its real 10
     const o = eco.shop.priceOverride; // placeholder pricing switch, see economy.json
     return o !== null && o !== undefined ? o : item.price;
   }

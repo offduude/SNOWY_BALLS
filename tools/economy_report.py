@@ -38,8 +38,14 @@ def check(eco):
             problems.append(f"{it.get('id')}: unknown category '{it.get('category')}'")
         if it.get("category") == "consumable" and "duration" not in it:
             problems.append(f"{it.get('id')}: consumable needs a 'duration'")
-    if len(shop["items"]) < shop["slots"] * 2:
-        problems.append(f"only {len(shop['items'])} items for {shop['slots']} slots - the shop will run dry fast")
+    # Consumables can be on sale in several slots at once, so a small pool is fine - but the shop needs at
+    # least one consumable or slots run empty once the projectiles are owned.
+    if not any(i.get("category") == "consumable" for i in shop["items"]):
+        problems.append("no consumable items - the shop will have empty slots once every projectile is owned")
+    projectiles = eco.get("projectiles", {})
+    for i in shop["items"]:
+        if i.get("category") == "projectile" and i.get("id") not in projectiles:
+            problems.append(f"{i['id']}: projectile has no entry in the top-level \"projectiles\" section")
     return problems
 
 

@@ -1,7 +1,8 @@
 // The PROJECTILES / CHARACTERS lists: a finger-scrollable list in the middle of the screen with
 // name, picture, description and an EQUIP button per entry. Only one list is open at a time.
-// What's equipped is saved (Economy.getEquipped) but not applied to gameplay yet - there is only
-// one character and one projectile so far.
+// What's equipped is saved (Economy.getEquipped). Equipping a projectile tells the game
+// (MainScene.onProjectileEquipped); characters are not selectable yet (no CHARACTERS button).
+// Only what the player owns is listed: entries with `free: true`, plus projectiles bought in the shop.
 //
 // To add an entry: add an object to the right array below. `id` is stored in saves, so never
 // rename it once players have it. `image` is any picture URL (shown pixelated).
@@ -15,6 +16,13 @@ const Collection = (() => {
           name: "Snowball",
           description: "The classic. Cold, round and reliable.",
           image: "assets/snowball/snowball.png",
+          free: true,
+        },
+        {
+          id: "chestnut", // same id as its shop item and its economy.json "projectiles" entry
+          name: "Chestnut",
+          description: "Easier to aim, but pays 20% less. Bounces off the wall and leaves no mark.",
+          image: "assets/snowball/chestnut.png",
         },
       ],
     },
@@ -26,6 +34,7 @@ const Collection = (() => {
           name: "Character 1",
           description: "Your starting thrower. Bundled up and ready.",
           image: "assets/character/character1_idle.png",
+          free: true,
         },
       ],
     },
@@ -63,7 +72,10 @@ const Collection = (() => {
   function open(kind) {
     openKind = kind;
     titleEl.textContent = CATALOG[kind].title;
-    scrollEl.innerHTML = CATALOG[kind].items.map((it) => rowHtml(kind, it)).join("");
+    scrollEl.innerHTML = CATALOG[kind].items
+      .filter((it) => it.free || Economy.getShopState().owned.includes(it.id))
+      .map((it) => rowHtml(kind, it))
+      .join("");
     scrollEl.scrollTop = 0;
     refreshButtons();
     container.classList.add("list-open");
@@ -96,6 +108,11 @@ const Collection = (() => {
     Economy.setEquipped(openKind, btn.dataset.id);
     click();
     refreshButtons();
+    if (openKind === "projectile") {
+      const game = window.snowyBallsGame;
+      const scene = game && game.scene.getScene("main");
+      if (scene && scene.onProjectileEquipped) scene.onProjectileEquipped(btn.dataset.id);
+    }
   }
 
   return {

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "_readme": "Every reward, price and shop rule lives here. Edit numbers, save, reload the game. The game reads 'rewards', 'events' and 'shop'. All shop items below are PLACEHOLDER test data - names, prices and effects are just there so the shop has something to show (effects are not applied yet). See docs/ECONOMY.md for what every field means, and run 'py tools/economy_report.py' for a quick balance table.",
 
   "rewards": {
@@ -18,6 +18,12 @@
       "hitRevertMs": 1000,
       "faceBonusCoins": 10
     }
+  },
+
+  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match a shop projectile / the PROJECTILES list). angleRange: how far the left-right offset marker travels (1 = whole bar, 0.8 = its edge positions pulled in 20%, so the throw can only drift 80% as far). angleSpeed: how fast that marker moves compared with normal (0.8 = 20% slower). coinMultiplier: multiplies the coins for a hit, rounded DOWN. leavesMark: false = no snow mark on the wall, it bounces off instead. spins: the projectile rotates in flight.",
+  "projectiles": {
+    "snowball": { "angleRange": 1, "angleSpeed": 1, "coinMultiplier": 1, "leavesMark": true, "spins": false },
+    "chestnut": { "angleRange": 0.8, "angleSpeed": 0.8, "coinMultiplier": 0.8, "leavesMark": false, "spins": true }
   },
 
   "shop": {
@@ -102,44 +108,13 @@
       },
 
       {
-        "id": "icy_snowball",
-        "name": "Icy Snowball",
+        "id": "chestnut",
+        "name": "Chestnut",
         "category": "projectile",
-        "price": 70,
-        "effect": { "type": "markLifetimeMultiplier", "value": 1.5 },
-        "description": "Marks stay on the wall 50% longer."
-      },
-      {
-        "id": "big_snowball",
-        "name": "Big Snowball",
-        "category": "projectile",
-        "price": 80,
-        "effect": { "type": "hitPaddingPx", "value": 3 },
-        "description": "Forgiving: counts as a hit up to 3px outside a window."
-      },
-      {
-        "id": "ice_ball",
-        "name": "Ice Ball",
-        "category": "projectile",
-        "price": 280,
-        "effect": { "type": "markLifetimeMultiplier", "value": 2 },
-        "description": "Marks stay on the wall twice as long."
-      },
-      {
-        "id": "golden_snowball",
-        "name": "Golden Snowball",
-        "category": "projectile",
-        "price": 350,
-        "effect": { "type": "coinMultiplier", "value": 1.25 },
-        "description": "Every hit pays 25% more."
-      },
-      {
-        "id": "rocket_snowball",
-        "name": "Rocket Snowball",
-        "category": "projectile",
-        "price": 1100,
-        "effect": { "type": "launchSpeedMultiplier", "value": 1.3 },
-        "description": "Flies 30% faster - careful, it can leave the building."
+        "price": 10,
+        "ignorePriceOverride": true,
+        "effect": { "type": "unlocksProjectile", "value": "chestnut" },
+        "description": "Easier to aim, but pays 20% less. Bounces off the wall."
       }
     ]
   }

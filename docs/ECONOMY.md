@@ -39,15 +39,20 @@ start with "economy.json failed to load or has a JSON syntax error".
 
 ## shop
 
-The shop always shows `slots` items. Buying one replaces it with another one from the pool.
+The shop always shows `slots` slots. Buying an item empties its slot: it shows SOLD OUT with a countdown,
+and when the timer ends the slot restocks with a different item from the pool.
+
+**`restockSeconds`** - how long a bought slot stays SOLD OUT. `60` while testing, `3600` for the real
+one hour. The deadline is stored as a timestamp from the **device clock** in the save, so it keeps
+counting while the app is closed: on the next open every slot whose time has passed is restocked.
+Setting the phone clock forward will restock early - there is no server to check against - but
+setting it back can not make a timer longer than one full `restockSeconds`.
 
 **`refill`** - how a replacement is chosen:
 - `mode: random_from_eligible` - random pick among items the player is allowed to see
 - `excludeOwned` - permanent items already bought never come back
 - (always on, not a setting) the same item is never on sale in two slots at once
-- when no eligible item is left for a slot it shows SOLD OUT, and it **stays** SOLD OUT when the
-  shop is closed and reopened. Empty slots only refill when the list of items in `economy.json`
-  changes (the game saves which list the stock came from as `catalog`)
+- a restocked slot never gets the item that was just sold there (it can come back later)
 - `guaranteeCheapItem` - after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop
   filling up with things the player can't afford.
@@ -84,5 +89,5 @@ The shop always shows `slots` items. Buying one replaces it with another one fro
 - Multiplier effects stack, so keep `coinMultiplier` values modest or a few purchases make the
   prices meaningless. Effects that make the *game itself* easier (`aimSpeedMultiplier`,
   `hitPaddingPx`) compound with that - watch total hit rate, not just coin rate.
-- Permanent items leave the pool once bought; consumables never do. If the pool can't fill every
-  slot, the extra slots show SOLD OUT.
+- Permanent items leave the pool once bought; consumables never do. If nothing is eligible when a
+  slot restocks it just stays SOLD OUT (no timer) until something is.

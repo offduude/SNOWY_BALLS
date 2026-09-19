@@ -202,7 +202,8 @@
     }
 
     .shop-card:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
-    .shop-card.empty { opacity: 0.55; cursor: default; justify-content: center; }
+    .shop-card.empty { opacity: 0.55; cursor: default; justify-content: center; gap: calc(var(--u) * 1.2); }
+    .shop-timer { font-size: calc(var(--u) * 1.8); }
     .shop-card.cant { opacity: 0.7; }
     .shop-card.cant .shop-price { color: #a3261c; }
     .shop-card.bought { opacity: 0; transform: scale(0.9); }
@@ -495,8 +496,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=4"></script>
-  <script src="src/shop.js?v=4"></script>
+  <script src="src/economy.js?v=5"></script>
+  <script src="src/shop.js?v=5"></script>
   <script src="src/collection.js?v=2"></script>
   <script src="src/main.js?v=48"></script>
   <script>

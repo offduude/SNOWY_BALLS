@@ -1,6 +1,7 @@
-// Shop: 6 slots pinned to the cork board. Buying an item spends coins and a *different* item
-// takes its slot. What's on sale is saved (Economy.getShopState().stock) so leaving and
-// re-entering the game can't reroll it. All numbers come from economy.json ("shop" section).
+// Shop: 6 slots pinned to the cork board. Buying an item spends coins and empties its slot ("SOLD OUT")
+// for economy.json shop.restockSeconds; when the timer ends the slot restocks with a different item.
+// Timers are device-clock timestamps saved with the stock (Economy.getShopState()), so they keep
+// running while the app is closed and leaving/re-entering can not reroll anything.
 //
 // Effects (coinMultiplier, aimSpeedMultiplier, ...) are NOT applied yet - buying currently just
 // spends coins and records the purchase.
@@ -66,27 +67,27 @@ const Shop = (() => {
     return candidate.id;
   }
 
-  // Identifies the item list in economy.json; changes when items are added or removed.
-  function catalogKey() {
-    return eco.shop.items.map((it) => it.id).sort().join(",");
+  // ---------- sold-out timers ----------
+  // Buying an item empties its slot ("SOLD OUT") and starts a timer. The timer is a wall-clock
+  // timestamp (Date.now() = the device's clock) saved with the stock, so it keeps running while the
+  // app is closed: when the player comes back, every slot whose time has passed is restocked.
+
+  function restockMs() {
+    return (eco.shop.restockSeconds > 0 ? eco.shop.restockSeconds : 3600) * 1000;
   }
 
-  // Make the saved stock valid (right length, real items, nothing owned, no duplicates) and fill
-  // gaps. A slot that is empty because the pool ran dry ("SOLD OUT") is NOT refilled just because
-  // the shop was reopened - otherwise the item you just bought (consumables never leave the pool)
-  // would pop straight back. Empty slots only refill when the item list in economy.json changes.
+  // Make the saved stock valid (right length, real items, nothing owned, no duplicates), restock
+  // slots whose timer has run out, and fill any other gap.
   function ensureStock() {
     const st = Economy.getShopState();
     const slots = eco.shop.slots;
-    const fresh = !Array.isArray(st.stock);
-    let stock = fresh ? [] : st.stock.slice(0, slots);
+    const now = Date.now();
+    let stock = Array.isArray(st.stock) ? st.stock.slice(0, slots) : [];
     while (stock.length < slots) stock.push(null);
+    const restock = Array.isArray(st.restock) ? st.restock.slice(0, slots) : [];
+    while (restock.length < slots) restock.push(null);
 
-    const wasEmpty = stock.map((id) => id === null); // sold out on purpose
-    const catalog = catalogKey();
-    const catalogChanged = st.catalog !== catalog;
-
-    // Invalid entries (item removed from economy.json, already owned, duplicate) become gaps that DO get refilled.
+    // Invalid entries (item removed from economy.json, already owned, duplicate) become empty slots.
     stock = stock.map((id) => {
       const it = id && itemById(id);
       return it && !isOwnedPermanent(it) ? id : null;
@@ -94,13 +95,22 @@ const Shop = (() => {
     stock = stock.map((id, i) => (id && stock.indexOf(id) !== i ? null : id));
 
     for (let i = 0; i < slots; i++) {
-      if (stock[i] !== null) continue;
-      if (wasEmpty[i] && !fresh && !catalogChanged) continue; // stays SOLD OUT
+      if (stock[i] !== null) {
+        restock[i] = null;
+        continue;
+      }
+      const t = restock[i];
+      if (t && typeof t.at === "number") {
+        // The device clock was set back: never wait longer than one full timer.
+        if (t.at - now > restockMs() + 1000) t.at = now + restockMs();
+        if (now < t.at) continue; // still counting down
+      }
       const others = stock.filter((id, j) => j !== i && id);
-      stock[i] = pickFor(others, null);
+      stock[i] = pickFor(others, t ? t.prev : null); // nothing eligible -> stays SOLD OUT, no timer
+      restock[i] = null;
     }
     st.stock = stock;
-    st.catalog = catalog;
+    st.restock = restock;
     Economy.saveShop();
     return stock;
   }
@@ -115,10 +125,20 @@ const Shop = (() => {
     if (item.kind === "permanent") st.owned.push(item.id);
     else st.consumables[item.id] = (st.consumables[item.id] || 0) + 1;
 
-    const others = st.stock.filter((x, j) => j !== slot && x);
-    st.stock[slot] = pickFor(others, item.id);
+    st.stock[slot] = null;
+    st.restock[slot] = { at: Date.now() + restockMs(), prev: item.id };
     Economy.saveShop();
     return { ok: true, item };
+  }
+
+  function formatTime(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const mm = String(m).padStart(2, "0");
+    const ss = String(s).padStart(2, "0");
+    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
   }
 
   // ---------- UI ----------
@@ -130,7 +150,9 @@ const Shop = (() => {
   function cardHtml(id, slot) {
     const item = id && itemById(id);
     if (!item) {
-      return `<div class="shop-card empty"><span class="shop-name">SOLD OUT</span></div>`;
+      const t = (Economy.getShopState().restock || [])[slot];
+      const timer = t && typeof t.at === "number" ? `<span class="shop-timer" data-at="${t.at}">${formatTime(t.at - Date.now())}</span>` : "";
+      return `<div class="shop-card empty"><span class="shop-name">SOLD OUT</span>${timer}</div>`;
     }
     const p = price(item);
     const afford = Economy.getCoins() >= p;
@@ -150,18 +172,35 @@ const Shop = (() => {
     root.innerHTML = `<div class="shop-grid">${stock.map(cardHtml).join("")}</div>`;
   }
 
+  // Once a second while the shop is on screen: count the timers down, and restock a slot the moment
+  // its time is up. Also runs when the app comes back to the foreground.
+  function tick() {
+    if (!eco || !document.getElementById("game-container").classList.contains("shop-open")) return;
+    const now = Date.now();
+    let expired = false;
+    root.querySelectorAll(".shop-timer").forEach((el) => {
+      const left = Number(el.dataset.at) - now;
+      if (left <= 0) expired = true;
+      else el.textContent = formatTime(left);
+    });
+    if (expired) {
+      ensureStock();
+      render();
+    }
+  }
+
   function onClick(e) {
     const btn = e.target.closest(".shop-card[data-slot]");
     if (!btn) return;
-    // A just-bought card lingers ~220ms while it fades; a quick double-tap must not buy the
-    // replacement item that has already been swapped in behind it.
+    // A just-bought card lingers ~220ms while it fades; a quick double-tap on it must not count as
+    // another purchase attempt.
     if (btn.classList.contains("bought")) return;
     const result = buy(Number(btn.dataset.slot));
     const game = window.snowyBallsGame;
     if (result.ok) {
       if (game) game.sound.play("click", { volume: 0.8 });
       btn.classList.add("bought");
-      setTimeout(render, 220); // let the "bought" flash play, then show the replacement
+      setTimeout(render, 220); // let the "bought" flash play, then show SOLD OUT + its timer
     } else if (result.reason === "funds") {
       btn.classList.remove("shake");
       void btn.offsetWidth; // restart the animation if they tap repeatedly
@@ -175,7 +214,11 @@ const Shop = (() => {
       eco = economyJson;
       root = document.getElementById("shop-items");
       root.addEventListener("click", onClick);
-      ensureStock(); // generate (or repair) the saved stock right away, before the shop is ever opened
+      ensureStock(); // generate / repair / restock the saved stock right away, before the shop is ever opened
+      setInterval(tick, 1000);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) tick();
+      });
     },
     // Called every time the shop screen opens.
     onOpen() {

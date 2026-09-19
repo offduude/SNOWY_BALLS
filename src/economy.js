@@ -16,7 +16,7 @@ const Economy = (() => {
         stock: null, // array of item ids currently on sale, one per slot; null = not generated yet
         owned: [], // ids of permanent items bought
         consumables: {}, // id -> how many bought and not yet used
-        catalog: null, // which item list the stock was generated from (see Shop.ensureStock)
+        restock: [], // per slot: null, or { at: ms timestamp (device clock) the slot restocks, prev: id sold there }
       },
     };
   }
@@ -39,7 +39,7 @@ const Economy = (() => {
           stock: Array.isArray(shop.stock) ? shop.stock : null,
           owned: Array.isArray(shop.owned) ? shop.owned : [],
           consumables: shop.consumables && typeof shop.consumables === "object" ? shop.consumables : {},
-          catalog: typeof shop.catalog === "string" ? shop.catalog : null,
+          restock: Array.isArray(shop.restock) ? shop.restock : [],
         },
       };
     } catch (e) {

@@ -10,7 +10,7 @@
 //   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit
-// This file also draws the buff cards at the top of the screen (next to the live display).
+// This file also draws the buff cards at the top of the screen (next to the live display); tapping a card cancels its buff.
 const Buffs = (() => {
   let eco = null;
   let hudEl = null;
@@ -67,6 +67,16 @@ const Buffs = (() => {
     changed();
   }
 
+  // Tapping a buff card in the game cancels that buff for good.
+  function cancel(id) {
+    const list = Economy.getBuffList();
+    const i = list.findIndex((b) => b.id === id);
+    if (i === -1) return;
+    list.splice(i, 1);
+    Economy.saveBuffs();
+    changed();
+  }
+
   function formatTime(ms) {
     const total = Math.max(0, Math.ceil(ms / 1000));
     const h = Math.floor(total / 3600);
@@ -108,6 +118,12 @@ const Buffs = (() => {
     init(economyJson) {
       eco = economyJson;
       hudEl = document.getElementById("buff-hud");
+      hudEl.addEventListener("click", (e) => {
+        const card = e.target.closest(".buff-card");
+        if (!card) return;
+        if (typeof playUiClick === "function") playUiClick();
+        cancel(card.dataset.id);
+      });
       render();
       // Twice a second: refresh timers, drop expired buffs (and tell the BUFFS list to redraw).
       setInterval(() => {
@@ -122,6 +138,7 @@ const Buffs = (() => {
     active,
     modifiers,
     activate,
+    cancel,
     formatTime,
     onChange: (fn) => listeners.push(fn),
   };

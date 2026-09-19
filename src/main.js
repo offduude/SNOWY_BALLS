@@ -298,6 +298,16 @@ class MainScene extends Phaser.Scene {
     };
   }
 
+  // The shop was opened. An aim in progress (angle or power phase) is dropped and the game goes back to
+  // "TAP to aim" - the player is no longer looking at it, and the buffs are re-read on the next tap. A ball
+  // already in flight is left to finish (its coins count) and resets by itself like any other throw.
+  onShopOpened() {
+    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
+      this.state = STATE.IDLE;
+      this.showMessage("TAP to aim");
+    }
+  }
+
   // Called by the PROJECTILES list when the player equips something.
   //  - aiming: the aim is thrown away (different aim range/speed) and we go back to "TAP to aim"
   //  - mid-flight: the current throw (its result, bounce and message) finishes with the old projectile;
@@ -910,16 +920,18 @@ class MainScene extends Phaser.Scene {
 
     if (this.state === STATE.AIM_ANGLE) {
       const elapsed = (time - this.aimStartTime) / 1000;
-      // angleRange squeezes the marker's travel toward the middle of the bar (its edge positions),
-      // angleSpeed scales how fast the marker moves. The sweep rate is divided by the range so the
-      // marker's speed along the bar is exactly angleSpeed x normal.
+      // The marker sweeps the BAR at a fixed speed (angleSpeed x normal) whatever the range: `pos` is where it
+      // is along the bar (0..1), and angleValue is what that position means - the bar shows angleRange of the
+      // full swing edge to edge, so a smaller range (chestnut, precision buff) is finer aim but the marker
+      // itself never moves faster on screen.
       const a = this.aim;
-      this.angleValue = 0.5 + (pingPong((elapsed * ANGLE_HZ * a.angleSpeed) / a.angleRange) - 0.5) * a.angleRange;
+      const pos = pingPong(elapsed * ANGLE_HZ * a.angleSpeed);
+      this.angleValue = 0.5 + (pos - 0.5) * a.angleRange;
     } else if (this.state === STATE.AIM_POWER) {
       const elapsed = (time - this.aimStartTime) / 1000;
-      // Same for strength: the marker covers `powerRange` of the power span, centered, at the normal marker speed.
+      // Same for strength: fixed marker speed along the bar, the bar covers `powerRange` of the power span (centered).
       const r = this.aim.powerRange;
-      this.powerValue = 0.5 + (pingPong((elapsed * POWER_HZ) / r) - 0.5) * r;
+      this.powerValue = 0.5 + (pingPong(elapsed * POWER_HZ) - 0.5) * r;
     } else if (this.state === STATE.FLIGHT) {
       this.updateFlight(dt);
     }

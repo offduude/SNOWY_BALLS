@@ -475,6 +475,9 @@
     }
 
     .buff-card {
+      pointer-events: auto; /* tapping a card cancels the buff (the rest of the HUD lets taps through) */
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
       display: flex;
       align-items: center;
       gap: calc(var(--u) * 0.7);
@@ -639,17 +642,17 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=7"></script>
-  <script src="src/buffs.js?v=1"></script>
+  <script src="src/buffs.js?v=2"></script>
   <script src="src/shop.js?v=10"></script>
   <script src="src/collection.js?v=5"></script>
-  <script src="src/main.js?v=57"></script>
+  <script src="src/main.js?v=58"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "buff-hud", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());
@@ -680,7 +683,12 @@
       const container = document.getElementById("game-container");
       const open = container.classList.toggle("shop-open");
       document.getElementById("shop-btn").textContent = open ? "BACK" : "SHOP";
-      if (open) Collection.close();
+      if (open) {
+        Collection.close();
+        const game = window.snowyBallsGame;
+        const scene = game && game.scene.getScene("main");
+        if (scene && scene.onShopOpened) scene.onShopOpened(); // drop an aim in progress
+      }
       if (open && typeof Shop !== "undefined") Shop.onOpen();
     });
   </script>

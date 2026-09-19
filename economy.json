@@ -90,7 +90,19 @@
         "image": "assets/items/kaiser_roll.png",
         "effects": [{ "type": "coinMultiplier", "value": 1.2 }],
         "description": "Makes Making it Easier.",
-        "detail": "Coins bonus: 1.2x."
+        "detail": "Coin bonus: 1.2x."
+      },
+      {
+        "id": "water_bottle",
+        "name": "Water Bottle",
+        "category": "consumable",
+        "rarity": "common",
+        "priceRange": { "min": 10, "max": 20 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 60 },
+        "image": "assets/items/water_bottle.png",
+        "effects": [{ "type": "saveProjectile", "value": 0.1 }],
+        "description": "Has 10% chance to not consume projectile."
       },
       {
         "id": "tomato_juice",

@@ -12,6 +12,7 @@
 //   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit
+//   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile (several sources combine: 1 - (1-a)(1-b))
 //   triggerEvent     name  while it runs, that event ("face" = the banana face) is on, for as long as the buff lasts; when the event ends
 //                          (the player hits the face) the buff ends with it, and when the buff ends (timer / cancelled) so does the
 //                          event. The game (main.js syncBuffEvent) starts and stops the event; this file only reports the buff.
@@ -52,11 +53,12 @@ const Buffs = (() => {
 
   // The combined effect of everything active right now. Read this once per throw (see the top comment).
   function modifiers() {
-    const m = { guideLines: 0, precision: 1, strengthControl: 1, coinMultiplier: 1 };
+    const m = { guideLines: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0 };
     for (const b of active()) {
       for (const e of b.item.effects || []) {
         if (!(e.type in m)) continue;
         if (e.type === "guideLines") m.guideLines += e.value; // a switch: any active source turns it on
+        else if (e.type === "saveProjectile") m.saveProjectile = 1 - (1 - m.saveProjectile) * (1 - e.value); // independent chances
         else m[e.type] *= e.value;
       }
     }

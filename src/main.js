@@ -406,6 +406,7 @@ class MainScene extends Phaser.Scene {
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Skyr) gives them
+      saveProjectile: b.saveProjectile, // chance (0-1) that this throw does not use up its projectile (Water Bottle)
     };
   }
 
@@ -481,6 +482,7 @@ class MainScene extends Phaser.Scene {
   // saved right now, applied when the throw concludes (pendingProjectile), so the aim isn't disturbed.
   consumeProjectile() {
     if (this.proj.infinite) return;
+    if (Math.random() < this.aim.saveProjectile) return; // lucky: the projectile is not used up (Water Bottle)
     const id = this.projectileId;
     if (!Economy.useProjectile(id)) return;
     if (id !== "snowball" && Economy.getProjectileCount(id) === 0) {

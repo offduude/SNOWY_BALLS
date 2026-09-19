@@ -172,7 +172,7 @@ const Collection = (() => {
     const control = b.active
       ? `<div class="pick-timer">${Buffs.formatTime(b.msLeft)}</div>`
       : `<button class="pick-equip pick-use" type="button" data-id="${esc(b.id)}">USE</button>`;
-    // The bottom line (the item's `detail`, e.g. "Coins bonus: 1.2x."), drawn over the bottom of the card (it takes no
+    // The bottom line (the item's `detail`, e.g. "Coin bonus: 1.2x."), drawn over the bottom of the card (it takes no
     // room of its own, so the card's height stays fixed).
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (

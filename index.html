@@ -72,13 +72,11 @@
       z-index: 2;
     }
 
-    /* The HIT / MISS result text: bigger than the other messages and with a thick black outline (8 hard 2px shadows + a
-       soft one) so it reads on any background. */
+    /* The HIT / MISS result text: the normal size, with a thin black outline (8 hard 1px shadows) so it reads on any
+       background. */
     #message.result {
-      font-size: 16px;
-      line-height: 1.7;
-      text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
-        0 -2px 0 #000, 0 2px 0 #000, -2px 0 0 #000, 2px 0 0 #000, 0 0 6px rgba(0, 0, 0, 0.9);
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+        0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
     }
 
     /* Mute toggle, top-right of the game. Plain <img>-as-button since it's just an icon, no

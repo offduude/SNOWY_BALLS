@@ -213,8 +213,7 @@ const PROJECTILE_VISUALS = {
   },
   egg: {
     ball: "egg",
-    // no egg-in-hand character art found yet: the snowball poses stand in (character1_idle_egg / character1_aiming_egg)
-    sprites: { idle: "char_idle_snowball", aiming: "char_aiming", throwing: "char_throwing" },
+    sprites: { idle: "char_idle_egg", aiming: "char_aiming_egg", throwing: "char_throwing" },
     impactSound: "egg_impact",
     impactVolume: 0.5,
     mark: { texture: "egg_impact", size: 40 }, // the splat it leaves on the wall (64px art shown at the same 0.625 scale as the others)
@@ -295,6 +294,8 @@ class MainScene extends Phaser.Scene {
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
     this.load.image("stone", "assets/snowball/stone.png");
     this.load.image("egg", "assets/snowball/egg.png");
+    this.load.image("char_idle_egg", "assets/character/character1_idle_egg.png");
+    this.load.image("char_aiming_egg", "assets/character/character1_aiming_egg.png");
     this.load.image("egg_impact", "assets/snowball/egg_impact.png"); // the splat it leaves on the wall
     this.load.image("rowan_berry", "assets/snowball/rowan_berry_projectile.png?v=2"); // the ball in the air (the card / shop icon is rowan_berry.png)
     this.load.image("char_idle_rowan_berry", "assets/character/character1_idle_rowan_berry.png");

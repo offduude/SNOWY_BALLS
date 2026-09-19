@@ -398,15 +398,28 @@
       display: none;
     }
 
-    /* The weight / hit value lines: the last thing in the text column (right of the picture), pinned to the card's
-       bottom - the text column is as tall as the card, so margin-top: auto puts them in the same place on every card. */
+    /* A projectile card is a grid: the picture on the left spanning both rows (so it stays centered on the card),
+       the name/description and the EQUIP button on the first row, and the weight / hit value stats in ONE row along the
+       bottom, starting right after the picture and running under the text and the button. */
+    .pick-row.has-stats {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      column-gap: calc(var(--u) * 1.4);
+      row-gap: calc(var(--u) * 0.9);
+      align-items: center;
+    }
+
+    .pick-row.has-stats .pick-pic { grid-column: 1; grid-row: 1 / span 2; }
+    .pick-row.has-stats .pick-text { grid-column: 2; grid-row: 1; align-self: start; }
+    .pick-row.has-stats .pick-equip { grid-column: 3; grid-row: 1; }
+    .pick-row.has-stats .pick-stats { grid-column: 2 / 4; grid-row: 2; }
+
+    /* Two fixed columns: the left one is as wide as the longest weight word ("weight: very heavy" = 18 characters, one
+       em each in this font), so "hit value" always starts in the same place. */
     .pick-stats {
-      margin-top: auto;
-      padding-top: calc(var(--u) * 0.9);
-      display: flex;
-      flex-direction: column;
-      gap: calc(var(--u) * 0.5);
-      font-size: calc(var(--u) * 1.1);
+      display: grid;
+      grid-template-columns: calc(var(--u) * 19.5) auto;
+      font-size: calc(var(--u) * 1);
       color: #6b4a2a;
       white-space: nowrap;
     }
@@ -451,8 +464,6 @@
       flex: 1;
       align-self: stretch;
       min-width: 0;
-      display: flex;
-      flex-direction: column;
     }
 
     .pick-name {
@@ -734,7 +745,7 @@
   <script src="src/economy.js?v=9"></script>
   <script src="src/buffs.js?v=3"></script>
   <script src="src/shop.js?v=14"></script>
-  <script src="src/collection.js?v=11"></script>
+  <script src="src/collection.js?v=12"></script>
   <script src="src/main.js?v=71"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

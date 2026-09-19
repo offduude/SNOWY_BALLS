@@ -253,17 +253,27 @@ const PROJECTILE_VISUALS = {
 };
 // HOW A THROW LOOKS (visual only - where it lands, hit/miss and the coins come from the apex physics in launchBall, unchanged):
 // a throw that sticks to the wall does not slow down towards its apex any more. It flies from the hand to the point where it
-// will stick at FLIGHT_SPEED (px/s, nearly straight, with only a small upward arc) and hits the wall at full speed.
-const FLIGHT_SPEED = 1100;
-const FLIGHT_MIN_S = 0.2; // shortest / longest flight time whatever the distance
-const FLIGHT_MAX_S = 0.5;
+// will stick at flightSpeed(weight) (px/s, nearly straight, with only a small upward arc) and hits the wall at full speed.
+// The lighter the projectile the faster it flies: FLIGHT_SPEED_W0 at weight 0 down to FLIGHT_SPEED_W200 at weight 200 (a
+// straight line between; the snowball, weight 100, is 1100).
+const FLIGHT_SPEED_W0 = 1600;
+const FLIGHT_SPEED_W200 = 600;
+function flightSpeed(weight) {
+  const w = Math.min(200, Math.max(0, weight));
+  return FLIGHT_SPEED_W0 + ((FLIGHT_SPEED_W200 - FLIGHT_SPEED_W0) * w) / 200;
+}
+const FLIGHT_MIN_S = 0.08; // shortest / longest flight time whatever the distance (only there to stop absurd values)
+const FLIGHT_MAX_S = 1.5;
 const FLIGHT_ARC = 0.08; // the upward bulge of the path, as a share of its length (max FLIGHT_ARC_MAX px)
 const FLIGHT_ARC_MAX = 26;
 const FLIGHT_EASE = 1.25; // > 1: it picks up speed on the way (1 = constant speed)
 const IMPACT_SHAKE = { ms: 90, x: 0.003, y: 0.003 }; // a tiny jolt of the game picture when it hits the wall (the UI does not shake)
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
-const BOUNCE_OFF_SPEED = 90; // px/s a bouncing projectile is kicked away from where it hit
-const BOUNCE_POP_SPEED = 130; // px/s upward pop of that bounce
+// A projectile that bounces off the wall leaves with a share of the velocity it arrived with (so a faster / lighter throw
+// bounces harder, and the angle follows the way it was flying): BOUNCE_KEEP_X of its sideways speed, BOUNCE_KEEP_UP of its
+// upward speed.
+const BOUNCE_KEEP_X = 0.3;
+const BOUNCE_KEEP_UP = 0.18;
 const BOUNCE_RESTITUTION = 0.35; // how much speed it keeps when it lands on the ground
 
 const STATE = {
@@ -780,7 +790,13 @@ class MainScene extends Phaser.Scene {
       const dx = this.ballVX * this.apexTime;
       const dh = apex - ORIGIN_Y;
       const dist = Math.hypot(dx, dh);
-      this.flightVis = { dx, dh, dur: Math.min(FLIGHT_MAX_S, Math.max(FLIGHT_MIN_S, dist / FLIGHT_SPEED)), arc: Math.min(FLIGHT_ARC_MAX, FLIGHT_ARC * dist) };
+      const weightNow = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
+      const dur = Math.min(FLIGHT_MAX_S, Math.max(FLIGHT_MIN_S, dist / flightSpeed(weightNow)));
+      const arc = Math.min(FLIGHT_ARC_MAX, FLIGHT_ARC * dist);
+      // The velocity it hits the wall with (the derivative of the drawn path at its end), used for the bounce.
+      const impactVX = (dx * FLIGHT_EASE) / dur;
+      const impactVH = ((dh - 4 * arc) * FLIGHT_EASE) / dur;
+      this.flightVis = { dx, dh, dur, arc, impactVX, impactVH };
     } else {
       this.flightVis = null;
     }
@@ -798,7 +814,7 @@ class MainScene extends Phaser.Scene {
 
   updateFlight(dt) {
     this.flightTime += dt;
-    const vis = this.flightVis; // a throw that sticks: the fast visual path (see FLIGHT_SPEED); null for one that flies over the roof
+    const vis = this.flightVis; // a throw that sticks: the fast visual path (see flightSpeed); null for one that flies over the roof
     const reachedApex = vis ? this.flightTime >= vis.dur : this.flightTime >= this.apexTime;
     // Normally the flight freezes at the apex (the ball sticks there); a ball that fell behind the
     // roof keeps following its arc back down.
@@ -884,16 +900,21 @@ class MainScene extends Phaser.Scene {
     this.finishThrow(false, null, x, heightClimbed, false);
   }
 
-  // A projectile that leaves no mark hits the wall at its apex, glances off further the way it was
-  // thrown (right stays right, left stays left) with a little pop upward, then falls, hops on the ground and settles - all while the result shows. It is
-  // purely visual: the hit/miss and the coins were already decided at the moment of impact.
+  // A projectile that leaves no mark hits the wall and glances off with a share of the velocity it hit with: it keeps
+  // going the way it was thrown sideways (right stays right, left stays left, a straight throw drops straight down) and
+  // pops up by a share of its upward speed - so a faster (lighter) throw bounces harder - then falls, hops on the ground and
+  // settles, all while the result shows. It is purely visual: the hit/miss and the coins were already decided at the
+  // moment of impact.
   startBounce(x, heightClimbed) {
-    const dir = this.ballVX > 1 ? 1 : this.ballVX < -1 ? -1 : Math.random() < 0.5 ? -1 : 1; // thrown straight: either way
+    const vis = this.flightVis;
+    const inVX = vis ? vis.impactVX : this.ballVX;
+    const inVH = vis ? vis.impactVH : 0;
+    const dir = inVX > 1 ? 1 : inVX < -1 ? -1 : Math.random() < 0.5 ? -1 : 1; // (only the way it spins when thrown straight)
     this.bounce = {
       x,
       h: heightClimbed,
-      vx: dir * (BOUNCE_OFF_SPEED + 0.3 * Math.abs(this.ballVX)),
-      vh: BOUNCE_POP_SPEED,
+      vx: BOUNCE_KEEP_X * inVX,
+      vh: BOUNCE_KEEP_UP * Math.max(0, inVH),
       spin: dir,
       resting: false,
     };

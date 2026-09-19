@@ -55,7 +55,7 @@ not the projectile - those only change how wide the sliders are).
 
 | field | meaning |
 |---|---|
-| `markerHz` | back-and-forth sweeps per second (`0.85` = one sweep in about 1.2s) |
+| `markerHz` | back-and-forth sweeps per second (`1.275` = one sweep in about 0.8s; it was 0.85) |
 | `offsetZoneAtWeight100` | the share of the OFFSET slider that is a guaranteed W20 hit for a weight-100 projectile (the snowball). `0.5` = half the slider. See "weight" below |
 
 ## rarities (live)

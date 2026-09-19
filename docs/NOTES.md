@@ -775,3 +775,7 @@ not actual play.
 
 - Kaiser Roll's bottom line is now "Coin bonus: 1.2x." (was "Coins bonus").
 - **Water Bottle** (new shop item, `assets/items/water_bottle.png`, moved from `assets/`): consumable, **common**, `priceRange` 10-20, 60 s, effect `saveProjectile 0.1` (new effect type: the chance, 0-1, that a throw does NOT use up its projectile; several sources combine as 1-(1-a)(1-b)), description "Has 10% chance to not consume projectile." The chance is read with the rest of the buff snapshot at the tap on "TAP to AIM" (`aim.saveProjectile`) and rolled in `consumeProjectile` - so it applies to every projectile including the snowball (a saved snowball doesn't lower the stock or start the +1 timer). No on-screen sign that it triggered (only the count doesn't drop). Verified: no buff, 200 taps -> 200 used; with the buff the modifier is 0.1 and 2000 taps saved 9.3% (expected 10% +-1.3); a forced lucky roll left the snowball stock at 100 with no timer, an unlucky one made it 99. Shop odds now: water bottle 30% and chestnut 30% (the two commons share the 60%), kaiser roll 15%, pinecone 15%, skyr 4.5%, grenade 4.5%, tomato juice 1%. `buffs.js?v=8`, `main.js?v=86`.
+
+## Sliders 50% faster (2026-09-19)
+
+- `aim.markerHz` 0.85 -> **1.275** (x1.5) in `economy.json` (and the fallback default in `main.js`); one speed for both the offset and the strength slider. Measured live: an edge-to-edge sweep takes 784 ms on the offset slider and 783 ms on the strength slider (was ~1180 ms; 1/1.275 = 784 ms). `main.js?v=87`.

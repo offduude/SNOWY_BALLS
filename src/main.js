@@ -61,7 +61,7 @@ const ROOF_EDGE_HEIGHT = IMG_GROUND_Y - 15; // 645
 
 // Marker speed (full back-and-forth sweeps per second) - the numbers live in economy.json under "aim".
 // ONE fixed speed for both sliders - nothing (streak, buffs, projectiles) changes it.
-const AIM_DEFAULTS = { markerHz: 0.85, offsetZoneAtWeight100: 0.5 };
+const AIM_DEFAULTS = { markerHz: 1.275, offsetZoneAtWeight100: 0.5 };
 
 const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
 const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed

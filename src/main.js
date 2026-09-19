@@ -251,6 +251,16 @@ const PROJECTILE_VISUALS = {
     explosion: { flashMs: 340, flashScale: 4.6, shakeMs: 330, shakeX: 0.014, shakeY: 0.008 },
   },
 };
+// HOW A THROW LOOKS (visual only - where it lands, hit/miss and the coins come from the apex physics in launchBall, unchanged):
+// a throw that sticks to the wall does not slow down towards its apex any more. It flies from the hand to the point where it
+// will stick at FLIGHT_SPEED (px/s, nearly straight, with only a small upward arc) and hits the wall at full speed.
+const FLIGHT_SPEED = 1100;
+const FLIGHT_MIN_S = 0.2; // shortest / longest flight time whatever the distance
+const FLIGHT_MAX_S = 0.5;
+const FLIGHT_ARC = 0.08; // the upward bulge of the path, as a share of its length (max FLIGHT_ARC_MAX px)
+const FLIGHT_ARC_MAX = 26;
+const FLIGHT_EASE = 1.25; // > 1: it picks up speed on the way (1 = constant speed)
+const IMPACT_SHAKE = { ms: 90, x: 0.003, y: 0.003 }; // a tiny jolt of the game picture when it hits the wall (the UI does not shake)
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 const BOUNCE_OFF_SPEED = 90; // px/s a bouncing projectile is kicked away from where it hit
 const BOUNCE_POP_SPEED = 130; // px/s upward pop of that bounce
@@ -765,6 +775,15 @@ class MainScene extends Phaser.Scene {
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     // An apex above the roof edge would be a stick in the sky: that ball doesn't stick, it falls back.
     this.fallsBehind = (this.ballVY0 * this.ballVY0) / (2 * GRAVITY) > ROOF_EDGE_HEIGHT;
+    // The visual path of a throw that sticks: from the hand to the exact point where the physics say it lands (the apex).
+    if (!this.fallsBehind) {
+      const dx = this.ballVX * this.apexTime;
+      const dh = apex - ORIGIN_Y;
+      const dist = Math.hypot(dx, dh);
+      this.flightVis = { dx, dh, dur: Math.min(FLIGHT_MAX_S, Math.max(FLIGHT_MIN_S, dist / FLIGHT_SPEED)), arc: Math.min(FLIGHT_ARC_MAX, FLIGHT_ARC * dist) };
+    } else {
+      this.flightVis = null;
+    }
     this.cameraFollowing = true;
     this.bounce = null;
     this.ball.setTexture(this.projVisuals.ball);
@@ -779,22 +798,38 @@ class MainScene extends Phaser.Scene {
 
   updateFlight(dt) {
     this.flightTime += dt;
-    const reachedApex = this.flightTime >= this.apexTime;
+    const vis = this.flightVis; // a throw that sticks: the fast visual path (see FLIGHT_SPEED); null for one that flies over the roof
+    const reachedApex = vis ? this.flightTime >= vis.dur : this.flightTime >= this.apexTime;
     // Normally the flight freezes at the apex (the ball sticks there); a ball that fell behind the
     // roof keeps following its arc back down.
     const t = reachedApex && !this.fallsBehind ? this.apexTime : this.flightTime;
 
-    const x = this.ballStartX + this.ballVX * t;
-    const heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
-    const y = this.worldY(heightClimbed);
-    this.ball.setPosition(x, y);
-    if (this.proj.spins) this.ball.setRotation(t * SPIN_RATE); // stops turning at the apex, where it hits the wall
+    // Where the throw LANDS is always the physics apex point: (x, heightClimbed) below is what hit / miss is decided from.
+    let x = this.ballStartX + this.ballVX * t;
+    let heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
+    let drawX = x;
+    let drawHeight = heightClimbed;
+    if (vis) {
+      // Fast, nearly straight path to the same point, speeding up a little instead of slowing down.
+      const u = Math.min(1, this.flightTime / vis.dur);
+      const s = Math.pow(u, FLIGHT_EASE);
+      drawX = this.ballStartX + vis.dx * s;
+      drawHeight = ORIGIN_Y + vis.dh * s + vis.arc * 4 * s * (1 - s);
+      if (reachedApex) {
+        drawX = x;
+        drawHeight = heightClimbed;
+      }
+      if (drawHeight > ROOF_EDGE_HEIGHT) drawHeight = ROOF_EDGE_HEIGHT; // never a peek above the roof line
+    }
+    const y = this.worldY(drawHeight);
+    this.ball.setPosition(drawX, y);
+    if (this.proj.spins) this.ball.setRotation((vis ? Math.min(1, this.flightTime / vis.dur) * this.apexTime : t) * SPIN_RATE); // same turns as before, stops where it hits the wall
 
     if (this.cameraFollowing) {
       const targetScrollY = y - GAME_HEIGHT * 0.6;
       // Frame-rate independent smoothing: a fixed per-frame fraction (the old 0.12) moves the
       // camera by different amounts on uneven frames, which reads as the whole screen shaking.
-      const follow = 1 - Math.exp(-14 * dt);
+      const follow = 1 - Math.exp(-(vis ? 24 : 14) * dt); // a faster throw needs a snappier camera
       // Never show anything above the top of the texture.
       const clampedTarget = Math.max(targetScrollY, -TOP_BOUNDARY_HEIGHT);
       // Whole pixels only, like scrollX: a fractional scrollY that creeps toward the top limit
@@ -811,7 +846,7 @@ class MainScene extends Phaser.Scene {
 
     // Flew out through the top of the building: no wall to stick to, so end the throw right
     // here as if it had landed (camera goes back to the character via the normal result flow).
-    if (heightClimbed >= TOP_BOUNDARY_HEIGHT) {
+    if (!vis && heightClimbed >= TOP_BOUNDARY_HEIGHT) {
       this.finishThrow(false, null, x, heightClimbed, false, true);
       return;
     }
@@ -939,6 +974,8 @@ class MainScene extends Phaser.Scene {
       if (v.hitSound && (hit || hitsAnyWindow(stickX, stickHeight))) this.sound.play(v.hitSound, { volume: v.hitVolume });
       else this.sound.play(v.impactSound, { volume: v.impactVolume });
     }
+    // The impact: a tiny jolt of the game picture so it reads as hitting the wall with force (the grenade has its own, bigger one).
+    if (!escaped && !this.projVisuals.explosion) this.cameras.main.shake(IMPACT_SHAKE.ms, new Phaser.Math.Vector2(IMPACT_SHAKE.x, IMPACT_SHAKE.y));
     // An exploding projectile lights up the wall where it hit (not when it flew out of the top / fell behind the roof).
     if (!escaped && this.projVisuals.explosion) this.playExplosion(stickX, this.worldY(stickHeight), this.projVisuals.explosion);
 

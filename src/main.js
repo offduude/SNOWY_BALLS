@@ -308,8 +308,8 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  // The always-visible STREAK: x / HIGHEST: x boxes under the top-right buttons. The text shrinks a little
-  // if it would be wider than the box (a streak in the hundreds).
+  // The always-visible STREAK: x box under the top-right buttons. The text shrinks a little if it would be
+  // wider than the box (a streak in the hundreds). (The best streak is still saved, just not shown.)
   updateStreakHud() {
     const fit = (id, text) => {
       const el = document.getElementById(id);
@@ -318,7 +318,6 @@ class MainScene extends Phaser.Scene {
       el.style.fontSize = Math.min(8, Math.floor(88 / text.length)) + "px"; // 88px = the box minus its border and padding
     };
     fit("streak-text", "STREAK: " + this.streak);
-    fit("best-text", "HIGHEST: " + Economy.getBestStreak());
   }
 
   // Called by the PROJECTILES list when the player equips something.
@@ -682,7 +681,7 @@ class MainScene extends Phaser.Scene {
       // 5 x 0.8 x 1.5 = 6 doesn't fall to 5 through floating point).
       coins = Math.floor(coins * this.proj.coinMultiplier * this.aim.coinMultiplier + 1e-9);
 
-      // (The streak itself is shown all the time in the top-right STREAK / HIGHEST boxes now.)
+      // (The streak itself is shown all the time in the top-right STREAK box now.)
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
       this.updateStreakHud();

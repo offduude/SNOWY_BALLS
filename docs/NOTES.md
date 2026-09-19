@@ -575,3 +575,7 @@ not actual play.
 - **Equipping a projectile closes the PROJECTILES list** (`Collection.onEquip` calls `close()` after telling the game).
 - **Streak display moved**: the "streak xN" line is gone from the HIT message ("HIT / +N coins") and the MISS message is just "MISS". Two always-visible boxes sit under the top-right buttons: `STREAK: n` (top 44px) and `HIGHEST: n` (top 70px). Each is 96px wide = the BUFFS button (46-106px from the right edge) + the mute button (10-38px), measured equal; same brown as the coin counter; z-index 2 so the shop board covers them in the shop. `updateStreakHud()` refreshes them at start and after every throw; the font shrinks (8px -> smaller) if a number gets long ("HIGHEST: 1234" fits at 6px). Best streak comes from the save (`Economy.getBestStreak()`).
 - Documented the payout formula and a streak table in `docs/ECONOMY.md` ("How a hit is paid"). `main.js?v=63`, `collection.js?v=6`.
+
+## HIGHEST box removed (2026-09-19)
+
+- Removed the `HIGHEST: n` box (HTML, CSS, `updateStreakHud`). Only `STREAK: n` remains under the top-right buttons (96px wide, unchanged). The best streak is still tracked in the save (`Economy.reportStreak` / `getBestStreak`), just not displayed - useful later for achievements. `main.js?v=64`.

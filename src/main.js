@@ -406,7 +406,8 @@ class MainScene extends Phaser.Scene {
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Skyr) gives them
-      saveProjectile: b.saveProjectile, // chance (0-1) that this throw does not use up its projectile (Water Bottle)
+      saveProjectile: b.saveProjectile, // chance (0-1) that this throw does not use up its projectile (Water Bottle) - the best running buff's
+      saveProjectileBy: b.saveProjectileBy, // ... and which buff that is (its icon is shown when it saves one)
     };
   }
 
@@ -481,8 +482,12 @@ class MainScene extends Phaser.Scene {
   // (this.proj is unchanged until the throw is over); if it was the LAST one, the snowball is equipped again -
   // saved right now, applied when the throw concludes (pendingProjectile), so the aim isn't disturbed.
   consumeProjectile() {
+    this.savedBy = null; // the buff that saved THIS throw's projectile, shown on the result message
     if (this.proj.infinite) return;
-    if (Math.random() < this.aim.saveProjectile) return; // lucky: the projectile is not used up (Water Bottle)
+    if (Math.random() < this.aim.saveProjectile) {
+      this.savedBy = this.aim.saveProjectileBy; // lucky: the projectile is not used up (Water Bottle)
+      return;
+    }
     const id = this.projectileId;
     if (!Economy.useProjectile(id)) return;
     if (id !== "snowball" && Economy.getProjectileCount(id) === 0) {
@@ -897,13 +902,13 @@ class MainScene extends Phaser.Scene {
       Economy.reportStreak(this.streak);
       Economy.setStreak(this.streak);
       this.updateStreakHud();
-      this.showMessage("HIT\n+" + coins + " coins");
+      this.showMessage("HIT\n+" + coins + " coins", this.savedBy);
     } else {
       this.streak = 0;
       Economy.setStreak(0);
       if (this.eco.rewards.missCoins) Economy.addCoins(this.eco.rewards.missCoins);
       this.updateStreakHud();
-      this.showMessage("MISS");
+      this.showMessage("MISS", this.savedBy);
     }
 
     this.maybeStartRandomEvent();
@@ -1076,11 +1081,19 @@ class MainScene extends Phaser.Scene {
     this.showMessage("TAP to AIM");
   }
 
-  showMessage(msg) {
+  // `savedBy`: id of a buff that saved this throw's projectile - its icon and "+1" go one row above the text.
+  showMessage(msg, savedBy) {
     // Text lives in HTML now (see index.html #message), not as a Phaser Text object - canvas
     // text at this resolution renders as blurry upscaled pixels, an HTML element with a real
     // web font doesn't.
-    document.getElementById("message").textContent = msg;
+    const el = document.getElementById("message");
+    const item = savedBy && this.eco.shop.items.find((it) => it.id === savedBy);
+    el.textContent = msg;
+    if (!item) return;
+    const row = document.createElement("div");
+    row.className = "msg-saved";
+    row.innerHTML = `<img src="${item.image}" alt="" draggable="false" /><span>+1</span>`;
+    el.appendChild(row);
   }
 
   // The power-bar range that lands the throw's apex inside `box` ({xFrom, xTo, heightFrom, heightTo}) GIVEN the

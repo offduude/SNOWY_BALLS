@@ -72,6 +72,26 @@
       z-index: 2;
     }
 
+    /* When a buff saved the projectile (Water Bottle): its icon and "+1" one row above the HIT / MISS text. Absolutely
+       positioned on the top edge of #message, so the text itself does not move. */
+    #message .msg-saved {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      line-height: 1;
+    }
+
+    #message .msg-saved img {
+      width: 20px;
+      height: 20px;
+      image-rendering: pixelated;
+    }
+
     /* Mute toggle, top-right of the game. Plain <img>-as-button since it's just an icon, no
        label needed. */
     #volume-btn {
@@ -872,10 +892,10 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=16"></script>
   <script src="src/rarity.js?v=2"></script>
-  <script src="src/buffs.js?v=8"></script>
+  <script src="src/buffs.js?v=9"></script>
   <script src="src/shop.js?v=20"></script>
   <script src="src/collection.js?v=30"></script>
-  <script src="src/main.js?v=87"></script>
+  <script src="src/main.js?v=88"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

@@ -779,3 +779,8 @@ not actual play.
 ## Sliders 50% faster (2026-09-19)
 
 - `aim.markerHz` 0.85 -> **1.275** (x1.5) in `economy.json` (and the fallback default in `main.js`); one speed for both the offset and the strength slider. Measured live: an edge-to-edge sweep takes 784 ms on the offset slider and 783 ms on the strength slider (was ~1180 ms; 1/1.275 = 784 ms). `main.js?v=87`.
+
+## Saved-projectile indicator, best save chance only (2026-09-19)
+
+- **Indicator:** when a projectile-saving buff (Water Bottle) saves a throw's projectile, the result message ("HIT +N coins" / "MISS") gets a row one line above it: the buff's icon and "+1" (`showMessage(msg, savedBy)` in `main.js`, `.msg-saved` in `index.html`, absolutely positioned on the top edge of `#message`, so the HIT / MISS text does not move). It is generic: whichever buff saved the throw shows its own icon, so future save-projectile items get it for free (they only need the `saveProjectile` effect). The roll is still at the tap on "TAP to AIM" (`consumeProjectile` sets `this.savedBy`), the icon appears when the result shows. Verified: forced lucky throw -> result `MISS` + row "+1" with `assets/items/water_bottle.png`; row gone after the reset to "TAP to AIM"; static preview above "HIT / +12 coins" (screenshot).
+- **Several save buffs at once:** all of them keep running with their own timers, but only the HIGHEST chance counts - no combining (was 1-(1-a)(1-b); `Buffs.modifiers()` now keeps the max, and `saveProjectileBy` says which buff, whose icon is shown). Verified with temporary fake buffs (30% and 5%) next to the Water Bottle (10%): 30% by the strong one with all three running; cancel the strong one and the Water Bottle (10%) counts again, its timer never having stopped. `buffs.js?v=9`, `main.js?v=88`.

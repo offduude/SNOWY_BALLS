@@ -26,6 +26,27 @@ start with "economy.json failed to load or has a JSON syntax error".
 | `streakBonusPerLevel` | each hit in a streak beyond the first adds this fraction of the base, rounded down. `0.15` = +15% per level. Set `0` to turn streak bonuses off |
 | `missCoins` | coins for a miss (or a ball that flies out the top). `0` normally |
 
+### How a hit is paid (the streak bonus)
+
+`coins = floor( (base + streakBonus + faceBonus) x projectile.coinMultiplier x buffs.coinMultiplier )`
+
+- `base` = `rewards.windows.W20` / `W21` (5 / 3)
+- `streakBonus = floor( base x streakBonusPerLevel x (streak - 1) )` - with `streakBonusPerLevel` 0.15, every hit beyond
+  the first in a streak adds 15% of the base per level, **rounded down**. The streak is the number of hits in a row (a miss resets it to 0)
+- `faceBonus` = `events.faceWindow.faceBonusCoins` (10) when the banana face is hit
+- then the projectile's multiplier and the buffs' multiplier (read when the player tapped to aim), rounded down once at the end
+
+| streak | W20 (base 5) | W21 (base 3) |
+|---|---|---|
+| 1 | 5 | 3 |
+| 2 | 5 (bonus 0.75 -> 0) | 3 (0.45 -> 0) |
+| 3 | 6 (1.5 -> 1) | 3 (0.9 -> 0) |
+| 4 | 7 (2.25 -> 2) | 4 (1.35 -> 1) |
+| 5 | 8 (3.0 -> 3) | 4 (1.8 -> 1) |
+| 10 | 11 (6.75 -> 6) | 6 (4.05 -> 4) |
+
+Because the bonus rounds down, the first level of a streak pays nothing at these small bases.
+
 ## events (live)
 
 `faceWindow` is the random event where W20 turns into the face window: hit the face for the bonus.

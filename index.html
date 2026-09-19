@@ -516,6 +516,32 @@
       transition: opacity 0.25s ease;
     }
 
+    /* STREAK / HIGHEST: always visible, right under the top-right buttons. Same width as the BUFFS + mute
+       buttons together (mute 10..38px from the right edge, BUFFS 46..106px -> 96px), same brown as the coin
+       counter. Under the shop board (z 3), so they disappear with the rest of the game view in the shop. */
+    .hud-stat {
+      position: absolute;
+      right: 10px;
+      width: 96px;
+      height: 22px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 8px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    #streak-box { top: 44px; } /* 10px margin + 28px buttons + 6px gap */
+    #best-box { top: 70px; } /* + 22px box + 4px gap */
+
     #game-container.shop-open #buffs-btn {
       opacity: 0;
       pointer-events: none;
@@ -629,6 +655,8 @@
     </div>
     <div id="buff-hud"></div>
     <button id="buffs-btn" class="side-btn" type="button">BUFFS</button>
+    <div id="streak-box" class="hud-stat"><span id="streak-text">STREAK: 0</span></div>
+    <div id="best-box" class="hud-stat"><span id="best-text">HIGHEST: 0</span></div>
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
     </div>
@@ -644,8 +672,8 @@
   <script src="src/economy.js?v=7"></script>
   <script src="src/buffs.js?v=2"></script>
   <script src="src/shop.js?v=10"></script>
-  <script src="src/collection.js?v=5"></script>
-  <script src="src/main.js?v=62"></script>
+  <script src="src/collection.js?v=6"></script>
+  <script src="src/main.js?v=63"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

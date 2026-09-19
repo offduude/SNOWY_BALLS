@@ -245,6 +245,7 @@ class MainScene extends Phaser.Scene {
     this.pendingProjectile = null; // equipped mid-flight, applied when the throw concludes
     this.applyProjectile(Economy.getEquipped("projectile"));
     this.takeAimSnapshot();
+    this.updateStreakHud();
 
     // Aim HUD (screen-space, ignores camera scroll).
     this.aimGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
@@ -305,6 +306,19 @@ class MainScene extends Phaser.Scene {
       this.state = STATE.IDLE;
       this.showMessage("TAP to aim");
     }
+  }
+
+  // The always-visible STREAK: x / HIGHEST: x boxes under the top-right buttons. The text shrinks a little
+  // if it would be wider than the box (a streak in the hundreds).
+  updateStreakHud() {
+    const fit = (id, text) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.style.fontSize = Math.min(8, Math.floor(88 / text.length)) + "px"; // 88px = the box minus its border and padding
+    };
+    fit("streak-text", "STREAK: " + this.streak);
+    fit("best-text", "HIGHEST: " + Economy.getBestStreak());
   }
 
   // Called by the PROJECTILES list when the player equips something.
@@ -668,14 +682,16 @@ class MainScene extends Phaser.Scene {
       // 5 x 0.8 x 1.5 = 6 doesn't fall to 5 through floating point).
       coins = Math.floor(coins * this.proj.coinMultiplier * this.aim.coinMultiplier + 1e-9);
 
-      const message = "HIT\n+" + coins + " coins" + (this.streak > 1 ? "\nstreak x" + this.streak : "");
+      // (The streak itself is shown all the time in the top-right STREAK / HIGHEST boxes now.)
       Economy.addCoins(coins);
       Economy.reportStreak(this.streak);
-      this.showMessage(message);
+      this.updateStreakHud();
+      this.showMessage("HIT\n+" + coins + " coins");
     } else {
       this.streak = 0;
       if (this.eco.rewards.missCoins) Economy.addCoins(this.eco.rewards.missCoins);
-      this.showMessage("MISS\nstreak reset");
+      this.updateStreakHud();
+      this.showMessage("MISS");
     }
 
     this.maybeStartRandomEvent();

@@ -158,6 +158,7 @@ const Collection = (() => {
       const game = window.snowyBallsGame;
       const scene = game && game.scene.getScene("main");
       if (scene && scene.onProjectileEquipped) scene.onProjectileEquipped(btn.dataset.id);
+      close(); // equipping is the end of the errand: back to the game
     }
   }
 

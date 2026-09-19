@@ -844,9 +844,14 @@ class MainScene extends Phaser.Scene {
     return (Math.sqrt((2 * GRAVITY * apex) / apexScale) - MIN_POWER_SPEED) / (MAX_POWER_SPEED - MIN_POWER_SPEED);
   }
 
-  drawEventDot(g, x, y, color) {
+  // `hitWidthPx` = how wide (on the bar) the range that really hits is. The dot never sticks out of it - it is
+  // shrunk to fit when that range gets narrow (e.g. an offset near the edge of what can still hit) - so a
+  // marker overlapping the dot is always a hit.
+  drawEventDot(g, x, y, color, hitWidthPx) {
+    if (hitWidthPx < 2) return; // a sliver too thin to aim at: no dot rather than a dot that overhangs it
+    const radius = Math.min(EVENT_DOT_RADIUS, hitWidthPx / 2);
     g.fillStyle(color, 1);
-    g.fillCircle(Math.round(x), y, EVENT_DOT_RADIUS);
+    g.fillCircle(Math.round(x), y, radius);
   }
 
   drawAimBar() {
@@ -892,7 +897,7 @@ class MainScene extends Phaser.Scene {
         const swing = (target.swingFrom + target.swingTo) / 2;
         if (Math.abs(swing) < range) {
           const x = barX + (0.5 + swing / 2 / range) * barW;
-          this.drawEventDot(g, x, barY + barH / 2, target.color);
+          this.drawEventDot(g, x, barY + barH / 2, target.color, ((target.swingTo - target.swingFrom) / 2 / range) * barW);
         }
       }
     } else {
@@ -931,7 +936,10 @@ class MainScene extends Phaser.Scene {
       const target = this.activeEventTarget(swingNow);
       if (target && target.powerFrom !== null) {
         const power = (target.powerFrom + target.powerTo) / 2;
-        if (power > pLo && power < pLo + pRange) this.drawEventDot(g, barX + barPos(power) * barW, barY + barH / 2, target.color);
+        if (power > pLo && power < pLo + pRange) {
+          const hitWidthPx = ((target.powerTo - target.powerFrom) / pRange) * barW;
+          this.drawEventDot(g, barX + barPos(power) * barW, barY + barH / 2, target.color, hitWidthPx);
+        }
       }
     }
 

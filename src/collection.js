@@ -269,7 +269,7 @@ const Collection = (() => {
   }
 
   // The sound of drinking / using a buff (instead of the plain click).
-  const BUFF_USE_VOLUME = 0.6;
+  const BUFF_USE_VOLUME = 1;
   function playBuffUse() {
     const game = window.snowyBallsGame;
     if (game) game.sound.play("buff_use", { volume: BUFF_USE_VOLUME });

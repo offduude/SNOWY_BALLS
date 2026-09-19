@@ -793,3 +793,5 @@ not actual play.
 - **Result text revised:** back to the original size (12px, line-height 1.8); `#message.result` now only adds a **thin black outline** (8 hard 1px text-shadows). The "Saved Projectile" line stays. Other messages unchanged.
 
 - **All middle text has the thin outline:** the outline moved from `#message.result` onto `#message` itself (8 hard 1px black text-shadows, the old soft glow is gone), so "TAP to AIM", "OUT of SNOWBALLS", HIT / MISS and everything else in the middle share exactly the same size (12px, line-height 1.8) and outline. The `result` class / second `showMessage` argument were removed. `main.js?v=90`.
+
+- **First line of the middle text is the centre:** `#message` is now shifted up by half a line only (`translate(-50%, -0.9em)`), so the first line - HIT / MISS / TAP to AIM / OUT of SNOWBALLS - sits on the exact vertical middle of the game and everything else in the message (+N coins, Saved Projectile, the "+1 in" countdown) hangs below it. Measured: the first line's centre is within 0.8px of the middle for one-, two- and three-line messages alike (single-line messages did not move).

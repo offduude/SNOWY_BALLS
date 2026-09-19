@@ -59,7 +59,9 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
+      /* The FIRST line (HIT / MISS / TAP to AIM ...) is centred on the middle of the screen (half a line up = 0.9em);
+         whatever else the message says (+N coins, Saved Projectile, the countdown) hangs below it. */
+      transform: translate(-50%, -0.9em);
       width: 90%;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;

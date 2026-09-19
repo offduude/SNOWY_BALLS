@@ -31,6 +31,12 @@ const Collection = (() => {
           description: "Found it in someone's backpack. How convenient!",
           image: "assets/snowball/chestnut.png",
         },
+        {
+          id: "pinecone", // same id as its shop item and its economy.json "projectiles" entry
+          name: "Pinecone",
+          description: "Feels kinda sticky.",
+          image: "assets/snowball/pine_cone.png",
+        },
       ],
     },
     character: {

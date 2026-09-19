@@ -45,6 +45,7 @@
   "projectiles": {
     "snowball": { "infinite": false, "regen": { "max": 100, "everySeconds": 30 }, "rarity": "default", "weight": 100, "rewards": { "W20": 5, "W21": 3 }, "leavesMark": true, "spins": false },
     "chestnut": { "infinite": false, "rarity": "common", "weight": 75, "rewards": { "W20": 8, "W21": 5 }, "leavesMark": false, "spins": true },
+    "pinecone": { "infinite": false, "rarity": "rare", "weight": 126, "rewards": { "W20": 21, "W21": 21 }, "leavesMark": false, "spins": true },
     "grenade": { "infinite": false, "rarity": "epic", "weight": 130, "rewards": { "W20": 199, "W21": 199 }, "leavesMark": true, "spins": false }
   },
 
@@ -124,6 +125,17 @@
         "image": "assets/snowball/chestnut.png",
         "effect": { "type": "givesProjectile", "value": "chestnut" },
         "description": "Found it in someone's backpack. How convenient!"
+      },
+      {
+        "id": "pinecone",
+        "name": "Pinecone",
+        "category": "projectile",
+        "amount": { "min": 10, "max": 20 },
+        "unitPrice": { "min": 13, "max": 20 },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/pine_cone.png",
+        "effect": { "type": "givesProjectile", "value": "pinecone" },
+        "description": "Feels kinda sticky."
       }
     ]
   }

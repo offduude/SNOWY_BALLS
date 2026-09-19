@@ -757,3 +757,10 @@ not actual play.
 - **Bottom line on a buff card**: a new optional item field `detail` (economy.json) is drawn at the bottom of the buff's card in the BUFFS tab (`.pick-row.buff-row .pick-stats`, same lighter stats font as the projectiles' weight/hit value line). It is positioned over the card's bottom (no room of its own), so every buff card keeps its fixed 13.05u height (Tomato Juice, Skyr and Kaiser Roll all measured 126px, USE button at the same y). Only the Kaiser Roll has one so far. The USE button / timer is now wrapped in `.pick-action` like on projectile cards.
 - **Skyr price** 39-59 -> **140-190**.
 - Balance report (average price / shop odds per slot with all five items on sale: chestnut 60% (the only common), kaiser 30% (the only rare), skyr and grenade 4.5% each (the two epics share 9%), tomato juice 1%): Kaiser Roll 40 (10 snowball hits), Skyr 165 (41 hits). `collection.js?v=28`.
+
+## Pinecone (2026-09-19)
+
+- New projectile **Pinecone** (`assets/snowball/pine_cone.png`, id `pinecone`): **rare**, weight **126** ("heavy"), hit value **21** (W20 and W21 both 21 - one value was given), no mark, bounces off like the chestnut, spins in flight, and plays the chestnut's impact sound (`chestnut_impact`, 0.5). Shop: 10-20 per stack, 13-20 per piece (average price 248 = 62 snowball hits). Description "Feels kinda sticky." (also `CATALOG` in `collection.js`; `PROJECTILE_VISUALS.pinecone` in `main.js`.) There is no pinecone-in-hand character art, so the snowball idle/aiming poses stand in (add `character1_idle_pinecone.png` / `character1_aiming_pinecone.png` and point `sprites` at them when they exist).
+- Verified live: list shows Pinecone between the grenade (epic) and the chestnut (common), "weight: heavy, hit value: 21", dot on the new card; equipped it and threw: 1 used, spun, bounced (0 new marks), sounds `throw_whoosh` then `chestnut_impact`.
+- Shop odds per slot with all six items on sale: chestnut 60%, kaiser roll 15%, pinecone 15% (the two rares share 30%), skyr 4.5%, grenade 4.5%, tomato juice 1%.
+- Weights for reference: snowball 100, chestnut 75, pinecone 126, grenade 130. `main.js?v=83`, `collection.js?v=29`.

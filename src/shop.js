@@ -9,6 +9,13 @@
 //
 // Effects (coinMultiplier, aimSpeedMultiplier, ...) are NOT applied yet - buying currently just
 // spends coins and records the purchase.
+// Every UI button click (SHOP/BACK, buying, equipping, list buttons) goes through here.
+const UI_CLICK_VOLUME = 0.4; // half of the old 0.8
+function playUiClick() {
+  const game = window.snowyBallsGame;
+  if (game) game.sound.play("click", { volume: UI_CLICK_VOLUME });
+}
+
 const Shop = (() => {
   let eco = null;
   let root = null;
@@ -139,7 +146,7 @@ const Shop = (() => {
         if (now < t.at) continue; // still counting down
       }
       const others = stock.filter((id, j) => j !== i && id);
-      stock[i] = pickFor(others); // nothing eligible -> stays SOLD OUT, no timer
+      stock[i] = pickFor(others); // nothing eligible -> stays empty, shown as (TBD)
       if (t && stock[i] !== null) restocked++;
       restock[i] = null;
     }
@@ -186,14 +193,15 @@ const Shop = (() => {
     if (!item) {
       const t = (Economy.getShopState().restock || [])[slot];
       const timer = t && typeof t.at === "number" ? `<span class="shop-timer" data-at="${t.at}">${formatTime(t.at - Date.now())}</span>` : "";
-      return `<div class="shop-card empty"><span class="shop-name">SOLD OUT</span>${timer}</div>`;
+      // A slot with a timer is SOLD OUT; a slot with nothing to sell at all is (TBD) - there are no items for it yet.
+      return `<div class="shop-card empty"><span class="shop-name">${timer ? "SOLD OUT" : "(TBD)"}</span>${timer}</div>`;
     }
     const p = price(item);
     const afford = Economy.getCoins() >= p;
     return (
       `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
       `<span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>` +
-      `<span class="shop-pic"></span>` + // reserved for the item's picture
+      `<span class="shop-pic">${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
       `<span class="shop-name">${esc(item.name)}</span>` +
       `<span class="shop-price"><i class="coin"></i>${p}</span>` +
       `</button>`
@@ -263,9 +271,8 @@ const Shop = (() => {
     // another purchase attempt.
     if (btn.classList.contains("bought")) return;
     const result = buy(Number(btn.dataset.slot));
-    const game = window.snowyBallsGame;
     if (result.ok) {
-      if (game) game.sound.play("click", { volume: 0.8 });
+      playUiClick();
       btn.classList.add("bought");
       setTimeout(render, 220); // let the "bought" flash play, then show SOLD OUT + its timer
     } else if (result.reason === "funds") {

@@ -20,10 +20,10 @@
     }
   },
 
-  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match a shop projectile / the PROJECTILES list). angleRange: how far the left-right offset marker travels (1 = whole bar, 0.8 = its edge positions pulled in 20%, so the throw can only drift 80% as far). angleSpeed: how fast that marker moves compared with normal (0.8 = 20% slower). coinMultiplier: multiplies the coins for a hit, rounded DOWN. leavesMark: false = no snow mark on the wall, it bounces off instead. spins: the projectile rotates in flight.",
+  "_projectilesNote": "Gameplay numbers for every projectile you can equip (the id must match a shop projectile / the PROJECTILES list). weight: NOT shown to the player - heavier projectiles fly lower with the same throw strength (100 = the reference snowball; a weight of 80 flies 25% higher). angleRange: how long the left-right offset bar is (1 = the full bar, 0.8 = a bar 20% shorter, so the throw can only drift 80% as far). angleSpeed: how fast the marker moves along the bar compared with normal (0.8 = 20% slower). coinMultiplier: multiplies the coins for a hit, rounded DOWN. leavesMark: false = no snow mark on the wall, it bounces off instead. spins: the projectile rotates in flight.",
   "projectiles": {
-    "snowball": { "angleRange": 1, "angleSpeed": 1, "coinMultiplier": 1, "leavesMark": true, "spins": false },
-    "chestnut": { "angleRange": 0.8, "angleSpeed": 0.8, "coinMultiplier": 0.8, "leavesMark": false, "spins": true }
+    "snowball": { "weight": 100, "angleRange": 1, "angleSpeed": 1, "coinMultiplier": 1, "leavesMark": true, "spins": false },
+    "chestnut": { "weight": 80, "angleRange": 0.8, "angleSpeed": 0.8, "coinMultiplier": 0.8, "leavesMark": false, "spins": true }
   },
 
   "shop": {
@@ -41,78 +41,15 @@
       "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
     },
 
-    "_itemsNote": "category is 'consumable' (common, can be bought again and again, and can be on sale in two slots at once; needs a duration) or 'projectile' (rare, bought once and kept, never on sale twice).",
+    "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. category is 'consumable' (common, can be bought again and again, and can be on sale in two slots at once; needs a duration) or 'projectile' (rare, bought once and kept, never on sale twice).",
     "items": [
-      {
-        "id": "lucky_penny",
-        "name": "Lucky Penny",
-        "category": "consumable",
-        "price": 25,
-        "duration": { "throws": 2 },
-        "effect": { "type": "coinMultiplier", "value": 1.5 },
-        "description": "1.5x coins for your next 2 throws."
-      },
-      {
-        "id": "hot_cocoa",
-        "name": "Hot Cocoa",
-        "category": "consumable",
-        "price": 35,
-        "duration": { "throws": 3 },
-        "effect": { "type": "aimSpeedMultiplier", "value": 0.8 },
-        "description": "Pointers sweep 20% slower for 3 throws."
-      },
-      {
-        "id": "snack_break",
-        "name": "Snack Break",
-        "category": "consumable",
-        "price": 45,
-        "duration": { "throws": 4 },
-        "effect": { "type": "coinMultiplier", "value": 1.25 },
-        "description": "1.25x coins for your next 4 throws."
-      },
-      {
-        "id": "double_coins",
-        "name": "Double Coins",
-        "category": "consumable",
-        "price": 40,
-        "duration": { "throws": 3 },
-        "effect": { "type": "coinMultiplier", "value": 2 },
-        "description": "2x coins for your next 3 throws."
-      },
-      {
-        "id": "slow_pointer",
-        "name": "Slow Pointer",
-        "category": "consumable",
-        "price": 30,
-        "duration": { "throws": 5 },
-        "effect": { "type": "aimSpeedMultiplier", "value": 0.6 },
-        "description": "Pointers sweep much slower for 5 throws."
-      },
-      {
-        "id": "streak_shield",
-        "name": "Streak Shield",
-        "category": "consumable",
-        "price": 180,
-        "duration": { "throws": 1 },
-        "effect": { "type": "streakShield", "value": 1 },
-        "description": "Your next miss won't reset your streak."
-      },
-      {
-        "id": "jackpot_hour",
-        "name": "Jackpot",
-        "category": "consumable",
-        "price": 700,
-        "duration": { "throws": 10 },
-        "effect": { "type": "coinMultiplier", "value": 3 },
-        "description": "3x coins for your next 10 throws."
-      },
-
       {
         "id": "chestnut",
         "name": "Chestnut",
         "category": "projectile",
         "price": 10,
         "ignorePriceOverride": true,
+        "image": "assets/snowball/chestnut.png",
         "effect": { "type": "unlocksProjectile", "value": "chestnut" },
         "description": "Easier to aim, but pays 20% less. Bounces off the wall."
       }

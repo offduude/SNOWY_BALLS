@@ -15,7 +15,7 @@ const Collection = (() => {
           id: "snowball",
           name: "Snowball",
           description: "The classic. Cold, round and reliable.",
-          image: "assets/snowball/snowball.png",
+          image: "assets/snowball/snowball_shop.png",
           free: true,
         },
         {
@@ -91,8 +91,7 @@ const Collection = (() => {
   }
 
   function click() {
-    const game = window.snowyBallsGame;
-    if (game) game.sound.play("click", { volume: 0.8 });
+    playUiClick();
   }
 
   // Pressing the open list's own button closes it; pressing the other one switches lists.

@@ -47,9 +47,14 @@ const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 20);
 // calibrated so a 0%/100% power throw's apex lands exactly on those two bounds -
 // vy0 = sqrt(2 * GRAVITY * height).
 const MIN_STICK_HEIGHT = IMG_GROUND_Y - 486 + 10; // 184
-// Max power now throws PAST the top of the texture on purpose (2026-09-19) so a ball can escape the
-// building - later accessories may make that routine. Apex at full power:
-const MAX_APEX_HEIGHT = 800;
+// Apex of a full-strength throw of the reference projectile (weight 100, the snowball) with no buffs:
+// the middle of the window row above the goal windows (image y 173-216 -> height 660 - 194.5).
+// Buffs/lighter projectiles can still push a throw higher - past the roof edge it falls back behind
+// the building, past the top of the texture it escapes (see updateFlight).
+const MAX_APEX_HEIGHT = IMG_GROUND_Y - (173 + 216) / 2; // 465.5
+// A projectile of this weight flies exactly as the constants above say; heavier flies lower, lighter higher
+// (see launchBall). The number is per projectile in economy.json ("weight") and never shown to the player.
+const REFERENCE_WEIGHT = 100;
 // Where the wall ends and the sky starts: background.png rows 0-14 are sky, row 15 is the dark roof
 // edge. Nothing can stick above this line - a ball whose apex is higher falls back down and sinks
 // behind the roofline instead (see updateFlight), and marks are clipped at it (see addMark).
@@ -154,7 +159,7 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_aiming", "assets/character/character1_aiming.png");
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
-    this.load.image("char_idle_chestnut", "assets/character/character1_idle_chestnut.png");
+    this.load.image("char_idle_chestnut", "assets/character/character1_idle_chestnut.png?v=2");
     this.load.image("char_aiming_chestnut", "assets/character/character1_aiming_chestnut.png");
     // Timestamp so an edited economy.json is never served from a stale browser/CDN cache.
     this.load.json("economy", "economy.json?t=" + Date.now());
@@ -254,7 +259,10 @@ class MainScene extends Phaser.Scene {
   applyProjectile(id) {
     const known = PROJECTILE_VISUALS[id] && this.eco.projectiles && this.eco.projectiles[id];
     const owned = id === "snowball" || Economy.getShopState().owned.includes(id);
-    if (!known || !owned) id = "snowball";
+    if (!known || !owned) {
+      id = "snowball"; // the default
+      if (Economy.getEquipped("projectile") !== id) Economy.setEquipped("projectile", id); // keep the save honest
+    }
     this.projectileId = id;
     this.proj = this.eco.projectiles[id];
     this.projVisuals = PROJECTILE_VISUALS[id];
@@ -422,7 +430,14 @@ class MainScene extends Phaser.Scene {
 
     const swing = (this.angleValue - 0.5) * 2; // -1..1
     this.ballVX = swing * MAX_SWING_SPEED;
-    this.ballVY0 = MIN_POWER_SPEED + this.powerValue * (MAX_POWER_SPEED - MIN_POWER_SPEED);
+    // Same throw strength, different weight: the apex scales with REFERENCE_WEIGHT / weight (weight 80 flies
+    // 25% higher than the snowball, weight 125 would fly 20% lower). Never below the lowest allowed stick
+    // height, so a heavy projectile can't end up in the restricted ground zone.
+    const apexScale = REFERENCE_WEIGHT / (this.proj.weight || REFERENCE_WEIGHT);
+    this.ballVY0 = Math.max(
+      MIN_POWER_SPEED,
+      (MIN_POWER_SPEED + this.powerValue * (MAX_POWER_SPEED - MIN_POWER_SPEED)) * Math.sqrt(apexScale)
+    );
     this.ballStartX = ORIGIN_X;
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
     // An apex above the roof edge would be a stick in the sky: that ball doesn't stick, it falls back.
@@ -511,11 +526,11 @@ class MainScene extends Phaser.Scene {
     this.finishThrow(false, null, x, heightClimbed, false);
   }
 
-  // A projectile that leaves no mark hits the wall at its apex, is kicked back the way it came with a
-  // little pop upward, then falls, hops on the ground and settles - all while the result shows. It is
+  // A projectile that leaves no mark hits the wall at its apex, glances off further the way it was
+  // thrown (right stays right, left stays left) with a little pop upward, then falls, hops on the ground and settles - all while the result shows. It is
   // purely visual: the hit/miss and the coins were already decided at the moment of impact.
   startBounce(x, heightClimbed) {
-    const dir = this.ballVX > 1 ? -1 : this.ballVX < -1 ? 1 : Math.random() < 0.5 ? -1 : 1;
+    const dir = this.ballVX > 1 ? 1 : this.ballVX < -1 ? -1 : Math.random() < 0.5 ? -1 : 1; // thrown straight: either way
     this.bounce = {
       x,
       h: heightClimbed,
@@ -731,8 +746,14 @@ class MainScene extends Phaser.Scene {
     const barW = GAME_WIDTH - 40;
     const barH = 8;
 
+    // The offset (angle) bar is drawn as long as the projectile's angleRange says, centered - the chestnut
+    // gets a bar 20% shorter, and its marker runs edge to edge of it. The power bar is always full length.
+    const angleBar = this.state === STATE.AIM_ANGLE;
+    const trackW = angleBar ? barW * this.proj.angleRange : barW;
+    const trackX = barX + (barW - trackW) / 2;
+
     g.fillStyle(0x000000, 0.4);
-    g.fillRect(barX, barY, barW, barH);
+    g.fillRect(trackX, barY, trackW, barH);
 
     const value = this.state === STATE.AIM_ANGLE ? this.angleValue : this.powerValue;
     const color = this.state === STATE.AIM_ANGLE ? 0x6fb1ff : 0xff6f6f;
@@ -741,7 +762,7 @@ class MainScene extends Phaser.Scene {
     g.fillRect(markerX - 2, barY - 4, 4, barH + 8);
 
     g.lineStyle(1, 0xffffff, 0.6);
-    g.strokeRect(barX, barY, barW, barH);
+    g.strokeRect(trackX, barY, trackW, barH);
   }
 
   update(time, delta) {

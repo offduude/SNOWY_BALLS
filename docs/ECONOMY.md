@@ -45,17 +45,18 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 
 | field | meaning |
 |---|---|
-| `angleRange` | how far the left-right offset marker travels. `1` = the whole bar; `0.8` = its edge positions pulled in 20% (the marker runs 10%-90% of the bar, so the throw can drift only 80% as far sideways) |
+| `weight` | **not shown to the player.** Heavier projectiles fly lower with the same throw strength: the apex is multiplied by `100 / weight` (snowball = 100 is the reference; chestnut 80 flies 25% higher). A very heavy projectile is clamped so it never ends up below the lowest allowed stick height |
+| `angleRange` | how long the left-right offset bar is, drawn centered. `1` = the full bar; `0.8` = a bar 20% shorter (the marker runs edge to edge of it, so the throw can drift only 80% as far sideways) |
 | `angleSpeed` | how fast that marker moves along the bar compared with normal. `0.8` = 20% slower |
 | `coinMultiplier` | multiplies the coins of a hit (streak and face bonuses included), rounded **down**. `0.8` on a 6-coin hit = 4 |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
 | `spins` | the projectile rotates in flight |
 
-Chestnut right now: `angleRange 0.8`, `angleSpeed 0.8`, `coinMultiplier 0.8`, no mark, spins (placeholder numbers, to be tuned).
+A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5). Chestnut right now: `weight 80`, `angleRange 0.8`, `angleSpeed 0.8`, `coinMultiplier 0.8`, no mark, spins (placeholder numbers, to be tuned).
 
 ## shop
 
-The shop always shows `slots` slots. Buying an item empties its slot: it shows SOLD OUT with a countdown,
+The shop always shows `slots` slots. **A slot with no item to sell shows `(TBD)`** - the shop currently has only the chestnut, the placeholder items were removed. Buying an item empties its slot: it shows SOLD OUT with a countdown,
 and when the timer ends the slot restocks with an item picked by the rules below (it can be the same one again).
 If that happens while the shop is closed, the SHOP button gets a pulsing red dot and `assets/audio/shop_restock.mp3` plays
 (the dot is saved and stays until the shop is opened; a restock that happened while the app was closed shows the dot but
@@ -84,6 +85,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 | `name`, `description` | shown in the shop |
 | `category` | `consumable` (common: buy it as often as you like, used up over `duration`; can be on sale in two slots at once) or `projectile` (rare: bought once and kept, never on sale twice) |
 | `price` | coins |
+| `image` | optional: picture path shown on the shop card (the chestnut has one; other items show an empty picture box) |
 | `ignorePriceOverride` | optional. `true` = always costs its own `price`, even while `shop.priceOverride` makes everything else 1 coin (the chestnut is 10) |
 | `duration` | consumables only: `{ "throws": N }` |
 | `effect` | `{ "type": ..., "value": ... }` - see below |

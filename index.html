@@ -231,7 +231,17 @@
       border-radius: 2px;
     }
 
+    .shop-pic img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
     .shop-name {
+      align-self: stretch;
+      text-align: center;
       font-size: calc(var(--u) * 1.5);
       line-height: 1.35;
       overflow-wrap: anywhere;
@@ -428,7 +438,12 @@
 
     .pick-equip {
       flex: none;
-      padding: calc(var(--u) * 1) calc(var(--u) * 1.2);
+      box-sizing: border-box;
+      /* Always as wide as "EQUIPPED" (8 glyphs, 1em each in this font, plus padding and border), so
+         switching between EQUIP and EQUIPPED never changes the row's layout. */
+      width: calc(var(--u) * (1.2 * 8 + 2.4) + 4px);
+      text-align: center;
+      padding: calc(var(--u) * 1) 0;
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
@@ -536,9 +551,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/economy.js?v=6"></script>
-  <script src="src/shop.js?v=8"></script>
-  <script src="src/collection.js?v=3"></script>
-  <script src="src/main.js?v=50"></script>
+  <script src="src/shop.js?v=9"></script>
+  <script src="src/collection.js?v=4"></script>
+  <script src="src/main.js?v=51"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
@@ -572,8 +587,7 @@
     // SHOP <-> BACK: same button, label swaps. Click sound goes through Phaser so the mute
     // button and master volume apply to it too.
     document.getElementById("shop-btn").addEventListener("click", () => {
-      const game = window.snowyBallsGame;
-      if (game) game.sound.play("click", { volume: 0.8 });
+      playUiClick();
       const container = document.getElementById("game-container");
       const open = container.classList.toggle("shop-open");
       document.getElementById("shop-btn").textContent = open ? "BACK" : "SHOP";

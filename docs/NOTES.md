@@ -623,3 +623,8 @@ not actual play.
 - **Timer survives closing the app**: buffs are stored as device-clock `endsAt` timestamps (like the shop's sold-out timers) - verified: closed with 90 s left, reopened 7 s later -> 83 s left, lines active on the next tap; a buff whose time ran out while the app was closed is dropped on load (0 active, 0 saved, no HUD card, no lines).
 - **Descriptions**: every item's description is now "no description" (chestnut in `economy.json` and in the PROJECTILES list, Skyr); the snowball's is untouched. (The unused character entry in `collection.js` also keeps its text - it isn't an item and has no button.)
 - `main.js?v=70`, `buffs.js?v=3`, `collection.js?v=9`.
+
+## Equal shop chances (2026-09-19)
+
+- Every eligible item now has the **same chance** to be put in a slot: `pickWeighted` is a plain uniform pick when `refill.categoryWeights` is absent (the 9:1 weights were removed from `economy.json`; adding `categoryWeights` again brings the type-first weighting back). Verified over 4000 fresh stocks: first-slot share skyr 50.2% / chestnut 49.8%.
+- Because the chestnut is unique (never in two slots at once) while Skyr can repeat, a full shop still averages ~1 chestnut and ~5 Skyr (98.8% of shops contain the chestnut, max 1). `shop.js?v=13`.

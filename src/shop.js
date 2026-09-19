@@ -89,10 +89,13 @@ const Shop = (() => {
     return list[Math.floor(Math.random() * list.length)];
   }
 
-  // Picks the item TYPE first by economy.json refill.categoryWeights (that is what makes projectiles
-  // rare), then a random item of that type. Types with nothing eligible are skipped.
+  // Every eligible item has the SAME chance - unless economy.json has refill.categoryWeights, which then picks
+  // the item TYPE first (e.g. {"consumable": 9, "projectile": 1} makes projectiles rare) and a random item of
+  // that type after. Types with nothing eligible are skipped. Without categoryWeights (the current setup) this
+  // is a plain uniform pick.
   function pickWeighted(pool) {
-    const weights = eco.shop.refill.categoryWeights || {};
+    const weights = eco.shop.refill.categoryWeights;
+    if (!weights) return pickRandom(pool);
     const cats = [...new Set(pool.map((it) => it.category))];
     const w = cats.map((c) => (weights[c] !== undefined ? weights[c] : 1));
     let roll = Math.random() * w.reduce((a, b) => a + b, 0);

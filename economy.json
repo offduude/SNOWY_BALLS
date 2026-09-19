@@ -38,8 +38,7 @@
     "refill": {
       "mode": "random_from_eligible",
       "excludeOwned": true,
-      "_categoryWeightsNote": "Odds of each TYPE when a slot is (re)stocked: projectile 1 vs consumable 9 = a projectile shows up about 1 time in 10. Then an item of that type is picked at random.",
-      "categoryWeights": { "consumable": 9, "projectile": 1 },
+      "_equalChanceNote": "Every item has the SAME chance to be put on sale in a slot. To make some kinds rarer again, add \"categoryWeights\": { \"consumable\": 9, \"projectile\": 1 } here (odds of each TYPE; then an item of that type is picked at random).",
       "guaranteeCheapItem": { "enabled": true, "maxPriceInAverageHits": 12 }
     },
 

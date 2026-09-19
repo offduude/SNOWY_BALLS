@@ -91,7 +91,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 **`refill`** - how a replacement is chosen:
 - `mode: random_from_eligible` - random pick among items the player is allowed to see
 - `excludeOwned` - permanent items already bought never come back
-- `categoryWeights` - odds of each TYPE when a slot is filled (`consumable` 9 vs `projectile` 1 = a projectile about 1 time in 10; measured 10.8%). An item of the chosen type is then picked at random
+- **every eligible item has the same chance** to be put in a slot (a plain random pick). Optional `categoryWeights` (e.g. `{ "consumable": 9, "projectile": 1 }`) makes some TYPES rarer: the type is picked by those weights first, then an item of that type at random. It is not set right now
 - (always on) a **projectile** is never on sale in two slots at once; **consumables can be** (the same one can show in two or more slots)
 - `guaranteeCheapItem` - after choosing, if nothing shown costs `maxPriceInAverageHits` average
   hits or less, swap one slot for a cheaper item. This is the safety net against the shop

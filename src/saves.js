@@ -378,7 +378,7 @@ const Saves = (() => {
         parsed = clean;
         importBtn.classList.remove("off");
         status.className = "modal-status ok";
-        status.textContent = `OK: ${clean.coins} coins, best streak ${clean.bestStreak}`;
+        status.textContent = `${clean.coins} coins`;
       } catch (e) {
         if (mine !== seq) return;
         status.className = "modal-status bad";
@@ -413,7 +413,8 @@ const Saves = (() => {
 
   function renderOptions(el) {
     listEl = el;
-    el.innerHTML = `<div class="opt-head">SAVES</div>` + getSlots().map(slotHtml).join("");
+    // Every section of the list is a rectangle of its own (SAVES now, others may follow).
+    el.innerHTML = `<div class="opt-section"><div class="opt-head">SAVES</div>${getSlots().map(slotHtml).join("")}</div>`;
   }
 
   function refresh() {

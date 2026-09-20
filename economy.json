@@ -114,13 +114,13 @@
       },
       {
         "id": "mints",
-        "name": "Mints",
+        "name": "Orange Mints",
         "category": "consumable",
         "rarity": "rare",
         "priceRange": { "min": 36, "max": 60 },
         "ignorePriceOverride": true,
         "duration": { "seconds": 120 },
-        "image": "assets/items/mints.png",
+        "image": "assets/items/mints_orange.png",
         "effects": [{ "type": "saveProjectile", "value": 0.2 }],
         "description": "Hmmm.. I can't read the label.",
         "detail": "Save chance: 20%."
@@ -153,7 +153,7 @@
       },
       {
         "id": "triangles",
-        "name": "Triangles",
+        "name": "Cheese Triangles",
         "category": "consumable",
         "rarity": "rare",
         "priceRange": { "min": 29, "max": 48 },
@@ -166,7 +166,7 @@
       },
       {
         "id": "triangles_common",
-        "name": "Triangles",
+        "name": "Salt Triangles",
         "category": "consumable",
         "rarity": "common",
         "priceRange": { "min": 3, "max": 5 },

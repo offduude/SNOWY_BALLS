@@ -40,9 +40,9 @@ legendary 12.5 h / 6.6 h.
 |---|---|---|---|---|---|---|
 | common | Water Bottle | 10% chance not to use up the projectile | 2 min | 5 | 2-4 (3) | in the game (2-4, 120 s; was 60 s, 16-33) |
 | common | Snowy Cube | 1.1x coins | 2 min | 6 | 3-5 (4) | in the game (added 2026-09-20) |
-| rare | Triangles | the OFFSET slider at 0.8x speed (was both sliders; the strength slider is not slowed any more) | 3 min (was 2) | 64 | 29-48 (38) | in the game (was 93-156, now the range above) |
+| rare | Cheese Triangles | the OFFSET slider at 0.8x speed (was both sliders; the strength slider is not slowed any more) | 3 min (was 2) | 64 | 29-48 (38) | in the game (was 93-156, now the range above) |
 | rare | Skyr | green guide lines on both sliders | 3 min (as now) | 96 | 43-72 (58) | in the game (now rare; was epic, 530-719) |
-| rare | Mints | 20% chance not to use up the projectile | 2 min | 80 | 36-60 (48) | in the game (added 2026-09-20) |
+| rare | Orange Mints | 20% chance not to use up the projectile | 2 min | 80 | 36-60 (48) | in the game (added 2026-09-20) |
 | rare | Kaiser Roll | 1.2x coins | 2 min (as now) | 96 | 43-72 (58) | in the game (was 93-156, now the range above) |
 | epic | *(new)* save | **50%** chance not to use up the projectile (was 30%) | 2 min | 1,500 | 675-1,125 (900) | future |
 | epic | *(new)* coin bonus | 1.35x coins | 2 min | 1,260 | 570-940 (756) | future |

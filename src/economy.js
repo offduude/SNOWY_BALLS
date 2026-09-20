@@ -320,8 +320,8 @@ const Economy = (() => {
 
   // Adds `n` of a buff. If the buff wasn't in the BUFFS tab before (none in the inventory and none running), the tab
   // "expands": the red dot is raised. More of a buff the player already has (in the inventory or running) raises nothing.
-  // (An inventory holds at most getBuffMax() of one buff - 99; the shop refuses to sell more, this is the safety net.)
-  let buffMax = 99;
+  // (An inventory can be limited to getBuffMax() of one buff - set with `shop.buffMax` in economy.json; there is no limit unless that is set.)
+  let buffMax = Infinity;
 
   function setBuffMax(n) {
     if (n > 0) buffMax = Math.floor(n);

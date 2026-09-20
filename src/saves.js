@@ -174,6 +174,24 @@ const Saves = (() => {
     refresh();
   }
 
+  // "Deleting" slot 1: it can never be empty, so the player names the save that takes its place and chooses how it starts
+  // (a new game, or an imported code). Nothing is erased until they do. The game being played is swapped, hence the reload.
+  function replaceSlot(i, name, cleanState) {
+    const data = cleanState ? JSON.stringify(cleanState) : Economy.freshJson();
+    if (meta.active === i) {
+      Economy.lockSaves();
+      write(Economy.storageKey, data);
+      meta.slots[i] = { name: cleanName(name, i), lastLoaded: Date.now() };
+      saveMeta();
+      location.reload();
+      return;
+    }
+    write(DATA_PREFIX + i, data);
+    meta.slots[i] = { name: cleanName(name, i), lastLoaded: null };
+    saveMeta();
+    refresh();
+  }
+
   function importInto(i, name, cleanState) {
     write(DATA_PREFIX + i, JSON.stringify(cleanState));
     meta.slots[i] = { name: cleanName(name, i), lastLoaded: null };
@@ -311,7 +329,22 @@ const Saves = (() => {
     });
   }
 
+  // Slot 1 cannot be left empty: instead of a plain delete, name its replacement and choose new game / import.
+  function showReplace(i, name) {
+    const s = meta.slots[i];
+    openModal(
+      "DELETE SAVE?",
+      `<div class="modal-text">"${esc(s.name)}" will be erased and replaced by a new save. This cannot be undone. Name the new save, then start a new game or import a code.</div><input class="modal-input" maxlength="16" value="${esc(name || defaultName(i))}" spellcheck="false" />`,
+      [
+        { label: "NEW GAME", cls: "danger", onClick: (el) => replaceSlot(i, el.querySelector("input").value, null) },
+        { label: "IMPORT", cls: "danger", onClick: (el) => (showImport(i, el.querySelector("input").value, true), false) },
+        { label: "CANCEL", cls: "ghost" },
+      ]
+    );
+  }
+
   function showDelete(i) {
+    if (i === 0) return showReplace(0);
     const s = meta.slots[i];
     const text =
       i === 0
@@ -343,21 +376,22 @@ const Saves = (() => {
     );
   }
 
-  function showImport(i, name) {
+  function showImport(i, name, replace) {
     let parsed = null;
     let seq = 0;
     const panel = openModal(
       "IMPORT",
-      `<div class="modal-text">Paste a save code.</div><textarea class="modal-code" spellcheck="false" placeholder="SB1...."></textarea><div class="modal-status"></div>`,
+      `<div class="modal-text">Paste a save code.${replace ? " It replaces the save you are deleting." : ""}</div><textarea class="modal-code" spellcheck="false" placeholder="SB1...."></textarea><div class="modal-status"></div>`,
       [
         {
           label: "IMPORT",
           onClick: () => {
             if (!parsed) return false;
-            importInto(i, name, parsed);
+            if (replace) replaceSlot(i, name, parsed);
+            else importInto(i, name, parsed);
           },
         },
-        { label: "BACK", cls: "ghost", onClick: () => (showCreate(i, name), false) },
+        { label: "BACK", cls: "ghost", onClick: () => ((replace ? showReplace(i, name) : showCreate(i, name)), false) },
       ]
     );
     const ta = panel.querySelector("textarea");

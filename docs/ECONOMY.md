@@ -132,7 +132,7 @@ If that happens while the shop is closed, the SHOP button gets a pulsing red dot
 (the dot is saved and stays until the shop is opened; a restock that happened while the app was closed shows the dot but
 plays no sound, since browsers only allow sound after a tap). Only the first restock after you last looked at the shop makes a sound: if more slots restock later while the dot is still showing, they stay silent.
 
-**`buffMax`** - the most copies of one buff a player can hold (99). A purchase that would exceed it is refused like too little money (the card shakes, nothing is charged).
+**`buffMax`** - OPTIONAL: the most copies of one buff a player can hold. Not set now (there is no limit; it was 99). If set, a purchase that would exceed it is refused like too little money (the card shakes, nothing is charged).
 
 **`restockSeconds`** - how long a bought slot stays SOLD OUT. `1800` = 30 minutes
 (now set; it was 3600 = one hour for a day); use `60` to test. The deadline is stored as a timestamp from the **device clock** in the save, so it keeps

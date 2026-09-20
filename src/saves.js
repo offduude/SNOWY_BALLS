@@ -130,8 +130,27 @@ const Saves = (() => {
     return `${tag}.${payload}.${crc32(payload)}`;
   }
 
+  // The secret import code "god mode": instead of a save it builds one with a huge wallet and a pile of every projectile and
+  // buff, flagged `god` so that Economy never uses anything up or charges for anything (for testing / playing around).
+  async function godSave() {
+    let eco = null;
+    try {
+      eco = await (await fetch("economy.json?t=" + Date.now())).json();
+    } catch (e) {
+      throw new Error("Could not load the game data. Try again.");
+    }
+    const s = JSON.parse(Economy.freshJson());
+    s.god = true;
+    s.coins = 999999999;
+    s.lifetimeCoins = 999999999;
+    for (const [id, p] of Object.entries(eco.projectiles || {})) if (id !== "snowball" && !p.infinite && !p.regen) s.projectiles[id] = 999;
+    for (const it of (eco.shop && eco.shop.items) || []) if (it.category === "consumable") s.buffItems[it.id] = 999;
+    return Economy.sanitize(s);
+  }
+
   // Returns the (cleaned) save, or throws an Error whose message is meant for the player.
   async function decode(code) {
+    if (String(code || "").trim().toLowerCase().replace(/\s+/g, " ") === "god mode") return godSave();
     const text = String(code || "").replace(/\s+/g, "");
     const parts = text.split(".");
     if (parts.length !== 3 || (parts[0] !== "SB0" && parts[0] !== "SB1")) throw new Error("That is not a save code.");
@@ -364,7 +383,7 @@ const Saves = (() => {
         parsed = clean;
         importBtn.classList.remove("off");
         status.className = "modal-status ok";
-        status.textContent = `${clean.coins} coins`;
+        status.textContent = clean.god ? "GOD MODE" : `${clean.coins} coins`;
       } catch (e) {
         if (mine !== seq) return;
         status.className = "modal-status bad";

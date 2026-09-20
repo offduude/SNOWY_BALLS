@@ -945,3 +945,10 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 - **Not in the game yet, kept for later:** `docs/FUTURE_PRICES.md` (reasoning, tables) and `docs/future_items.json` (ready-to-paste entries: epic standard, legendary standard and heavy hitter, common 1.1x coins, rare 20% save, epic 30% save and 1.35x, legendary 50% save, 1.5x and Sure Shot, which needs a new "guaranteed hit" mechanic).
 
 - **Skyr renamed** (2026-09-20): the buff (id `skyr`, unchanged so saves keep working) is now **Orange Skyr** with the picture `assets/items/skyr_orange.png` (economy.json only). The old `skyr.png` stays in the folder, unused.
+
+## God mode import code (2026-09-20)
+
+- Typing **god mode** (any case, any spacing) into an IMPORT box (a new slot, or replacing one) builds a special save instead of decoding a code: 999,999,999 coins and lifetime coins (every shop tier open), 999 of every projectile and of every buff, and the save flag `god: true` (`godSave()` in `saves.js`, which reads economy.json for the ids, so new items are included automatically). The status line reads "GOD MODE".
+- With `god` set, `Economy` never uses anything up: `spendCoins` always succeeds without charging, `useProjectile` and `takeBuff` succeed without removing anything (the snowball stays at 50), and the lists show **xINF** instead of the count. Coins from hits are still added, so payouts stay visible. `Economy.isGod()`. The flag is part of the save, so it survives reloads, switching slots and export/import of that slot (an exported god save is a code that gives god mode again). It is kept in the slot only; a normal import or a new game never has it.
+- The code is public (it is in the source on GitHub Pages), so it is a testing tool, not a secret. `economy.js?v=23`, `saves.js?v=5`, `collection.js?v=40`.
+- Verified on a separate origin: status "GOD MODE" for "  God   Mode ", the slot loads with 999,999,999 coins (counter shows 999M), spending 5,000,000 keeps the wallet, using a Grenade / Tomato Juice / snowball removes nothing, Orange Skyr runs and stays at 999, BUFFS and PROJECTILES lists show xINF.

@@ -88,11 +88,16 @@ const Collection = (() => {
     return `<span class="pick-corner">${label}${countText ? `<span class="pick-count">${countText}</span>` : ""}</span>`;
   }
 
+  // "x12" - or "xINF" in god mode, where nothing is used up
+  function countText(n) {
+    return Economy.isGod() ? "xINF" : `x${n}`;
+  }
+
   function projectileCorner(kind, item) {
     if (kind !== "projectile") return "";
     const p = eco && eco.projectiles && eco.projectiles[item.id];
     const finite = !(p && p.infinite);
-    return cornerHtml(p && p.rarity, finite ? `x${Economy.getProjectileCount(item.id)}` : "");
+    return cornerHtml(p && p.rarity, finite ? countText(Economy.getProjectileCount(item.id)) : "");
   }
 
   // "+1 in 00:27" under the EQUIP button of a refilling projectile ("MAX" while its stock is full).
@@ -196,7 +201,7 @@ const Collection = (() => {
       `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
       `<div class="pick-action">${control}${maxTime}</div>` +
       detail +
-      cornerHtml(Rarity.ofItem(b.item), b.count > 0 ? `x${b.count}` : "") +
+      cornerHtml(Rarity.ofItem(b.item), b.count > 0 ? countText(b.count) : "") +
       `</div>`
     );
   }
@@ -378,7 +383,7 @@ const Collection = (() => {
           const id = row.dataset.id;
           const p = eco && eco.projectiles && eco.projectiles[id];
           const count = row.querySelector(".pick-count");
-          if (count && p && !p.infinite) count.textContent = `x${Economy.getProjectileCount(id)}`;
+          if (count && p && !p.infinite) count.textContent = countText(Economy.getProjectileCount(id));
           const regen = row.querySelector(".pick-regen");
           if (regen) regen.textContent = regenText(id);
         });

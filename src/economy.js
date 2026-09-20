@@ -23,6 +23,7 @@ const Economy = (() => {
       projectiles: {}, // how many of each consumable projectile the player has (not the snowball - see regen)
       regen: {}, // projectiles that refill over time (the snowball): id -> { count, next } - `next` is the Date.now() timestamp (device clock) at which the next one arrives, null while the stock is full
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
+      god: false, // GOD MODE (the import code "god mode", see saves.js): nothing is ever used up or paid for - coins, projectiles and buffs are infinite
       coinCarry: 0, // the fraction of a coin left over from a payout with a coin multiplier (0 <= x < 1), added to the next payout
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
@@ -73,6 +74,7 @@ const Economy = (() => {
       lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
       bestStreak: p.bestStreak || 0,
       streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
+      god: p.god === true,
       coinCarry: typeof p.coinCarry === "number" && p.coinCarry >= 0 && p.coinCarry < 1 ? p.coinCarry : 0,
       aiming: p.aiming === true,
       projectiles: cleanCounts(p.projectiles),
@@ -171,6 +173,7 @@ const Economy = (() => {
 
   // Returns false (and changes nothing) if the player can't afford it.
   function spendCoins(amount) {
+    if (state.god) return true; // god mode: everything is free
     if (amount > state.coins) return false;
     state.coins -= amount;
     save();
@@ -293,6 +296,7 @@ const Economy = (() => {
   function useProjectile(id) {
     const n = getProjectileCount(id);
     if (n <= 0) return false;
+    if (state.god) return true; // god mode: never used up
     if (regenCfg[id]) {
       const r = state.regen[id];
       r.count = n - 1;
@@ -358,6 +362,7 @@ const Economy = (() => {
   function takeBuff(id) {
     const n = getBuffCount(id);
     if (n <= 0) return false;
+    if (state.god) return true; // god mode: never used up
     if (n === 1) delete state.buffItems[id];
     else state.buffItems[id] = n - 1;
     save();
@@ -487,6 +492,7 @@ const Economy = (() => {
     wasCleansed: () => cleansed,
     sanitize,
     snapshot: () => JSON.stringify(state), // the save as it is right now (for exporting)
+    isGod: () => state.god === true,
     freshJson: () => JSON.stringify(fresh()), // a brand-new game
     lockSaves: () => {
       locked = true;

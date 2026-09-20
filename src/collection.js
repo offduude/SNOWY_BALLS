@@ -198,7 +198,9 @@ const Collection = (() => {
     // room of its own, so the card's height stays fixed).
     // Under the USE button: how long the buff lasts once used ("03:00") - the same style as "MAX" under a snowball's EQUIP button.
     // (Not the running timer: while the buff is active its own countdown takes the button's place, and this stays under it.)
-    const maxTime = `<div class="pick-regen">${Buffs.isCharge(b.item) ? "+1" : clock(Buffs.durationMs(b.item))}</div>`;
+    // ... followed by how many the player has: "02:00 x3" ("+1 x3" for a charge buff, "02:00 xINF" in god mode).
+    const amount = b.count > 0 ? ` ${countText(b.count)}` : "";
+    const maxTime = `<div class="pick-regen">${Buffs.isCharge(b.item) ? "+1" : clock(Buffs.durationMs(b.item))}${amount}</div>`;
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (
       `<div class="pick-row buff-row" data-id="${esc(b.id)}">` +
@@ -208,8 +210,7 @@ const Collection = (() => {
       `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
       `<div class="pick-action">${control}${maxTime}</div>` +
       detail +
-      cornerHtml(Rarity.ofItem(b.item), "") + // the rarity label stays in the top-right corner ...
-      (b.count > 0 ? `<span class="pick-count buff-amount">${countText(b.count)}</span>` : "") + // ... the amount is in the bottom-right one
+      cornerHtml(Rarity.ofItem(b.item), "") + // the rarity label alone is in the top-right corner (the amount is under the button, see maxTime)
       `</div>`
     );
   }

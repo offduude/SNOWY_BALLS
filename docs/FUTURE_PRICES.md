@@ -49,7 +49,7 @@ legendary 12.5 h / 6.6 h.
 | legendary | *(new)* free throw | replaces the 50% save: the next throw does not use up a bought projectile (a one-time charge, no timer; needs a new mechanic) | until thrown | 3,000 (7,500 on a heavy hitter) | 2,250-3,750 (3,000) | future |
 | legendary | Daniel's 3 PLN | 1.5x coins | 2 min | 9,000 | 4,050-6,750 (5,400) | in the game (added 2026-09-20) |
 | legendary | Diamond Cross (was Sure Shot) | the next throw is carried to W20 (or the banana face during the event) if it misses; a charge, no timer | until thrown | 3,000 (7,500 with a face event) | 1,800-3,000 (2,400) | in the game (added 2026-09-20) |
-| legendary | Tomato Juice | starts the banana face event (face multiplier x2.5) | 20 s (as now) | 6,840 on a standard stack, 17,100 on a heavy hitter | 3,100-5,100 (4,100) | in the game (3,100-5,100, face x2.5; was 2,343-3,906, face x40) |
+| epic | Tomato Juice | starts the banana face event (face multiplier x2) - now an EPIC event | 20 s (as now) | 912 on a standard epic stack (0.95 x 1 x 960) | 410-685 (547) | in the game (was legendary, 3,100-5,100, face x2.5) |
 
 Buff price ladder by tier: about 3 / 50 / 550 / 5,000 for the save and multiplier buffs.
 
@@ -82,3 +82,11 @@ The disco event (built) pays a fixed **x1.25** on every hit of the singer's face
 - Price at the plan's 60% of the standard return: **about 6,800**, with the usual +-25% range: **5,100-8,550**. That is about 1.7x Tomato Juice (3,100-5,100), which fits: the disco lasts about 3 minutes and pays repeatedly, Tomato Juice pays once.
 - Sensitivity: the price scales with the face-hit rate and with (multiplier - 1): at a 20% face-hit rate the average would be about 3,900, at 50% about 9,700; a x1.5 multiplier instead of x1.25 would double it.
 - While it runs it also blocks every other event and every event buff for about 3 minutes (a real cost, not priced).
+
+## The banana face becomes an epic event (2026-09-20)
+
+The banana face event and its buff Tomato Juice moved from legendary to **epic**: the event has the rarity of its summon buff, so its natural chance follows the epic shop rarity - **1 in 111 throws** instead of about 1 in 2000 (18x more often). Fair values:
+
+- **Face multiplier x2.5 -> x2.0.** A rarer event should be worth more each time, but less than proportionally: I scale the value of one event with the square root of the wait between events. The disco (now the only legendary event: 1 in 1000 throws) is worth about 2.4 x the hit value per song; the banana face (epic, the only epic event: 1 in 111): 2.4 x sqrt(111 / 1000) = about 0.8 x the hit value per event; one face hit gives (m - 1) x the hit value and about 60% of events get a hit, so m - 1 = 0.8 / 0.6 = 1.3, i.e. about x2.3. I set **x2.0** - rounded down, because the event now comes 18x more often than before (it was about 1 in 2000), so it should not pay nearly as much as before. (One hit now pays +100% of the hit value instead of +150%: a third less.)
+- **Tomato Juice price 3,100-5,100 -> 410-685.** By the plan's rule (price = 60% of the return; return = 0.95 x (m - 1) x the hit value of a standard stack of its own rarity): the return on an epic stack (hit value 960) is 0.95 x 1 x 960 = 912, 60% is about 547, +-25% gives 410-685 (it was 0.95 x 1.5 x 4800 = 6,840 on a legendary stack). About 87% cheaper, and at the low end of the epic buffs (Mints and Skyr 675-1,125).
+- The disco keeps its 5,100-8,550 price (its natural chance also changed - it is now the only legendary event, 1 in 1000 instead of 1 in 2000 - but the value of a summon does not depend on how often the event happens by itself).

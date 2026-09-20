@@ -1276,7 +1276,7 @@ class MainScene extends Phaser.Scene {
           coins *= this.discoConfig().faceMultiplier; // a disco face hit: a fixed bonus; the face stays, the event goes on
         } else {
           this.bananaHitTriggered = true;
-          coins *= this.eco.events.faceWindow.faceMultiplier; // hitting the banana face multiplies this throw's coins (x2.5) and ends the event
+          coins *= this.eco.events.faceWindow.faceMultiplier; // hitting the banana face multiplies this throw's coins (events.faceWindow.faceMultiplier, x2) and ends the event
           this.triggerBananaHit(mark);
         }
       }

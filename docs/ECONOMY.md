@@ -29,7 +29,7 @@ start with "economy.json failed to load or has a JSON syntax error".
 `coins = floor( base x faceMultiplier x buffs.coinMultiplier )`
 
 - `base` = the equipped projectile's **hit value** - ONE number for both goal windows (W21 pays the same as W20), from its rarity (`rarities[].projectileHitValue`: snowball/default 4, common 16, rare 128, epic 960, legendary 4800) unless the projectile has a `hitValue` of its own (the heavy hitters: Stone 40, Egg 320, Grenade 2400)
-- `faceMultiplier` = `events.faceWindow.faceMultiplier` (2.5; it was 40) when the banana face is hit during the face event, otherwise 1 - so a snowball face hit pays 4 x 2.5 = 10, a common projectile's 16 x 2.5 = 40, a Grenade's 2400 x 2.5 = 6000 (fractions of a coin are carried over to the next payout)
+- `faceMultiplier` = `events.faceWindow.faceMultiplier` (2; it was 2.5, and 40 before that) when the banana face is hit during the face event, otherwise 1 - so a snowball face hit pays 4 x 2 = 8, a common projectile's 16 x 2 = 32, a Grenade's 2400 x 2 = 4800 (fractions of a coin are carried over to the next payout)
 - then the buffs' multiplier (read when the player tapped to aim), rounded down once at the end
 
 **The streak adds nothing.** It is only a counter (STREAK: n under the top-right buttons, saved across reloads, reset by a miss);
@@ -46,7 +46,7 @@ it no longer adds coins or speeds the markers up.
 | `throwsPerHour` | (optional) how many throws an hour to assume for the natural event chance; by default the snowball's REAL refill rate, `3600 / projectiles.snowball.regen.everySeconds` = 120 an hour. **The chance of a natural event is not set per event - it is by RARITY, see "Event rarities"** |
 | `durationMs` | how long the face texture stays (20000 = 20s) |
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
-| `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`2.5`) |
+| `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`2`; the banana face is an EPIC event) |
 
 **Disco event** (`events.discoWindow`, see NOTES.md "Disco event"): `faceMultiplier` `1.25` (paid on EVERY hit of the singer's face while disco.mp3 plays - the face stays - so it is far below the banana face's x2.5), `beatMs` `500` (120 bpm: W20 shows a new one of discoface1-6 every beat). A plain W20 hit pays as usual. After the song: applause.mp3 and falling roses, then normal. Only one event runs at a time; no event buff (`triggerEvent`) can be used while one runs.
 
@@ -78,7 +78,7 @@ rarity are equally likely). Only rarities that have an item to sell take part - 
 common chestnut and epic grenade and skyr on sale: chestnut 87%, grenade 6.5%, skyr 6.5%). `py tools/economy_report.py` prints each item's chance.
 
 **Where a rarity is set:** a projectile's in `projectiles.<id>.rarity` (also used by its shop item), a buff's on the shop item (`rarity`).
-Snowball = default, chestnut / rowan berry / stone = common, pinecone / egg = rare, grenade = epic; buffs: Water Bottle = common, Kaiser Roll / Triangles / **Skyr** = rare, Tomato Juice = legendary. A rarity with `chance` 0 (default) is never rolled for the shop.
+Snowball = default, chestnut / rowan berry / stone = common, pinecone / egg = rare, grenade = epic; buffs: Water Bottle = common, Kaiser Roll / Triangles / **Skyr** = rare, Tomato Juice = epic. A rarity with `chance` 0 (default) is never rolled for the shop.
 An item with **no rarity** is treated as common when the shop picks, and in the tabs it always goes at the very end - after every
 rarity, default and common included, however many of those there are (the tabs list: legendary, epic, rare, common, default, then no rarity).
 
@@ -197,7 +197,7 @@ when none are left. Effects do not stack from the same buff. Different buffs of 
 | `coinMultiplier` | multiplies the coins of a hit. Only whole coins are paid; the fraction is carried over to the next payout (5 x 1.1 = 5.5 pays 5 now and 6 next time), so a small multiplier is never rounded away |
 | `offsetSpeed` | the OFFSET slider's marker moves at this fraction of its speed (`0.8` = 20% slower); the strength slider is not affected. Several such buffs multiply (0.9 x 0.8 = 0.72), no floor |
 | `saveProjectile` | chance (0-1, e.g. `0.1` = 10%) that a throw does not use up its projectile (any projectile, the snowball included); several such buffs stack as independent rolls (10% + 20% = 28%, at most `buffCaps.saveProjectile`, 90%). When one saves a projectile the result text gets a "Saved Projectile" line |
-| `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 20 s, the same as the natural event; its hit pays the face multiplier x2.5). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual face multiplier (x2.5) |
+| `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 20 s, the same as the natural event; its hit pays the face multiplier x2). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual face multiplier (x2.5) |
 
 **When buffs are read:** only at the moment the player taps "TAP to aim". That snapshot is used for the whole throw
 (sliders, green lines, event dots and payout), so a buff expiring or being bought mid-aim never changes anything under the
@@ -228,7 +228,7 @@ player's finger. The buff cards and list always show the live state.
 
 ## Event rarities (2026-09-20)
 
-- An event has the rarity of its **summon buff** (the shop item whose `triggerEvent` effect names the event): the banana face (Tomato Juice) and the disco (Disco Ticket) are **legendary**. A future event takes the rarity of its buff; one with no buff can name its `rarity` in its own `events` block.
+- An event has the rarity of its **summon buff** (the shop item whose `triggerEvent` effect names the event): the banana face (Tomato Juice) is **epic** and the disco (Disco Ticket) is **legendary**. A future event takes the rarity of its buff; one with no buff can name its `rarity` in its own `events` block.
 - **Natural spawning is rolled by rarity, not by event.** After every throw the game makes ONE independent roll per rarity that has events. If **several rarities hit on the same throw, the better (rarer) one wins**; that rarity then picks one of its events at random. So adding an event to a rarity never makes that rarity's events more frequent. An event never starts while another runs.
 - **The chance of a rarity** is set so that, on average, it takes as many throws to get one of its events as it takes to see an item of that rarity in the shop: `meanShopHours = 1 / (the rarity's share of the shop's rarity roll x slots x 3600 / availabilitySeconds)`, `chance per throw = 1 / (meanShopHours x throwsPerHour)`, with `throwsPerHour` = the snowball's real refill rate (120 an hour: one every 30 s). With the shop odds common 60 / rare 30 / epic 9 / legendary 1 (of 100), 6 slots and 30-minute timers:
 
@@ -239,4 +239,4 @@ player's finger. The buff cards and list always show the live state.
 | epic | 55.6 min | 0.90% | 111 | 0.899% (1 in 111) |
 | legendary | 8.3 h | 0.10% | 1000 | 0.100% (1 in 1000) |
 
-  Only legendary has events today (the banana face and the disco, half each: about 1 in 2000 throws each). It follows the shop and the snowball by itself: change a rarity's shop odds, the slots, the timers or the snowball's regen and the events follow (`py tools/economy_report.py` prints this table); `events.rarityChances { legendary: 0.0008 }` overrides a rarity by hand. A rarity that has no item in the shop cannot spawn events.
+  Only epic and legendary have events today: the banana face (epic, the only one: 1 in 111 throws) and the disco (legendary, the only one: 1 in 1000 throws). It follows the shop and the snowball by itself: change a rarity's shop odds, the slots, the timers or the snowball's regen and the events follow (`py tools/economy_report.py` prints this table); `events.rarityChances { legendary: 0.0008 }` overrides a rarity by hand. A rarity that has no item in the shop cannot spawn events.

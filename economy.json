@@ -16,20 +16,19 @@
     }
   },
 
-  "_aimNote": "Speed of the two aim markers (offset and strength - always the same, fixed speed). markerHz = full back-and-forth sweeps per second (1.275 = one sweep in ~0.8s; it was 0.85 = ~1.2s). Nothing changes it: not the streak, not buffs, not the projectile. offsetZoneAtWeight100 = the share of the OFFSET slider that is a guaranteed W20 hit for a weight-100 projectile (the snowball): 0.5 = half the slider. A weight of 0 always needs the exact middle (share 0), a weight of 200 hits anywhere (share 1), and every other weight is on a straight line through these three points. Lower it to make the snowball offset harder - note that with 0.5 the snowball offset slider only spans +-0.31 swing, which is too short to reach W21 (it needs about +-0.37).",
+  "_aimNote": "Speed of the two aim markers (offset and strength - always the same, fixed speed). markerHz = full back-and-forth sweeps per second (1.275 = one sweep in ~0.8s; it was 0.85 = ~1.2s). Nothing changes it: not the streak, not buffs, not the projectile. (The width of the offset slider's hit zone comes from the projectile's weight tier, see weightTiers / offsetZone.)",
   "aim": {
-    "markerHz": 1.275,
-    "offsetZoneAtWeight100": 0.5
+    "markerHz": 1.275
   },
 
   "_rarityNote": "Every projectile (in \"projectiles\") and every buff (in the shop items) has a rarity number, bigger = rarer: the PROJECTILES and BUFFS tabs list the rarest first (equal rarities: projectiles by W20 hit value, buffs in file order). The numbers are PLACEHOLDERS - 1, 2, 3 in the current order - to be decided later.",
-  "_weightTiersNote": "PROJECTILE WEIGHT is a tier, not a number. A tier is where on the STRENGTH slider a throw of that projectile lands in W20: from-to are shares of the slider (0 = its start, 1 = its tip) - very light 0-25%, light 25-50%, moderate 37.5-62.5%, heavy 50-75%, very heavy 75-100%. Every band is 25% wide, so the strength part is equally easy for all tiers; only where it is differs. The tier also sets how wide the OFFSET slider is (lighter = a wider, less precise swing): it uses the old weight number equal to the middle of the band (25 / 75 / 100 / 125 / 175). label is the word on the projectile's card. A projectile names its tier in projectiles.<id>.weight.",
+  "_weightTiersNote": "PROJECTILE WEIGHT is a tier, not a number. from-to: where on the STRENGTH slider a throw of that projectile lands in W20 (shares of the slider, 0 = its start, 1 = its tip) - very light 0-25%, light 25-50%, moderate 37.5-62.5%, heavy 50-75%, very heavy 75-100%; every band is 25% wide. offsetZone: the share of the OFFSET slider (the whole bar) that is a guaranteed W20 hit, centered on the middle of the bar and reaching out to both sides - very light 6.25%, light 12.5%, moderate 25%, heavy 50%, very heavy 100% (each tier half of the next). The bar is scaled so the hit zone fills exactly that share, so a smaller offsetZone = a longer, less precise swing. A buff with the effect type precision multiplies the zone (1.2 = 20% bigger: 25% becomes 30%, never more than 100%). label is the word on the projectile's card. A projectile names its tier in projectiles.<id>.weight.",
   "weightTiers": [
-    { "id": "very_light", "label": "very light", "from": 0, "to": 0.25 },
-    { "id": "light", "label": "light", "from": 0.25, "to": 0.5 },
-    { "id": "moderate", "label": "moderate", "from": 0.375, "to": 0.625 },
-    { "id": "heavy", "label": "heavy", "from": 0.5, "to": 0.75 },
-    { "id": "very_heavy", "label": "very heavy", "from": 0.75, "to": 1 }
+    { "id": "very_light", "label": "very light", "from": 0, "to": 0.25, "offsetZone": 0.0625 },
+    { "id": "light", "label": "light", "from": 0.25, "to": 0.5, "offsetZone": 0.125 },
+    { "id": "moderate", "label": "moderate", "from": 0.375, "to": 0.625, "offsetZone": 0.25 },
+    { "id": "heavy", "label": "heavy", "from": 0.5, "to": 0.75, "offsetZone": 0.5 },
+    { "id": "very_heavy", "label": "very heavy", "from": 0.75, "to": 1, "offsetZone": 1 }
   ],
 
   "_raritiesNote": "Rarities, from the lowest to the rarest. projectileHitValue: what ONE HIT pays (base coins, before buffs and events) with a projectile of this rarity - the same for both goal windows and for every projectile of the rarity: default (the snowball) 4, common 16, rare 128, epic 960, legendary 4800 (a standard stack is 3-7 pieces at a price per piece 8 / 60 / 450 / 2250 up to 12 / 100 / 750 / 3750, average 10 / 80 / 600 / 3000, so the hit value is always above the highest price; a stack costs 50 / 400 / 3000 / 15000 on average). A projectile can override it with its own hitValue - the HEAVY HITTERS do (Stone 40, Egg 320, Grenade 2400): a smaller stack (1-3 instead of 3-7), a price per piece 2.5x higher and a hit value 2.5x higher, for the same average stack price - higher risk, higher reward. availabilitySeconds: how long an item of that rarity stays on sale in the shop before its slot REROLLS (a new item, amount and price) - 30 min for every rarity (better rarity no longer means longer); the timer is shown on the card and runs on the device clock (also while the app is closed); a rarity without it (default) has no timer. default (light grey, chance 0) is the snowball's: it can never come up in the shop. For the others a shop slot first rolls a rarity by chance (percent - only rarities that have an item to sell take part, and their chances are rescaled to 100), then picks one of that rarity's items at random. color is CSS text colour, or rainbow (animated waves + a pulsing shine). Every projectile (in projectiles) and every shop item names one with rarity; the PROJECTILES and BUFFS tabs list the rarest first and an item with NO rarity always goes at the very end, after default and common.",

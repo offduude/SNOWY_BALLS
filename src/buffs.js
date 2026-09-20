@@ -9,7 +9,8 @@
 //
 // Effect types (economy.json item `effects`: [{ "type", "value" }], values multiply if several buffs share a type):
 //   guideLines       1     shows the green guarantee lines on both sliders (hidden without this buff)
-//   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
+//   precision        x     offset (angle) slider: its hit zone gets x times bigger (x1.2 = 20% bigger, e.g. 25% of the bar -> 30%, never over
+//                          100%), so the bar's range shrinks to 1/x and the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout). Several such
 //                          buffs can run at once (each keeps its timer) but only the HIGHEST counts - they do not multiply

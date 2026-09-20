@@ -56,7 +56,7 @@ not the projectile - those only change how wide the sliders are).
 | field | meaning |
 |---|---|
 | `markerHz` | back-and-forth sweeps per second (`1.275` = one sweep in about 0.8s; it was 0.85) |
-| `offsetZoneAtWeight100` | the share of the OFFSET slider that is a guaranteed W20 hit for a weight-100 projectile (the snowball). `0.5` = half the slider. See "weight" below |
+| (the offset hit zone) | is not set here any more: it comes from the projectile's tier, `weightTiers[].offsetZone` (see "weight" below) |
 
 ## rarities (live)
 
@@ -102,11 +102,21 @@ Inside the band the apex is inside W20's height (344-387: the bottom of W20 at t
 through them that goes on both sides); below the band the throw peaks under W20, above it over W20. Every band is 25% wide, so the
 strength part is equally easy for every tier - only where it is differs (lighter = less strength, heavier = more).
 
-**Offset slider.** The share of the slider that lands inside W20 sideways depends on the tier through the old weight number equal to the
-middle of its band x 200 (very light 25, light 75, moderate 100, heavy 125, very heavy 175): a straight line from 0 (weight 0, only the
-exact middle; a floor of 1.5% is used) through `aim.offsetZoneAtWeight100` (0.5) at 100 to 1 (anywhere on the slider) at 200. Lighter =
-a wider, less precise swing. Precision buffs narrow the spread further. **Note:** W21 needs about +-0.37 swing; the offset slider
-spans +-1.22 (very light), +-0.41 (light), +-0.31 (moderate), +-0.24 (heavy), +-0.17 (very heavy) - so only very light and light projectiles can reach W21.
+**Offset slider.** The hit zone is the share of the WHOLE bar that lands inside W20 sideways. It is a band centered on the middle of the bar
+that reaches out to both sides, and every tier has its own size (`weightTiers[].offsetZone`; each tier is half of the next):
+
+| tier | offset hit zone (of the whole bar) | the bar spans (swing) |
+|---|---|---|
+| very light | 6.25% | +-2.44 |
+| light | 12.5% | +-1.22 |
+| moderate | 25% (the snowball) | +-0.61 |
+| heavy | 50% | +-0.31 |
+| very heavy | 100% (the whole bar hits) | +-0.15 |
+
+The bar is scaled so the zone fills exactly that share (a smaller zone = a longer, less precise swing); the green guide lines of Orange Skyr
+mark the zone's edges. A buff with the effect `precision` (value x) makes the zone x times bigger: `zone = offsetZone x product of the buffs`,
+e.g. x1.2 turns 25% into 30% (never more than 100%). The Triangles buff (slower marker) helps every tier, most where the zone is small.
+**Note:** W21 needs about +-0.37 swing, so very light, light and moderate projectiles can reach it and heavy and very heavy ones cannot.
 
 ## projectiles (live)
 
@@ -177,7 +187,7 @@ when none are left. Effects do not stack from the same buff; for a save chance o
 | type | value means |
 |---|---|
 | `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise). Does NOT affect the yellow event dots, which always show |
-| `precision` | offset (angle) slider: its range shrinks to 1/value (1.5 = 33% narrower, same marker speed) |
+| `precision` | offset (angle) slider: its hit zone gets `value` times bigger (1.2 = 20% bigger, 25% -> 30%; at most the whole bar), so its range shrinks to 1/value (same marker speed) |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
 | `coinMultiplier` | multiplies the coins of a hit. Only whole coins are paid; the fraction is carried over to the next payout (5 x 1.1 = 5.5 pays 5 now and 6 next time), so a small multiplier is never rounded away |
 | `sliderSpeed` | both sliders move at this fraction of their speed (`0.8` = 20% slower); several such buffs can run at once but only the best counts - the slowest - they do not multiply |

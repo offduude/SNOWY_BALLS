@@ -46,8 +46,6 @@ const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 20);
 // 184. The roofline (IMG_GROUND_Y - IMG_ROOF_Y = 643) is the maximum. The strength curve below is built on
 // these bounds (vy0 = sqrt(2 * GRAVITY * height)).
 const MIN_STICK_HEIGHT = IMG_GROUND_Y - 486 + 10; // 184
-// The reference weight number of the offset slider's zone (the moderate tier, the snowball's). See the "weight" section below.
-const REFERENCE_WEIGHT = 100;
 // Where the wall ends and the sky starts: background.png rows 0-14 are sky, row 15 is the dark roof
 // edge. Nothing can stick above this line - a ball whose apex is higher falls back down and sinks
 // behind the roofline instead (see updateFlight), and marks are clipped at it (see addMark).
@@ -55,7 +53,8 @@ const ROOF_EDGE_HEIGHT = IMG_GROUND_Y - 15; // 645
 
 // Marker speed (full back-and-forth sweeps per second) - the numbers live in economy.json under "aim".
 // ONE fixed speed for both sliders - nothing (streak, buffs, projectiles) changes it.
-const AIM_DEFAULTS = { markerHz: 1.275, offsetZoneAtWeight100: 0.5 };
+const AIM_DEFAULTS = { markerHz: 1.275 };
+const DEFAULT_OFFSET_ZONE = 0.25; // the moderate tier's (used if a projectile has none)
 
 const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
 const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed
@@ -127,10 +126,10 @@ const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit r
 //
 // OFFSET slider: the sideways drift is swing x MAX_SWING_SPEED x flight time, and a swing of +-W20_SWING_GUARANTEE
 // is the most that is still guaranteed to land inside W20's width. The offset bar spans +-offsetRange swing, so
-// the share of the bar that hits W20 is W20_SWING_GUARANTEE / offsetRange = the "zone": lighter = a smaller zone (a wider,
-// less precise swing), heavier = a bigger one. The tier uses the old weight number equal to the middle of its band
-// (x 200: 25 / 75 / 100 / 125 / 175) - the zone is `offsetZoneAtWeight100` (economy.json aim, 0.5) for 100 and a straight
-// line to 0 at weight 0 and to 1 at weight 200.
+// the share of the bar that hits W20 is W20_SWING_GUARANTEE / offsetRange = the "zone" - a band centered on the middle of the
+// bar that reaches out to both sides. Each tier has its own zone (economy.json weightTiers.offsetZone: very light 6.25%,
+// light 12.5%, moderate 25%, heavy 50%, very heavy 100% of the whole bar); a smaller zone = a longer, less precise swing.
+// A `precision` buff (x) multiplies the zone (x1.2 = 20% bigger), up to the whole bar.
 const DEFAULT_STRENGTH_BAND = { from: 0.375, to: 0.625 }; // moderate
 
 // Strength position -> apex height for a projectile (a straight line through W20's bottom at the band's start and top at its end).
@@ -146,17 +145,10 @@ function powerForApexOf(proj, apex) {
   return b.from + ((apex - W20.heightFrom) / (W20.heightTo - W20.heightFrom)) * (b.to - b.from);
 }
 
-// The share of the offset bar that is a guaranteed W20 hit (sideways) for a projectile of this weight.
-function offsetZone(weight, zoneAt100) {
-  const w = Math.min(Math.max(weight, 0), 2 * REFERENCE_WEIGHT);
-  return w <= REFERENCE_WEIGHT
-    ? (zoneAt100 * w) / REFERENCE_WEIGHT
-    : zoneAt100 + ((1 - zoneAt100) * (w - REFERENCE_WEIGHT)) / REFERENCE_WEIGHT;
-}
-
-// How far (in swing) the offset marker can drift from the middle - i.e. the bar spans +-this.
-function offsetRangeForWeight(weight, zoneAt100) {
-  return Math.min(10, W20_SWING_GUARANTEE / Math.max(0.015, offsetZone(weight, zoneAt100)));
+// How far (in swing) the offset marker can drift from the middle - i.e. the bar spans +-this - when `zone` (0..1) of the bar is the
+// guaranteed W20 hit. A zone of 1 = the whole bar hits (a bigger one would only waste the bar's ends), so it stops there.
+function offsetRangeForZone(zone) {
+  return Math.min(10, W20_SWING_GUARANTEE / Math.min(1, Math.max(0.015, zone)));
 }
 
 // The face window textures are exactly the size of the building's window INCLUDING its frame: 58x50 = W20's 52x44 glass plus a
@@ -457,17 +449,17 @@ class MainScene extends Phaser.Scene {
   // change the sliders (or the payout) of the throw in progress. The bars, their green lines and the event
   // dots are all drawn from this snapshot.
   //  angleRange: how far (in swing) the offset marker can drift, edge to edge of the bar - from the weight (see
-  //    "WEIGHT" above), narrowed by a precision buff; smaller = more precise.
+  //    "WEIGHT" above), narrowed by a precision buff (a bigger hit zone); smaller = more precise.
   //  powerRange: how much of the power span the strength slider covers (1 = all of it; strength-control buff).
   takeAimSnapshot() {
     const b = Buffs.modifiers();
     const cfg = { ...AIM_DEFAULTS, ...(this.eco.aim || {}) };
-    // The offset spread comes from the projectile's WEIGHT (heavier = a wider share of the bar is a hit), then a
-    // precision buff narrows it further.
-    const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
+    // The offset hit zone (the share of the bar that hits) comes from the projectile's weight tier, then a precision buff
+    // makes it bigger (zone x precision).
+    const zone = (typeof this.proj.offsetZone === "number" ? this.proj.offsetZone : DEFAULT_OFFSET_ZONE) * b.precision;
     this.aim = {
       markerHz: cfg.markerHz * b.sliderSpeed, // fixed speed, x the best slow-down buff (Triangles 0.8) - the same for both sliders
-      angleRange: offsetRangeForWeight(weight, cfg.offsetZoneAtWeight100) / b.precision,
+      angleRange: offsetRangeForZone(zone),
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Skyr) gives them
@@ -740,7 +732,7 @@ class MainScene extends Phaser.Scene {
   }
 
   // Turns what economy.json says about each projectile into what the game uses, once, right after loading:
-  //  - weight: the tier name -> its strength band, its label (shown on the card) and the equivalent weight number of the offset slider;
+  //  - weight: the tier name -> its strength band, its label (shown on the card) and its offset hit zone (offsetZone);
   //  - hitValue: from the projectile's rarity (rarities[].projectileHitValue), unless the projectile has a hitValue of its own.
   prepareProjectiles() {
     const tiers = Object.fromEntries((this.eco.weightTiers || []).map((t) => [t.id, t]));
@@ -752,7 +744,7 @@ class MainScene extends Phaser.Scene {
       p.weightId = t.id;
       p.weightLabel = t.label;
       p.strengthBand = { from: t.from, to: t.to };
-      p.weight = ((t.from + t.to) / 2) * 200; // the equivalent weight number (25 / 75 / 100 / 125 / 175): the offset slider's width
+      p.offsetZone = typeof t.offsetZone === "number" ? t.offsetZone : DEFAULT_OFFSET_ZONE; // the share of the offset bar that hits
       if (typeof p.hitValue !== "number") {
         const r = rarities[p.rarity];
         p.hitValue = r && typeof r.projectileHitValue === "number" ? r.projectileHitValue : 1;

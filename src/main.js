@@ -956,7 +956,7 @@ class MainScene extends Phaser.Scene {
 
   // ---- DIAMOND CROSS (buff effect `miracle`) ----
   // When the flight of a throw made with the buff stops (the projectile is at its apex, or - for a throw that would have gone over the
-  // roof - at the top of the picture), the buff is used up and:
+  // roof - at the top of the picture) (the buff is used up by the throw: its card stays until the impact) and:
   //  - no event running: a throw that landed in a goal window is left alone (a normal hit); one that missed is carried to the middle of W20;
   //  - the face event running: a throw that hit the face is left alone; anything else (a hit on W20 / W21 without the face, or a miss) is
   //    carried to the middle of the face.
@@ -972,7 +972,6 @@ class MainScene extends Phaser.Scene {
   }
 
   resolveMiracleThrow(x, h) {
-    Buffs.consumeCharge(this.aim.miracleId); // the Diamond Cross is used up by this throw, whatever it does
     const eventOn = this.bananaActive && !this.bananaHitTriggered;
     let hitWin = null;
     let faceHit = false;
@@ -993,6 +992,7 @@ class MainScene extends Phaser.Scene {
     }
     if (eventOn ? faceHit : hitWin) {
       this.finishThrow(true, hitWin, x, h, faceHit); // nothing to help with: exactly the normal hit
+      Buffs.consumeCharge(this.aim.miracleId); // the Diamond Cross is used up by this throw (its "+1" card goes at the impact)
       return;
     }
     const box = eventOn ? BANANA_FACE_BOX : W20;
@@ -1093,6 +1093,7 @@ class MainScene extends Phaser.Scene {
         this.destroyMiracleGlow(m);
         this.miracle = null;
         this.finishThrow(true, tg.win, tg.x, tg.h, tg.faceHit);
+        Buffs.consumeCharge(this.aim.miracleId); // the Diamond Cross is used up by this throw (its "+1" card goes at the impact)
         this.unduckMusic(); // the music comes back only now, after the projectile's impact (its sound has just started)
       }
     }

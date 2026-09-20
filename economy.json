@@ -117,7 +117,8 @@
         "duration": { "seconds": 120 },
         "image": "assets/items/water_bottle.png",
         "effects": [{ "type": "saveProjectile", "value": 0.1 }],
-        "description": "Has 10% chance to not consume projectile."
+        "description": "Contains hydration. Hydrates.",
+        "detail": "Save chance: 10%."
       },
       {
         "id": "snowy_cube",

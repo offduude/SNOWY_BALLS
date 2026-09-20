@@ -212,7 +212,7 @@
         "ignorePriceOverride": true,
         "image": "assets/snowball/rowan_berry.png",
         "effect": { "type": "givesProjectile", "value": "rowan_berry" },
-        "description": "Annoyingly imprecise. Not yummy."
+        "description": "Not yummy if you're not a bird."
       },
       {
         "id": "egg",

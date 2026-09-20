@@ -71,13 +71,13 @@
     "items": [
       {
         "id": "skyr",
-        "name": "Skyr",
+        "name": "Orange Skyr",
         "category": "consumable",
         "rarity": "rare",
         "priceRange": { "min": 43, "max": 72 },
         "ignorePriceOverride": true,
         "duration": { "seconds": 180 },
-        "image": "assets/items/skyr.png",
+        "image": "assets/items/skyr_orange.png",
         "effects": [{ "type": "guideLines", "value": 1 }],
         "description": "Improves brain function."
       },

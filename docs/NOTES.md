@@ -943,3 +943,5 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 - **Face multiplier x40 -> x2.5** (`events.faceWindow.faceMultiplier`): a face hit pays 10 (snowball), 40 (common), 6,000 (Grenade); fractions carry over.
 - `tools/economy_report.py` also flags a shop projectile whose hit value is not above its highest price per piece.
 - **Not in the game yet, kept for later:** `docs/FUTURE_PRICES.md` (reasoning, tables) and `docs/future_items.json` (ready-to-paste entries: epic standard, legendary standard and heavy hitter, common 1.1x coins, rare 20% save, epic 30% save and 1.35x, legendary 50% save, 1.5x and Sure Shot, which needs a new "guaranteed hit" mechanic).
+
+- **Skyr renamed** (2026-09-20): the buff (id `skyr`, unchanged so saves keep working) is now **Orange Skyr** with the picture `assets/items/skyr_orange.png` (economy.json only). The old `skyr.png` stays in the folder, unused.

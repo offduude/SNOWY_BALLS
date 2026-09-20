@@ -201,6 +201,19 @@
         "description": "Shines brighter with stronger projectiles."
       },
       {
+        "id": "daniels_coin",
+        "name": "Daniel's 3 PLN",
+        "category": "consumable",
+        "rarity": "legendary",
+        "priceRange": { "min": 4050, "max": 6750 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 120 },
+        "image": "assets/items/daniels_coin.png",
+        "effects": [{ "type": "coinMultiplier", "value": 1.5 }],
+        "description": "Won lawfully in a fair contest.",
+        "detail": "Coin bonus: 1.5x."
+      },
+      {
         "id": "grenade",
         "name": "Grenade",
         "category": "projectile",

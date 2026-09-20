@@ -1,5 +1,5 @@
 {
-  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20.",
+  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20. The legendary 1.5x coin bonus was added as Daniel's 3 PLN on 2026-09-20.",
   "projectiles": [
     {
       "_note": "EPIC STANDARD: the ordinary epic projectile (the Grenade is the epic heavy hitter). Average stack 3000, hit value 960 (the epic rarity default).",
@@ -143,30 +143,6 @@
       ],
       "description": "TBD",
       "detail": "Coin bonus: 1.35x."
-    },
-    {
-      "_note": "LEGENDARY coin bonus 1.5x.",
-      "id": "legendary_coin_bonus",
-      "name": "TBD",
-      "category": "consumable",
-      "rarity": "legendary",
-      "priceRange": {
-        "min": 4050,
-        "max": 6750
-      },
-      "ignorePriceOverride": true,
-      "duration": {
-        "seconds": 120
-      },
-      "image": "assets/items/TBD.png",
-      "effects": [
-        {
-          "type": "coinMultiplier",
-          "value": 1.5
-        }
-      ],
-      "description": "TBD",
-      "detail": "Coin bonus: 1.5x."
     },
     {
       "_note": "LEGENDARY FREE THROW (replaces the legendary 50% save): a one-time charge, no timer - the NEXT throw that would use up a bought projectile does not (never spent on the snowball; the save-chance roll comes first and the charge is only spent if that fails; several charges queue one per throw). NEEDS A NEW MECHANIC (effect 'freeThrow'). Worth one piece of the best projectile (3,000 standard, 7,500 heavy hitter): priced at one standard piece.",

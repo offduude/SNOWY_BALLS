@@ -681,6 +681,25 @@
       color: #ffffff;
     }
 
+    /* The card's background is tinted with its buff's rarity colour (set on the card as --tint by buffs.js) ... */
+    .buff-card.tinted {
+      background-image: linear-gradient(var(--tint), var(--tint));
+    }
+
+    /* ... and a LEGENDARY card gets the rainbow: waves travelling through the background, and a glow that pulses (the same
+       waves and shine as the rarity text, see .rarity-rainbow). */
+    .buff-card.rainbow {
+      background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.55), rgba(255, 168, 77, 0.55), rgba(255, 240, 77, 0.55), rgba(91, 255, 110, 0.55),
+        rgba(77, 210, 255, 0.55), rgba(106, 107, 255, 0.55), rgba(193, 77, 255, 0.55), rgba(255, 77, 77, 0.55));
+      background-size: 200% 100%;
+      animation: rarity-wave 2.4s linear infinite, buff-card-shine 1.7s ease-in-out infinite;
+    }
+
+    @keyframes buff-card-shine {
+      0%, 100% { box-shadow: 0 0 1px rgba(255, 255, 255, 0.15); filter: brightness(1); }
+      50% { box-shadow: 0 0 calc(var(--u) * 1.1) rgba(255, 255, 255, 0.85); filter: brightness(1.3); }
+    }
+
     .buff-card img,
     .buff-noimg {
       width: calc(var(--u) * 3);
@@ -1138,7 +1157,7 @@
     })();
   </script>
   <script src="src/rarity.js?v=2"></script>
-  <script src="src/buffs.js?v=14"></script>
+  <script src="src/buffs.js?v=15"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
   <script src="src/collection.js?v=45"></script>

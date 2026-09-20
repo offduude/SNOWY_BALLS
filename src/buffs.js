@@ -147,6 +147,18 @@ const Buffs = (() => {
     listeners.forEach((fn) => fn());
   }
 
+  // The background tint of a card: its rarity's colour (economy.json rarities) at ~40% (the class/style part of the card's HTML); the
+  // legendary rainbow gets an animated rainbow background instead (.buff-card.rainbow in index.html). "" if the item has no rarity.
+  function tintAttrs(item) {
+    const r = Rarity.info(Rarity.ofItem(item));
+    if (!r) return "";
+    if (r.color === "rainbow") return ' rainbow';
+    const m = /^#([0-9a-f]{6})$/i.exec(r.color || "");
+    if (!m) return "";
+    const n = parseInt(m[1], 16);
+    return ` tinted" style="--tint: rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.4)`;
+  }
+
   // The cards: icon + timer. Rebuilt only when the set of buffs changes; every tick just rewrites the timer text.
   function render() {
     if (!hudEl) return;
@@ -157,7 +169,7 @@ const Buffs = (() => {
       hudEl.innerHTML = list
         .map(
           (b) =>
-            `<div class="buff-card" data-id="${b.id}">` +
+            `<div class="buff-card${tintAttrs(b.item)}" data-id="${b.id}">` +
             (b.item.image ? `<img src="${b.item.image}" alt="" draggable="false" />` : `<span class="buff-noimg"></span>`) +
             `<span class="buff-timer">${formatTime(b.msLeft)}</span></div>`
         )

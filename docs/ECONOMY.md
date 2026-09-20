@@ -188,6 +188,7 @@ when none are left. Effects do not stack from the same buff. Different buffs of 
 |---|---|
 | `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise). Does NOT affect the yellow event dots, which always show |
 | `centerLine` | `1` = ONE green line at the middle of the hit zone on each slider: the middle of the offset bar, and the middle of the strength band that hits W20 from the chosen offset (Blue Skyr). Independent of `guideLines` (both can be on) |
+| `miracle` | `1` = the Diamond Cross: the NEXT throw is helped (see NOTES.md, "Diamond Cross"): no event running - a throw that misses is carried to the middle of W20; the face event running - anything but a face hit is carried to the middle of the face. Used up by that throw. Needs `"charge": true` on the item (no `duration`): it has no timer, its card shows "+1" |
 | `precision` | offset (angle) slider: its hit zone gets `value` times bigger (1.2 = 20% bigger, 25% -> 30%; at most the whole bar), so its range shrinks to 1/value (same marker speed) |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
 | `coinMultiplier` | multiplies the coins of a hit. Only whole coins are paid; the fraction is carried over to the next payout (5 x 1.1 = 5.5 pays 5 now and 6 next time), so a small multiplier is never rounded away |

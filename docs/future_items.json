@@ -1,5 +1,5 @@
 {
-  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20.",
+  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20 (branch diamond-cross, not pushed yet).",
   "projectiles": [
     {
       "_note": "EPIC STANDARD: the ordinary epic projectile (the Grenade is the epic heavy hitter). Average stack 3000, hit value 960 (the epic rarity default).",
@@ -167,29 +167,6 @@
       ],
       "description": "TBD",
       "detail": "Coin bonus: 1.5x."
-    },
-    {
-      "_note": "SURE SHOT (legendary): the NEXT throw hits, also a face during the banana event. NEEDS A NEW MECHANIC in the game (effect 'guaranteedHit', lasts until that throw is thrown - there is no time based duration). Worth 3000 on an ordinary throw, 7500 with a face event: priced 1800-3000.",
-      "id": "sure_shot",
-      "name": "TBD",
-      "category": "consumable",
-      "rarity": "legendary",
-      "priceRange": {
-        "min": 1800,
-        "max": 3000
-      },
-      "ignorePriceOverride": true,
-      "duration": {
-        "seconds": 3600
-      },
-      "image": "assets/items/TBD.png",
-      "effects": [
-        {
-          "type": "guaranteedHit",
-          "value": 1
-        }
-      ],
-      "description": "TBD"
     },
     {
       "_note": "LEGENDARY FREE THROW (replaces the legendary 50% save): a one-time charge, no timer - the NEXT throw that would use up a bought projectile does not (never spent on the snowball; the save-chance roll comes first and the charge is only spent if that fails; several charges queue one per throw). NEEDS A NEW MECHANIC (effect 'freeThrow'). Worth one piece of the best projectile (3,000 standard, 7,500 heavy hitter): priced at one standard piece.",

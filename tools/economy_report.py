@@ -45,8 +45,8 @@ def check(eco):
         seen.add(it.get("id"))
         if it.get("category") not in CATEGORIES:
             problems.append(f"{it.get('id')}: unknown category '{it.get('category')}'")
-        if it.get("category") == "consumable" and "duration" not in it:
-            problems.append(f"{it.get('id')}: consumable needs a 'duration'")
+        if it.get("category") == "consumable" and "duration" not in it and not it.get("charge"):
+            problems.append(f"{it.get('id')}: consumable needs a 'duration' (or charge: true)")
     # Empty slots simply show (TBD), so a shop with few or no items is allowed.
     projectiles = eco.get("projectiles", {})
     if "snowball" not in projectiles:

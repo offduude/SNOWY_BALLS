@@ -192,13 +192,13 @@ const Collection = (() => {
 
   function buffRowHtml(b) {
     const control = b.active
-      ? `<div class="pick-timer">${Buffs.formatTime(b.msLeft)}</div>`
+      ? `<div class="pick-timer">${Buffs.timeText(b.item, b.msLeft)}</div>`
       : `<button class="pick-equip pick-use" type="button" data-id="${esc(b.id)}">USE</button>`;
     // The bottom line (the item's `detail`, e.g. "Coin bonus: 1.2x."), drawn over the bottom of the card (it takes no
     // room of its own, so the card's height stays fixed).
     // Under the USE button: how long the buff lasts once used ("03:00") - the same style as "MAX" under a snowball's EQUIP button.
     // (Not the running timer: while the buff is active its own countdown takes the button's place, and this stays under it.)
-    const maxTime = `<div class="pick-regen">${clock(Buffs.durationMs(b.item))}</div>`;
+    const maxTime = `<div class="pick-regen">${Buffs.isCharge(b.item) ? "+1" : clock(Buffs.durationMs(b.item))}</div>`;
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (
       `<div class="pick-row buff-row" data-id="${esc(b.id)}">` +
@@ -258,7 +258,7 @@ const Collection = (() => {
     }
     list.forEach((b) => {
       const t = scrollEl.querySelector(`.pick-row[data-id="${b.id}"] .pick-timer`);
-      if (t) t.textContent = Buffs.formatTime(b.msLeft);
+      if (t) t.textContent = Buffs.timeText(b.item, b.msLeft);
     });
   }
 

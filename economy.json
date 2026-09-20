@@ -189,6 +189,18 @@
         "description": "It's insides carry a scent that few people adore."
       },
       {
+        "id": "diamond_cross",
+        "name": "Diamond Cross",
+        "category": "consumable",
+        "rarity": "legendary",
+        "priceRange": { "min": 1800, "max": 3000 },
+        "ignorePriceOverride": true,
+        "charge": true,
+        "image": "assets/items/diamond_cross.png",
+        "effects": [{ "type": "miracle", "value": 1 }],
+        "description": "Shines brighter with stronger projectiles."
+      },
+      {
         "id": "grenade",
         "name": "Grenade",
         "category": "projectile",

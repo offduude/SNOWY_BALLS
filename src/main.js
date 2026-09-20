@@ -248,6 +248,11 @@ const MUSIC_FADE_MS = 1500;
 const BALL_SIZE = 16;
 const BALL_APEX_SCALE = 0.5;
 const BALL_REGROW_MS = 450;
+// DIAMOND CROSS (the buff effect `miracle`): a throw that would miss hangs at its apex, is carried to the goal window (or the event) while the
+// angels sing, hangs there again, and is released as a hit - see resolveMiracleThrow.
+const MIRACLE_HANG_MS = 500; // the pause before the angels start and the pause after they have carried it
+const MIRACLE_MUSIC_FADE_MS = 300; // how quickly the music fades out before the angels and back in after them
+const MIRACLE_MOVE_MS = 3000; // the length of angels.mp3 (the real length is used once the sound is loaded)
 const BALL_CURVE_K = 9; // how sharply the curve bends (higher = more of the change happens near the wall)
 // 0..1 -> 0..1: log(1 + K x) / log(1 + K), steep near 0, flat near 1
 function logCurve(x) {
@@ -324,6 +329,7 @@ class MainScene extends Phaser.Scene {
     this.load.audio("grenade_launch", "assets/audio/grenade_launch.mp3");
     this.load.audio("grenade_impact", "assets/audio/grenade_impact.mp3");
     this.load.audio("buff_use", "assets/audio/buff_use.mp3");
+    this.load.audio("angels", "assets/audio/angels.mp3");
     this.load.audio("hard_impact", "assets/audio/hard_impact.mp3");
     this.load.audio("egg_impact", "assets/audio/egg_impact.mp3");
   }
@@ -470,6 +476,7 @@ class MainScene extends Phaser.Scene {
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Orange Skyr) gives them
+      miracleId: b.miracle > 0 ? b.miracleBy : null, // the Diamond Cross that helps THIS throw (used up when the throw reaches its apex)
       centerLine: b.centerLine > 0, // one green line at the middle of the hit zone on each slider (Blue Skyr)
       saveProjectile: b.saveProjectile, // chance (0-1) that this throw does not use up its projectile (Water Bottle) - the best running buff's
       saveProjectileBy: b.saveProjectileBy, // ... and which buff that is (its icon is shown when it saves one)
@@ -739,6 +746,24 @@ class MainScene extends Phaser.Scene {
     ].filter(Boolean);
   }
 
+  // The miracle of the Diamond Cross: the music (theme, and the event music if it is on) fades out quickly so only the angels are
+  // heard, and fades back in when they are done. The volumes it fades back to are read at that moment (an event may have changed them).
+  duckMusic() {
+    (this.musicTweens || []).forEach((tw) => tw.stop());
+    if (this.duckTween) this.duckTween.forEach((tw) => tw.stop());
+    const to0 = (sound) => (sound ? this.tweens.add({ targets: sound, volume: 0, duration: MIRACLE_MUSIC_FADE_MS, ease: "Sine.easeInOut" }) : null);
+    this.duckTween = [to0(this.theme), to0(this.eventMusic)].filter(Boolean);
+  }
+
+  unduckMusic() {
+    if (this.duckTween) this.duckTween.forEach((tw) => tw.stop());
+    const back = (sound, to) => (sound ? this.tweens.add({ targets: sound, volume: to, duration: MIRACLE_MUSIC_FADE_MS, ease: "Sine.easeInOut" }) : null);
+    this.duckTween = [
+      back(this.theme, this.eventMusicOn ? 0 : THEME_VOLUME),
+      back(this.eventMusic, this.eventMusicOn ? EVENT_MUSIC_VOLUME : 0),
+    ].filter(Boolean);
+  }
+
   // Turns what economy.json says about each projectile into what the game uses, once, right after loading:
   //  - weight: the tier name -> its strength band, its label (shown on the card) and its offset hit zone (offsetZone);
   //  - hitValue: from the projectile's rarity (rarities[].projectileHitValue), unless the projectile has a hitValue of its own.
@@ -807,6 +832,7 @@ class MainScene extends Phaser.Scene {
   launchBall() {
     this.state = STATE.FLIGHT;
     this.flightTime = 0;
+    this.miracle = null;
     Economy.setAiming(false); // thrown: the aim is no longer open
 
     const swing = (this.angleValue - 0.5) * 2; // -1..1
@@ -832,11 +858,19 @@ class MainScene extends Phaser.Scene {
   }
 
   updateFlight(dt) {
+    if (this.miracle) {
+      this.updateMiracle(dt);
+      return;
+    }
     this.flightTime += dt;
-    const reachedApex = this.flightTime >= this.apexTime;
+    // A Diamond Cross throw ALWAYS stops at its apex (also one that would have gone over the roof: it stops at the top of the picture),
+    // keeping its size, so it can be carried to the goal.
+    const helping = !!this.aim.miracleId;
+    const stopT = helping ? this.miracleStopTime() : this.apexTime;
+    const reachedApex = this.flightTime >= stopT;
     // Normally the flight freezes at the apex (the ball sticks there); a ball that fell behind the
     // roof keeps following its arc back down.
-    const t = reachedApex && !this.fallsBehind ? this.apexTime : this.flightTime;
+    const t = helping ? Math.min(this.flightTime, stopT) : reachedApex && !this.fallsBehind ? this.apexTime : this.flightTime;
 
     const x = this.ballStartX + this.ballVX * t;
     const heightClimbed = this.ballVY0 * t - 0.5 * GRAVITY * t * t;
@@ -847,33 +881,21 @@ class MainScene extends Phaser.Scene {
     this.ball.setDisplaySize(BALL_SIZE * shrink, BALL_SIZE * shrink);
     if (this.proj.spins) this.ball.setRotation(t * SPIN_RATE); // stops turning at the apex, where it hits the wall
 
-    if (this.cameraFollowing) {
-      const targetScrollY = y - GAME_HEIGHT * 0.6;
-      // Frame-rate independent smoothing: a fixed per-frame fraction (the old 0.12) moves the
-      // camera by different amounts on uneven frames, which reads as the whole screen shaking.
-      const follow = 1 - Math.exp(-14 * dt);
-      // Never show anything above the top of the texture.
-      const clampedTarget = Math.max(targetScrollY, -TOP_BOUNDARY_HEIGHT);
-      // Whole pixels only, like scrollX: a fractional scrollY that creeps toward the top limit
-      // (-659.99 ... -660) made the whole picture snap down 1px at the very end, which read as the
-      // camera jumping (worst right after the apex of a ball that falls back behind the roof).
-      // The min 1px step keeps the rounding from stalling the camera a couple of pixels short.
-      const cam = this.cameras.main;
-      const cur = Math.round(cam.scrollY);
-      const goal = Math.round(clampedTarget);
-      let next = Math.round(Phaser.Math.Linear(cur, clampedTarget, follow));
-      if (next === cur && cur !== goal) next = cur + Math.sign(goal - cur);
-      cam.scrollY = next;
-    }
+    this.followBallCamera(y, dt);
 
     // Flew out through the top of the building: no wall to stick to, so end the throw right
     // here as if it had landed (camera goes back to the character via the normal result flow).
-    if (heightClimbed >= TOP_BOUNDARY_HEIGHT) {
+    if (!helping && heightClimbed >= TOP_BOUNDARY_HEIGHT) {
       this.finishThrow(false, null, x, heightClimbed, false, true);
       return;
     }
 
     if (!reachedApex) return;
+
+    if (helping) {
+      this.resolveMiracleThrow(x, heightClimbed);
+      return;
+    }
 
     if (this.fallsBehind) {
       // Coming down past the roof: everything below the roof edge is behind the building, so mask the
@@ -904,6 +926,171 @@ class MainScene extends Phaser.Scene {
     }
 
     this.finishThrow(false, null, x, heightClimbed, false);
+  }
+
+  // The camera follows the ball (from the launch until the throw is over).
+  followBallCamera(y, dt) {
+    if (!this.cameraFollowing) return;
+    const targetScrollY = y - GAME_HEIGHT * 0.6;
+    // Frame-rate independent smoothing: a fixed per-frame fraction (the old 0.12) moves the
+    // camera by different amounts on uneven frames, which reads as the whole screen shaking.
+    const follow = 1 - Math.exp(-14 * dt);
+    // Never show anything above the top of the texture.
+    const clampedTarget = Math.max(targetScrollY, -TOP_BOUNDARY_HEIGHT);
+    // Whole pixels only, like scrollX: a fractional scrollY that creeps toward the top limit
+    // (-659.99 ... -660) made the whole picture snap down 1px at the very end, which read as the
+    // camera jumping (worst right after the apex of a ball that falls back behind the roof).
+    // The min 1px step keeps the rounding from stalling the camera a couple of pixels short.
+    const cam = this.cameras.main;
+    const cur = Math.round(cam.scrollY);
+    const goal = Math.round(clampedTarget);
+    let next = Math.round(Phaser.Math.Linear(cur, clampedTarget, follow));
+    if (next === cur && cur !== goal) next = cur + Math.sign(goal - cur);
+    cam.scrollY = next;
+  }
+
+  // ---- DIAMOND CROSS (buff effect `miracle`) ----
+  // When the flight of a throw made with the buff stops (the projectile is at its apex, or - for a throw that would have gone over the
+  // roof - at the top of the picture), the buff is used up and:
+  //  - no event running: a throw that landed in a goal window is left alone (a normal hit); one that missed is carried to the middle of W20;
+  //  - the face event running: a throw that hit the face is left alone; anything else (a hit on W20 / W21 without the face, or a miss) is
+  //    carried to the middle of the face.
+  // "Carried": it hangs where it is for half a second, then angels.mp3 plays (3 s) while it moves to the target, shining, it hangs there for
+  // half a second and is released as a normal hit (finishThrow: sound, mark or bounce, coins, streak, and the face reaction).
+
+  // The flight time at which a Diamond Cross throw stops: its apex, but never above the top of the picture.
+  miracleStopTime() {
+    const top = TOP_BOUNDARY_HEIGHT - 2;
+    const apexHeight = (this.ballVY0 * this.ballVY0) / (2 * GRAVITY);
+    if (apexHeight < top) return this.apexTime;
+    return (this.ballVY0 - Math.sqrt(this.ballVY0 * this.ballVY0 - 2 * GRAVITY * top)) / GRAVITY;
+  }
+
+  resolveMiracleThrow(x, h) {
+    Buffs.consumeCharge(this.aim.miracleId); // the Diamond Cross is used up by this throw, whatever it does
+    const eventOn = this.bananaActive && !this.bananaHitTriggered;
+    let hitWin = null;
+    let faceHit = false;
+    if (!this.fallsBehind) {
+      for (const win of WINDOWS) {
+        if (x >= win.xFrom && x <= win.xTo && h >= win.heightFrom && h <= win.heightTo) {
+          hitWin = win;
+          faceHit =
+            eventOn &&
+            win === W20 &&
+            x >= BANANA_FACE_BOX.xFrom &&
+            x <= BANANA_FACE_BOX.xTo &&
+            h >= BANANA_FACE_BOX.heightFrom &&
+            h <= BANANA_FACE_BOX.heightTo;
+          break;
+        }
+      }
+    }
+    if (eventOn ? faceHit : hitWin) {
+      this.finishThrow(true, hitWin, x, h, faceHit); // nothing to help with: exactly the normal hit
+      return;
+    }
+    const box = eventOn ? BANANA_FACE_BOX : W20;
+    this.startMiracle(x, h, {
+      x: (box.xFrom + box.xTo) / 2,
+      h: (box.heightFrom + box.heightTo) / 2,
+      win: W20,
+      faceHit: eventOn,
+    });
+  }
+
+  startMiracle(x, h, target) {
+    if (!this.textures.exists("miracle_glow")) this.makeMiracleGlowTexture();
+    // Shines brighter with stronger projectiles: the glow grows with the log of the projectile's hit value (snowball 0.85, grenade 1.55).
+    const strength = 0.7 + 0.25 * Math.log10(Math.max(1, this.proj.hitValue));
+    this.miracle = { phase: "hang1", t: 0, fromX: x, fromH: h, target, strength, glow: null };
+    this.duckMusic(); // quiet by the time the angels start (the pause is half a second)
+  }
+
+  makeMiracleGlowTexture() {
+    const tex = this.textures.createCanvas("miracle_glow", 128, 128);
+    const ctx = tex.getContext();
+    const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.2, "rgba(255,250,215,0.9)");
+    grad.addColorStop(0.5, "rgba(255,232,150,0.4)");
+    grad.addColorStop(1, "rgba(255,220,120,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 128);
+    tex.refresh();
+    tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
+
+  // The shine around the carried projectile: a big soft halo and a hot core that pulse, plus a few sparkles circling it.
+  createMiracleGlow() {
+    const add = () => this.add.image(0, 0, "miracle_glow").setDepth(11).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    const glow = { halo: add(), core: add(), sparks: [] };
+    for (let i = 0; i < 6; i++) glow.sparks.push(add());
+    return glow;
+  }
+
+  updateMiracleGlow(m, dt) {
+    const g = m.glow;
+    if (!g) return;
+    m.spin = (m.spin || 0) + dt * 2.2;
+    const pulse = 0.5 + 0.5 * Math.sin(m.spin * 3.1);
+    const k = m.strength;
+    const bx = this.ball.x;
+    const by = this.ball.y;
+    g.halo.setPosition(bx, by).setDisplaySize(k * (56 + 26 * pulse), k * (56 + 26 * pulse)).setAlpha(Math.min(1, 0.75 + 0.25 * pulse));
+    g.core.setPosition(bx, by).setDisplaySize(k * (20 + 9 * pulse), k * (20 + 9 * pulse)).setAlpha(1);
+    g.sparks.forEach((sp, i) => {
+      const a = m.spin + (i * Math.PI * 2) / g.sparks.length;
+      const r = k * (15 + 4 * Math.sin(m.spin * 2 + i));
+      const tw = 0.5 + 0.5 * Math.sin(m.spin * 5 + i * 1.7);
+      sp.setPosition(bx + Math.cos(a) * r, by + Math.sin(a) * r * 0.8).setAlpha(tw).setDisplaySize(6 * k + 2, 6 * k + 2);
+    });
+  }
+
+  destroyMiracleGlow(m) {
+    const g = m && m.glow;
+    if (!g) return;
+    [g.halo, g.core, ...g.sparks].forEach((o) => o.destroy());
+    m.glow = null;
+  }
+
+  updateMiracle(dt) {
+    const m = this.miracle;
+    m.t += dt * 1000;
+    const tg = m.target;
+    if (m.phase === "hang1") {
+      this.followBallCamera(this.worldY(m.fromH), dt);
+      if (m.t >= MIRACLE_HANG_MS) {
+        m.phase = "move";
+        m.t = 0;
+        const snd = this.sound.add("angels", { volume: 0.9 });
+        m.moveMs = snd.duration > 0.5 ? snd.duration * 1000 : MIRACLE_MOVE_MS;
+        snd.play();
+        m.sound = snd;
+        m.glow = this.createMiracleGlow();
+      }
+    } else if (m.phase === "move") {
+      const k = Math.min(1, m.t / m.moveMs);
+      const e = -(Math.cos(Math.PI * k) - 1) / 2; // Sine.easeInOut
+      const x = m.fromX + (tg.x - m.fromX) * e;
+      const h = m.fromH + (tg.h - m.fromH) * e;
+      this.ball.setPosition(x, this.worldY(h));
+      this.followBallCamera(this.worldY(h), dt);
+      this.updateMiracleGlow(m, dt);
+      if (k >= 1) {
+        m.phase = "hang2";
+        m.t = 0;
+        this.unduckMusic(); // the angels are done: the music comes back
+      }
+    } else if (m.phase === "hang2") {
+      this.followBallCamera(this.worldY(tg.h), dt);
+      this.updateMiracleGlow(m, dt);
+      if (m.t >= MIRACLE_HANG_MS) {
+        this.destroyMiracleGlow(m);
+        this.miracle = null;
+        this.finishThrow(true, tg.win, tg.x, tg.h, tg.faceHit);
+      }
+    }
   }
 
   // A projectile that leaves no mark hits the wall at its apex, glances off further the way it was
@@ -1171,6 +1358,13 @@ class MainScene extends Phaser.Scene {
   // was never actually touched, this overlay just sits on top of it).
   endBananaEvent() {
     if (!this.bananaActive) return;
+    // An event never ends while a throw is being aimed or is in the air (whatever ends it: its own timer, or the buff that made it):
+    // the end waits until the throw is over (checked every frame in update()).
+    if (!this.canEventEnd()) {
+      this.eventEndPending = true;
+      return;
+    }
+    this.eventEndPending = false;
     this.setEventMusic(false);
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
     this.buffEventId = null;
@@ -1184,10 +1378,16 @@ class MainScene extends Phaser.Scene {
     });
   }
 
+  // False while the player is aiming or the projectile is flying (the miracle of the Diamond Cross included): see endBananaEvent.
+  canEventEnd() {
+    return this.state !== STATE.AIM_ANGLE && this.state !== STATE.AIM_POWER && this.state !== STATE.FLIGHT;
+  }
+
   // Hitting the face: cancels the pending 20s revert, quickly swaps to goal_window_face_hit,
   // then after events.faceWindow.hitRevertMs fades both the texture and the mark that triggered it back
   // to nothing together.
   triggerBananaHit(mark) {
+    this.eventEndPending = false; // (the hit ends the event by itself)
     this.setEventMusic(false); // the event is over the moment the face is hit: the music fades out while the face fades away
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
     if (this.buffEventId) {
@@ -1443,6 +1643,7 @@ class MainScene extends Phaser.Scene {
     } else if (this.state === STATE.FLIGHT) {
       this.updateFlight(dt);
     }
+    if (this.eventEndPending && this.canEventEnd()) this.endBananaEvent(); // an event whose end was held back by a throw
     this.updateBounce(dt);
     this.updateFallingBalls(dt);
 

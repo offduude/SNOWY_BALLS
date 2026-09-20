@@ -9,6 +9,8 @@
 //
 // Effect types (economy.json item `effects`: [{ "type", "value" }], values multiply if several buffs share a type):
 //   guideLines       1     shows the green guarantee lines on both sliders (hidden without this buff)
+//   miracle          1     Diamond Cross: the NEXT throw is helped if it misses (see main.js resolveMiracleThrow) and the buff is used up by
+//                          that throw. A "charge" buff (`charge: true` on the item, no `duration`): no timer, its card shows "+1" instead
 //   centerLine       1     draws ONE green line on each slider, at the middle of the hit zone (the middle of the offset bar; the middle of the
 //                          strength band that hits W20 from the chosen offset) - Blue Skyr. Any active source turns it on; it works with or without guideLines
 //   precision        x     offset (angle) slider: its hit zone gets x times bigger (x1.2 = 20% bigger, e.g. 25% of the bar -> 30%, never over
@@ -37,7 +39,20 @@ const Buffs = (() => {
     return eco.shop.items.find((it) => it.id === id) || null;
   }
 
+  // A charge buff (item.charge) has no timer: it stays until the throw it is for uses it up (so: "forever" on the device clock).
+  const CHARGE_MS = 10 * 365 * 24 * 3600 * 1000;
+
+  function isCharge(item) {
+    return !!(item && item.charge);
+  }
+
+  // What a card shows as its time: mm:ss, or "+1" for a charge buff.
+  function timeText(item, ms) {
+    return isCharge(item) ? "+1" : formatTime(ms);
+  }
+
   function durationMs(item) {
+    if (isCharge(item)) return CHARGE_MS;
     const s = item.duration && item.duration.seconds;
     return (s > 0 ? s : 60) * 1000;
   }
@@ -65,11 +80,14 @@ const Buffs = (() => {
   function modifiers() {
     let notSaved = 1; // the chance that no running buff saves the projectile
     let bestSave = 0;
-    const m = { guideLines: 0, centerLine: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1 };
+    const m = { guideLines: 0, centerLine: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1, miracle: 0, miracleBy: null };
     for (const b of active()) {
       for (const e of b.item.effects || []) {
         if (!(e.type in m)) continue;
-        if (e.type === "guideLines" || e.type === "centerLine") m[e.type] += e.value; // a switch: any active source turns it on
+        if (e.type === "miracle") {
+          m.miracle += e.value;
+          m.miracleBy = b.id;
+        } else if (e.type === "guideLines" || e.type === "centerLine") m[e.type] += e.value; // a switch: any active source turns it on
         else if (e.type === "saveProjectile") {
           notSaved *= 1 - e.value; // independent rolls: the projectile is used up only if EVERY buff's roll fails
           if (e.value > bestSave) {
@@ -176,13 +194,13 @@ const Buffs = (() => {
           (b) =>
             `<div class="buff-card${tintAttrs(b.item)}" data-id="${b.id}">` +
             (b.item.image ? `<img src="${b.item.image}" alt="" draggable="false" />` : `<span class="buff-noimg"></span>`) +
-            `<span class="buff-timer">${formatTime(b.msLeft)}</span></div>`
+            `<span class="buff-timer">${timeText(b.item, b.msLeft)}</span></div>`
         )
         .join("");
     } else {
       list.forEach((b) => {
         const t = hudEl.querySelector(`.buff-card[data-id="${b.id}"] .buff-timer`);
-        if (t) t.textContent = formatTime(b.msLeft);
+        if (t) t.textContent = timeText(b.item, b.msLeft);
       });
     }
   }
@@ -213,6 +231,9 @@ const Buffs = (() => {
     },
     active,
     durationMs,
+    isCharge,
+    timeText,
+    consumeCharge: cancel, // a charge buff is used up: its card goes
     owned,
     use,
     modifiers,

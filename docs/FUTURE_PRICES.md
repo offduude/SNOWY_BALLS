@@ -40,13 +40,13 @@ legendary 12.5 h / 6.6 h.
 |---|---|---|---|---|---|---|
 | common | Water Bottle | 10% chance not to use up the projectile | 2 min | 5 | 2-4 (3) | in the game (2-4, 120 s; was 60 s, 16-33) |
 | common | Snowy Cube | 1.1x coins | 2 min | 6 | 3-5 (4) | in the game (added 2026-09-20) |
-| rare | Triangles | both sliders at 0.8x speed | 3 min (was 2) | 64 | 29-48 (38) | in the game (was 93-156, now the range above) |
+| rare | Triangles | the OFFSET slider at 0.8x speed (was both sliders; the strength slider is not slowed any more) | 3 min (was 2) | 64 | 29-48 (38) | in the game (was 93-156, now the range above) |
 | rare | Skyr | green guide lines on both sliders | 3 min (as now) | 96 | 43-72 (58) | in the game (now rare; was epic, 530-719) |
 | rare | Mints | 20% chance not to use up the projectile | 2 min | 80 | 36-60 (48) | in the game (added 2026-09-20) |
 | rare | Kaiser Roll | 1.2x coins | 2 min (as now) | 96 | 43-72 (58) | in the game (was 93-156, now the range above) |
-| epic | *(new)* save | 30% chance not to use up the projectile | 2 min | 900 | 400-680 (540) | future |
+| epic | *(new)* save | **50%** chance not to use up the projectile (was 30%) | 2 min | 1,500 | 675-1,125 (900) | future |
 | epic | *(new)* coin bonus | 1.35x coins | 2 min | 1,260 | 570-940 (756) | future |
-| legendary | *(new)* save | 50% chance not to use up the projectile | 2 min | 7,500 | 3,400-5,600 (4,500) | future |
+| legendary | *(new)* free throw | replaces the 50% save: the next throw does not use up a bought projectile (a one-time charge, no timer; needs a new mechanic) | until thrown | 3,000 (7,500 on a heavy hitter) | 2,250-3,750 (3,000) | future |
 | legendary | *(new)* coin bonus | 1.5x coins | 2 min | 9,000 | 4,050-6,750 (5,400) | future |
 | legendary | *(new)* Sure Shot | the next throw hits, also a face during the banana event | until thrown | 3,000 (7,500 with a face event) | 1,800-3,000 (2,400) | future |
 | legendary | Tomato Juice | starts the banana face event (face multiplier x2.5) | 20 s (as now) | 6,840 on a standard stack, 17,100 on a heavy hitter | 3,100-5,100 (4,100) | in the game (3,100-5,100, face x2.5; was 2,343-3,906, face x40) |
@@ -68,3 +68,7 @@ depend on the projectile, use: 2.5 x the buff's price / the hit value, kept betw
 ## Effect of moving Skyr to rare on the shop odds
 
 Rare items: Kaiser Roll, Triangles, Skyr, Pinecone, Egg = 6% each (was 7.5% with four); epic then holds only the Grenade at 9% (was 4.5% each).
+
+## Stacking (2026-09-20)
+
+Buffs of the same kind stack: save chances as independent rolls (10 / 20 / 50 = 64% together, never above 75%), coin multipliers multiply (no cap: 1.1 x 1.2 x 1.35 x 1.5 = 2.67x with the planned ladder), the Triangles slow-downs multiply on the offset slider only (no floor). The prices above were set for one buff at a time; with stacking each extra buff of a kind returns a little less than its own price implies.

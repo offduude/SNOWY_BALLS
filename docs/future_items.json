@@ -98,14 +98,14 @@
   ],
   "buffs": [
     {
-      "_note": "EPIC save chance 30%.",
+      "_note": "EPIC save chance 50% (was 30%): save chances stack as independent rolls (10 / 20 / 50 -> 64% together). Price = 60% of half a 3,000 stack.",
       "id": "epic_save",
       "name": "TBD",
       "category": "consumable",
       "rarity": "epic",
       "priceRange": {
-        "min": 400,
-        "max": 680
+        "min": 675,
+        "max": 1125
       },
       "ignorePriceOverride": true,
       "duration": {
@@ -115,7 +115,7 @@
       "effects": [
         {
           "type": "saveProjectile",
-          "value": 0.3
+          "value": 0.5
         }
       ],
       "description": "TBD"
@@ -143,29 +143,6 @@
       ],
       "description": "TBD",
       "detail": "Coin bonus: 1.35x."
-    },
-    {
-      "_note": "LEGENDARY save chance 50%.",
-      "id": "legendary_save",
-      "name": "TBD",
-      "category": "consumable",
-      "rarity": "legendary",
-      "priceRange": {
-        "min": 3400,
-        "max": 5600
-      },
-      "ignorePriceOverride": true,
-      "duration": {
-        "seconds": 120
-      },
-      "image": "assets/items/TBD.png",
-      "effects": [
-        {
-          "type": "saveProjectile",
-          "value": 0.5
-        }
-      ],
-      "description": "TBD"
     },
     {
       "_note": "LEGENDARY coin bonus 1.5x.",
@@ -213,6 +190,30 @@
         }
       ],
       "description": "TBD"
+    },
+    {
+      "_note": "LEGENDARY FREE THROW (replaces the legendary 50% save): a one-time charge, no timer - the NEXT throw that would use up a bought projectile does not (never spent on the snowball; the save-chance roll comes first and the charge is only spent if that fails; several charges queue one per throw). NEEDS A NEW MECHANIC (effect 'freeThrow'). Worth one piece of the best projectile (3,000 standard, 7,500 heavy hitter): priced at one standard piece.",
+      "id": "free_throw",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "legendary",
+      "priceRange": {
+        "min": 2250,
+        "max": 3750
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 3600
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "freeThrow",
+          "value": 1
+        }
+      ],
+      "description": "TBD",
+      "detail": "Next throw is free."
     }
   ],
   "price_ladder_summary": {
@@ -241,6 +242,8 @@
       "epic": 550,
       "legendary": 5000
     },
-    "face_multiplier": "x2.5 fits a legendary standard projectile; with a lower-tier projectile it pays little (a buff for the best projectile). If it should depend on the projectile: 2.5 x the buff's price / the hit value, kept between x2 and x20."
+    "face_multiplier": "x2.5 fits a legendary standard projectile; with a lower-tier projectile it pays little (a buff for the best projectile). If it should depend on the projectile: 2.5 x the buff's price / the hit value, kept between x2 and x20.",
+    "save_chance_ladder": "10% common (Water Bottle), 20% rare (Mints), 50% epic (planned); they stack as independent rolls, 64% together, capped at 75%. Legendary = a one-time free throw instead of a percentage.",
+    "stacking": "Save chances: independent rolls, cap 75%. Coin multipliers and offset slow-downs multiply, no cap."
   }
 }

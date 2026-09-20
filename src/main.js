@@ -464,7 +464,8 @@ class MainScene extends Phaser.Scene {
     // makes it bigger (zone x precision).
     const zone = (typeof this.proj.offsetZone === "number" ? this.proj.offsetZone : DEFAULT_OFFSET_ZONE) * b.precision;
     this.aim = {
-      markerHz: cfg.markerHz * b.sliderSpeed, // fixed speed, x the best slow-down buff (Triangles 0.8) - the same for both sliders
+      markerHz: cfg.markerHz, // the STRENGTH marker's fixed speed
+      angleMarkerHz: cfg.markerHz * b.offsetSpeed, // the OFFSET marker's: the same, x the slow-down buffs (Triangles 0.8 x 0.9 ...)
       angleRange: offsetRangeForZone(zone),
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
@@ -1432,7 +1433,7 @@ class MainScene extends Phaser.Scene {
       // full swing edge to edge, so a smaller range (chestnut, precision buff) is finer aim but the marker
       // itself never moves faster on screen.
       const a = this.aim;
-      const pos = pingPong(elapsed * a.markerHz);
+      const pos = pingPong(elapsed * a.angleMarkerHz);
       this.angleValue = 0.5 + (pos - 0.5) * a.angleRange;
     } else if (this.state === STATE.AIM_POWER) {
       const elapsed = (time - this.aimStartTime) / 1000;

@@ -55,7 +55,7 @@ not the projectile - those only change how wide the sliders are).
 
 | field | meaning |
 |---|---|
-| `markerHz` | back-and-forth sweeps per second (`1.275` = one sweep in about 0.8s; it was 0.85) |
+| `markerHz` | back-and-forth sweeps per second (`1.275` = one sweep in about 0.8s; it was 0.85); the offset marker is slowed by `offsetSpeed` buffs (Triangles), the strength marker never is |
 | (the offset hit zone) | is not set here any more: it comes from the projectile's tier, `weightTiers[].offsetZone` (see "weight" below) |
 
 ## rarities (live)
@@ -182,7 +182,7 @@ A `consumable` item is a timed **buff**. Buying one only puts it in the **invent
 It is **used from the BUFFS tab**: the USE button takes one out of the inventory and starts it for `duration.seconds`, and the button
 turns into the running timer (device clock, so it keeps running while the app is closed and is saved). While a buff is running it
 can't be used again (its button is a timer); when it ends the USE button comes back if there are more, and the card leaves the list
-when none are left. Effects do not stack from the same buff. Different buffs of the same kind STACK (`Buffs.modifiers`, limits in `buffCaps`): save chances as independent rolls (10% + 20% = 28%, at most 75%), coin multipliers multiply (1.1 x 1.2 = 1.32, at most x2), pointer slow-downs multiply (0.9 x 0.8 = 0.72, never below 0.6). Its `effects` list is what it does:
+when none are left. Effects do not stack from the same buff. Different buffs of the same kind STACK (`Buffs.modifiers`): save chances as independent rolls (10% + 20% = 28%, at most `buffCaps.saveProjectile` 75% - the only cap), coin multipliers multiply (1.1 x 1.2 = 1.32, no cap), offset slow-downs multiply (0.9 x 0.8 = 0.72, no floor). Its `effects` list is what it does:
 
 | type | value means |
 |---|---|
@@ -191,7 +191,7 @@ when none are left. Effects do not stack from the same buff. Different buffs of 
 | `precision` | offset (angle) slider: its hit zone gets `value` times bigger (1.2 = 20% bigger, 25% -> 30%; at most the whole bar), so its range shrinks to 1/value (same marker speed) |
 | `strengthControl` | strength (power) slider: same, its range shrinks to 1/value around the middle of the bar |
 | `coinMultiplier` | multiplies the coins of a hit. Only whole coins are paid; the fraction is carried over to the next payout (5 x 1.1 = 5.5 pays 5 now and 6 next time), so a small multiplier is never rounded away |
-| `sliderSpeed` | both sliders move at this fraction of their speed (`0.8` = 20% slower); several such buffs multiply (0.9 x 0.8 = 0.72) but the speed never goes below `buffCaps.sliderSpeedMin` (0.6) |
+| `offsetSpeed` | the OFFSET slider's marker moves at this fraction of its speed (`0.8` = 20% slower); the strength slider is not affected. Several such buffs multiply (0.9 x 0.8 = 0.72), no floor |
 | `saveProjectile` | chance (0-1, e.g. `0.1` = 10%) that a throw does not use up its projectile (any projectile, the snowball included); several such buffs stack as independent rolls (10% + 20% = 28%, at most `buffCaps.saveProjectile`, 75%). When one saves a projectile the result text gets a "Saved Projectile" line |
 | `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 20 s, the same as the natural event; its hit pays the face multiplier x2.5). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual face multiplier (x2.5) |
 
@@ -203,7 +203,7 @@ player's finger. The buff cards and list always show the live state.
 
 | type | value means |
 |---|---|
-| `coinMultiplier` | multiplies coins from hits (several running buffs multiply each other, up to `buffCaps.coinMultiplier`, x2) |
+| `coinMultiplier` | multiplies coins from hits (several running buffs multiply each other, no cap) |
 | `aimSpeedMultiplier` | multiplies the aim pointers' sweep speed (below 1 = slower = easier) |
 | `streakShield` | number of misses that won't reset the streak |
 | `hitPaddingPx` | window hitboxes grow by this many pixels on every side |
@@ -215,7 +215,7 @@ player's finger. The buff cards and list always show the live state.
 
 - The snowball pays 5 a hit (free, so it is the baseline); `tools/economy_report.py` prints how many
   hits and throws each item costs. There are no tiers right now: every item can appear from the start.
-- Coin multipliers stack (multiplied, capped at x2 by `buffCaps`), so the caps are what keep a pile of buffs from breaking the prices.
+- Coin multipliers stack (multiplied, no cap), so every new multiplier buff must be checked against the whole stack (with the planned ladder 1.1 x 1.2 x 1.35 x 1.5 = 2.67x).
   Effects that make the *game itself* easier (`aimSpeedMultiplier`,
   `hitPaddingPx`) compound with that - watch total hit rate, not just coin rate.
 - Permanent items leave the pool once bought; consumables never do. If nothing is eligible when a

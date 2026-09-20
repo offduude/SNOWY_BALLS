@@ -14,13 +14,14 @@
 //   precision        x     offset (angle) slider: its hit zone gets x times bigger (x1.2 = 20% bigger, e.g. 25% of the bar -> 30%, never over
 //                          100%), so the bar's range shrinks to 1/x and the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
-//   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout). Several such
-//                          buffs can run at once (each keeps its timer) but only the HIGHEST counts - they do not multiply
-//   sliderSpeed      x     both sliders move at x times their speed (0.8 = 20% slower, steadier). Several such buffs can run at once
-//                          (each keeps its timer) but only the BEST counts = the slowest (lowest x); they do not multiply
-//   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Several such buffs can run at once (all keep
-//                          their timers) but only the HIGHEST chance counts - they do not add up or combine; modifiers() also says
-//                          which buff that is (saveProjectileBy), it is shown on the result message when it saves a projectile
+//   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout). Buffs STACK:
+//                          they multiply each other (1.1 x 1.2 = 1.32), up to `buffCaps.coinMultiplier` (economy.json, x2)
+//   sliderSpeed      x     both sliders move at x times their speed (0.8 = 20% slower, steadier). Buffs STACK: they multiply
+//                          (0.9 x 0.8 = 0.72), never below `buffCaps.sliderSpeedMin` (0.6)
+//   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Buffs STACK as INDEPENDENT ROLLS: each has its own chance,
+//                          so the chance that one of them saves it is 1 - (1-a)(1-b)... (10% + 20% = 28%), never above
+//                          `buffCaps.saveProjectile` (0.75); modifiers() also says which buff has the highest chance (saveProjectileBy),
+//                          it is shown on the result message when it saves a projectile
 //   triggerEvent     name  while it runs, that event ("face" = the banana face) is on, for as long as the buff lasts; when the event ends
 //                          (the player hits the face) the buff ends with it, and when the buff ends (timer / cancelled) so does the
 //                          event. The game (main.js syncBuffEvent) starts and stops the event; this file only reports the buff.
@@ -62,22 +63,27 @@ const Buffs = (() => {
 
   // The combined effect of everything active right now. Read this once per throw (see the top comment).
   function modifiers() {
+    let notSaved = 1; // the chance that no running buff saves the projectile
+    let bestSave = 0;
     const m = { guideLines: 0, centerLine: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, sliderSpeed: 1 };
     for (const b of active()) {
       for (const e of b.item.effects || []) {
         if (!(e.type in m)) continue;
         if (e.type === "guideLines" || e.type === "centerLine") m[e.type] += e.value; // a switch: any active source turns it on
-        else if (e.type === "sliderSpeed") m.sliderSpeed = Math.min(m.sliderSpeed, e.value); // only the slowest counts
-        else if (e.type === "coinMultiplier") m.coinMultiplier = Math.max(m.coinMultiplier, e.value); // only the highest counts
         else if (e.type === "saveProjectile") {
-          if (e.value > m.saveProjectile) {
-            m.saveProjectile = e.value; // only the best one counts
-            m.saveProjectileBy = b.id;
+          notSaved *= 1 - e.value; // independent rolls: the projectile is used up only if EVERY buff's roll fails
+          if (e.value > bestSave) {
+            bestSave = e.value;
+            m.saveProjectileBy = b.id; // the strongest one gets the credit on the result message
           }
-        }
-        else m[e.type] *= e.value;
+        } else m[e.type] *= e.value; // coinMultiplier, sliderSpeed (and precision, strengthControl) multiply
       }
     }
+    // The stacks are limited (economy.json buffCaps) so a pile of buffs can never make throws free, coins explode or the markers crawl.
+    const caps = { saveProjectile: 0.75, coinMultiplier: 2, sliderSpeedMin: 0.6, ...((eco && eco.buffCaps) || {}) };
+    m.saveProjectile = Math.min(caps.saveProjectile, 1 - notSaved);
+    m.coinMultiplier = Math.min(caps.coinMultiplier, m.coinMultiplier);
+    m.sliderSpeed = Math.max(caps.sliderSpeedMin, m.sliderSpeed);
     return m;
   }
 

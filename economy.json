@@ -21,6 +21,9 @@
     "markerHz": 1.275
   },
 
+  "_buffCapsNote": "Buffs of the same kind STACK, up to these limits. saveProjectile: several save chances are INDEPENDENT ROLLS (10% and 20% together = 1 - 0.9 x 0.8 = 28%), the total never goes above this share (0.75). coinMultiplier: coin multipliers multiply each other (1.1 x 1.2 = 1.32), the total never goes above this (x2). sliderSpeedMin: pointer slow-downs multiply (0.9 x 0.8 = 0.72), the marker speed never goes below this share of its normal speed (0.6 = at most 40% slower).",
+  "buffCaps": { "saveProjectile": 0.75, "coinMultiplier": 2, "sliderSpeedMin": 0.6 },
+
   "_rarityNote": "Every projectile (in \"projectiles\") and every buff (in the shop items) has a rarity number, bigger = rarer: the PROJECTILES and BUFFS tabs list the rarest first (equal rarities: projectiles by W20 hit value, buffs in file order). The numbers are PLACEHOLDERS - 1, 2, 3 in the current order - to be decided later.",
   "_weightTiersNote": "PROJECTILE WEIGHT is a tier, not a number. from-to: where on the STRENGTH slider a throw of that projectile lands in W20 (shares of the slider, 0 = its start, 1 = its tip) - very light 0-25%, light 25-50%, moderate 37.5-62.5%, heavy 50-75%, very heavy 75-100%; every band is 25% wide. offsetZone: the share of the OFFSET slider (the whole bar) that is a guaranteed W20 hit, centered on the middle of the bar and reaching out to both sides - very light 6.25%, light 12.5%, moderate 25%, heavy 50%, very heavy 100% (each tier half of the next). The bar is scaled so the hit zone fills exactly that share, so a smaller offsetZone = a longer, less precise swing. A buff with the effect type precision multiplies the zone (1.2 = 20% bigger: 25% becomes 30%, never more than 100%). label is the word on the projectile's card. A projectile names its tier in projectiles.<id>.weight.",
   "weightTiers": [

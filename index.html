@@ -1054,7 +1054,9 @@
 
     .modal-btn:active { background: #74491f; }
     .modal-btn.danger { background: #a3352b; }
-    .modal-btn.ghost { background: #b9a88f; border-color: #8a7a62; color: #f4ead0; }
+    /* CANCEL / CLOSE / BACK: a proper button in the popup's own colours (tan with dark text), less loud than the main action but clearly pressable. */
+    .modal-btn.ghost { background: #dcc9a0; border-color: #7a5230; color: #3b2412; }
+    .modal-btn.ghost:active { background: #cbb789; }
     .modal-btn.off { opacity: 0.4; cursor: default; }
 
     #coin-counter .coin {

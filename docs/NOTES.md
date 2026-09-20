@@ -966,7 +966,7 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 
 - **Water Bottle text** (2026-09-20): description is now "Contains hydration. Hydrates." and it has the bottom line "Save chance: 10%." (like Mints and Snowy Cube; economy.json only).
 
-- **Buff bottom lines** (2026-09-20): Triangles "Slows pointer by 20%." (its 0.8x slider speed), Orange Skyr "Marks the sweet spot." (the green guide lines); every buff now has one (economy.json only).
+- **Buff bottom lines** (2026-09-20): Triangles "Slows pointer by 20%." (its 0.8x slider speed), Orange Skyr "Shows the hit zone." (the green guide lines; "Marks the sweet spot." was dropped so it can go to a future buff that marks the middle of the green lines); every buff now has one (economy.json only).
 
 ## "Doesn't stack." on buffs (2026-09-20)
 
@@ -974,3 +974,5 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 - **Behavior change to make the label true:** coin multipliers used to MULTIPLY when several ran together (Kaiser Roll 1.2x + Snowy Cube 1.1x = 1.32x). Now only the **highest** counts (1.2x), like save chances (`Buffs.modifiers`). Verified with Kaiser Roll, Snowy Cube, Mints and Water Bottle running at once: coinMultiplier 1.2, saveProjectile 0.2 by Mints. `buffs.js?v=12`, `collection.js?v=42`. This also means the buff prices in `docs/FUTURE_PRICES.md` (one buff use per stack) hold with several buffs on.
 
 - **"Doesn't stack." moved** (2026-09-20): it is now on the same row as the buff's detail line, in the same style (1u font, the lighter brown) and same baseline, at the right end of the card (`.pick-row.buff-row .pick-nostack`, drawn after the detail in `buffRowHtml`), instead of under the max time. Measured: the same 14 px from the card's bottom as the detail on every card; the two never meet (detail ends at x 550, the label starts at 572). `collection.js?v=43`.
+
+- **Orange Skyr's bottom line** (2026-09-20): "Shows the hit zone." (was "Marks the sweet spot.", kept free for a planned buff that marks the middle of the green lines; economy.json only).

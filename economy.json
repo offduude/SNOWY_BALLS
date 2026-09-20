@@ -80,7 +80,7 @@
         "image": "assets/items/skyr_orange.png",
         "effects": [{ "type": "guideLines", "value": 1 }],
         "description": "Improves brain function.",
-        "detail": "Marks the sweet spot."
+        "detail": "Shows the hit zone."
       },
       {
         "id": "kaiser_roll",

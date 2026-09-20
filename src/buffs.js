@@ -27,7 +27,8 @@
 //   triggerEvent     name  while it runs, that event ("face" = the banana face) is on, for as long as the buff lasts; when the event ends
 //                          (the player hits the face) the buff ends with it, and when the buff ends (timer / cancelled) so does the
 //                          event. The game (main.js syncBuffEvent) starts and stops the event; this file only reports the buff.
-// This file also draws the buff cards at the top of the screen (next to the live display); tapping a card cancels its buff.
+// This file also draws the buff cards at the top of the screen (next to the live display); tapping a card cancels its buff - except an EVENT buff
+// (one with a triggerEvent effect: Tomato Juice, the Disco Ball): once used, its event cannot be cancelled (canCancel).
 const Buffs = (() => {
   let eco = null;
   let hudEl = null;
@@ -179,13 +180,17 @@ const Buffs = (() => {
     changed();
   }
 
-  // Tapping a buff card in the game cancels that buff for good.
+  // Can the player cancel this buff by tapping its card? Not an event buff (Tomato Juice, the Disco Ball): the event it summoned, or is about to
+  // start, cannot be cancelled. (The game itself still removes such a buff when it is over - cancel() below has no such rule.)
+  function canCancel(id) {
+    return !hasTrigger(itemById(id));
+  }
+
+  // Removes a buff for good (the tap on its card - if canCancel -, a face hit ending Tomato Juice, a used-up charge).
   function cancel(id) {
     const list = Economy.getBuffList();
     const i = list.findIndex((b) => b.id === id);
     if (i === -1) return;
-    const item = itemById(id);
-    if (item && isCharge(item) && hasTrigger(item) && list[i].endsAt - Date.now() < CHARGE_MS / 2) return; // a summon buff whose event is on cannot be cancelled
     list.splice(i, 1);
     Economy.saveBuffs();
     changed();
@@ -247,6 +252,7 @@ const Buffs = (() => {
       hudEl.addEventListener("click", (e) => {
         const card = e.target.closest(".buff-card");
         if (!card) return;
+        if (!canCancel(card.dataset.id)) return; // an event buff: its event cannot be cancelled (no click, nothing)
         if (typeof playUiClick === "function") playUiClick();
         cancel(card.dataset.id);
       });
@@ -275,6 +281,7 @@ const Buffs = (() => {
     isCharge,
     timeText,
     consumeCharge: cancel, // a charge buff is used up: its card goes
+    canCancel,
     owned,
     use,
     modifiers,

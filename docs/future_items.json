@@ -115,7 +115,7 @@
       "detail": "Next throw is free."
     },
     {
-      "_note": "LEGENDARY DISCO SUMMON (planned, needs wiring): using it starts the disco event (main.js startDiscoEvent) between throws; refused while any event runs (Buffs.eventBlocked already does that for every buff with a triggerEvent effect). Unlike Tomato Juice it must not end with a timer - the event has its own length (song 164 s + applause 21 s) - so it needs the same 'charge' treatment as the Diamond Cross (charge: true, used up when the event starts) and syncBuffEvent must start an event BY NAME from the effect value. Price estimate: see docs/FUTURE_PRICES.md 'Disco buff'.",
+      "_note": "BUILT AS A TEST ITEM on branch disco-event (2026-09-20, not pushed): 'Disco Ball (test)' with a placeholder picture cut from discoface1.png and this price. Rename / real art / decide the price before it ships. LEGENDARY DISCO SUMMON (planned, needs wiring): using it starts the disco event (main.js startDiscoEvent) between throws; refused while any event runs (Buffs.eventBlocked already does that for every buff with a triggerEvent effect). Unlike Tomato Juice it must not end with a timer - the event has its own length (song 164 s + applause 21 s) - so it needs the same 'charge' treatment as the Diamond Cross (charge: true, used up when the event starts) and syncBuffEvent must start an event BY NAME from the effect value. Price estimate: see docs/FUTURE_PRICES.md 'Disco buff'.",
       "id": "disco_summon",
       "name": "TBD",
       "category": "consumable",

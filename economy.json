@@ -234,6 +234,18 @@
         "detail": "Coin bonus: 1.5x."
       },
       {
+        "id": "disco_summon",
+        "name": "Disco Ball (test)",
+        "category": "consumable",
+        "rarity": "legendary",
+        "priceRange": { "min": 5100, "max": 8550 },
+        "ignorePriceOverride": true,
+        "charge": true,
+        "image": "assets/items/disco_summon.png",
+        "effects": [{ "type": "triggerEvent", "value": "disco" }],
+        "description": "TEST ITEM: starts the disco event. Placeholder name and picture."
+      },
+      {
         "id": "grenade",
         "name": "Grenade",
         "category": "projectile",

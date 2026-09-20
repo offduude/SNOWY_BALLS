@@ -117,6 +117,16 @@ const Buffs = (() => {
     return m;
   }
 
+  // A SUMMON buff: a charge buff (no timer) whose effect is triggerEvent <name> (the disco ball): using it means "start that event as soon as
+  // no throw is being made and no event runs" (main.js syncSummonBuff); the charge is used up when the event starts. Returns { id, event }
+  // or null.
+  function summonBuff() {
+    const b = active().find((x) => isCharge(x.item) && hasTrigger(x.item));
+    if (!b) return null;
+    const e = b.item.effects.find((x) => x.type === "triggerEvent");
+    return { id: b.id, event: e.value };
+  }
+
   // The running buff that switches the event `name` on, or null: { id, msLeft }.
   function eventBuff(name) {
     const b = active().find((x) => (x.item.effects || []).some((e) => e.type === "triggerEvent" && e.value === name));
@@ -244,6 +254,7 @@ const Buffs = (() => {
       });
     },
     active,
+    summonBuff,
     eventBlocked,
     setEventGate: (fn) => {
       eventGate = fn;

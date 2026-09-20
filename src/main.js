@@ -1485,6 +1485,16 @@ class MainScene extends Phaser.Scene {
     this.startBananaEvent(b.msLeft, b.id);
   }
 
+  // A summon buff (the disco ball) was used: the event it names starts as soon as the game is idle (no aim, no flight) and no event runs; the
+  // charge is used up then. (Checked every frame; using it while an event runs is refused by Buffs.eventBlocked, so it never waits for that.)
+  syncSummonBuff() {
+    if (this.state !== STATE.IDLE || this.isEventActive()) return;
+    const s = Buffs.summonBuff();
+    if (!s) return;
+    Buffs.consumeCharge(s.id);
+    this.startEvent(s.event);
+  }
+
   // The single way to start an event by name. Refuses (returns false) while another event is running.
   startEvent(name) {
     if (this.isEventActive()) return false;
@@ -1840,6 +1850,7 @@ class MainScene extends Phaser.Scene {
 
     this.updateStockMessage();
     this.syncBuffEvent();
+    this.syncSummonBuff();
     this.updateCharacterPose();
     this.updateFpsReadout(time, delta);
     this.drawAimBar();

@@ -1,0 +1,293 @@
+{
+  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece.",
+  "projectiles": [
+    {
+      "_note": "EPIC STANDARD: the ordinary epic projectile (the Grenade is the epic heavy hitter). Average stack 3000, hit value 960 (the epic rarity default).",
+      "shop_item": {
+        "id": "epic_standard",
+        "name": "TBD",
+        "category": "projectile",
+        "amount": {
+          "min": 3,
+          "max": 7
+        },
+        "unitPrice": {
+          "min": 450,
+          "max": 750
+        },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/TBD.png",
+        "effect": {
+          "type": "givesProjectile",
+          "value": "epic_standard"
+        },
+        "description": "TBD"
+      },
+      "projectile": {
+        "id": "epic_standard",
+        "infinite": false,
+        "rarity": "epic",
+        "weight": "moderate",
+        "leavesMark": true,
+        "spins": false
+      }
+    },
+    {
+      "_note": "LEGENDARY STANDARD. Average stack 15000, hit value 4800 (the legendary rarity default).",
+      "shop_item": {
+        "id": "legendary_standard",
+        "name": "TBD",
+        "category": "projectile",
+        "amount": {
+          "min": 3,
+          "max": 7
+        },
+        "unitPrice": {
+          "min": 2250,
+          "max": 3750
+        },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/TBD.png",
+        "effect": {
+          "type": "givesProjectile",
+          "value": "legendary_standard"
+        },
+        "description": "TBD"
+      },
+      "projectile": {
+        "id": "legendary_standard",
+        "infinite": false,
+        "rarity": "legendary",
+        "weight": "moderate",
+        "leavesMark": true,
+        "spins": false
+      }
+    },
+    {
+      "_note": "LEGENDARY HEAVY HITTER: a stack of 1-3, price per piece 2.5x the standard, hit value 2.5x (12000). Average stack 15000.",
+      "shop_item": {
+        "id": "legendary_heavy_hitter",
+        "name": "TBD",
+        "category": "projectile",
+        "amount": {
+          "min": 1,
+          "max": 3
+        },
+        "unitPrice": {
+          "min": 5600,
+          "max": 9400
+        },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/TBD.png",
+        "effect": {
+          "type": "givesProjectile",
+          "value": "legendary_heavy_hitter"
+        },
+        "description": "TBD"
+      },
+      "projectile": {
+        "id": "legendary_heavy_hitter",
+        "infinite": false,
+        "rarity": "legendary",
+        "hitValue": 12000,
+        "weight": "heavy",
+        "leavesMark": true,
+        "spins": false
+      }
+    }
+  ],
+  "buffs": [
+    {
+      "_note": "COMMON coin bonus 1.1x (coin fractions are carried over, so 1.1x works on cheap hits).",
+      "id": "common_coin_bonus",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "common",
+      "priceRange": {
+        "min": 3,
+        "max": 5
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 120
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "coinMultiplier",
+          "value": 1.1
+        }
+      ],
+      "description": "TBD",
+      "detail": "Coin bonus: 1.1x."
+    },
+    {
+      "_note": "RARE save chance 20%.",
+      "id": "rare_save",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "rare",
+      "priceRange": {
+        "min": 36,
+        "max": 60
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 120
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "saveProjectile",
+          "value": 0.2
+        }
+      ],
+      "description": "TBD"
+    },
+    {
+      "_note": "EPIC save chance 30%.",
+      "id": "epic_save",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "epic",
+      "priceRange": {
+        "min": 400,
+        "max": 680
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 120
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "saveProjectile",
+          "value": 0.3
+        }
+      ],
+      "description": "TBD"
+    },
+    {
+      "_note": "EPIC coin bonus 1.35x.",
+      "id": "epic_coin_bonus",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "epic",
+      "priceRange": {
+        "min": 570,
+        "max": 940
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 120
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "coinMultiplier",
+          "value": 1.35
+        }
+      ],
+      "description": "TBD",
+      "detail": "Coin bonus: 1.35x."
+    },
+    {
+      "_note": "LEGENDARY save chance 50%.",
+      "id": "legendary_save",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "legendary",
+      "priceRange": {
+        "min": 3400,
+        "max": 5600
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 120
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "saveProjectile",
+          "value": 0.5
+        }
+      ],
+      "description": "TBD"
+    },
+    {
+      "_note": "LEGENDARY coin bonus 1.5x.",
+      "id": "legendary_coin_bonus",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "legendary",
+      "priceRange": {
+        "min": 4050,
+        "max": 6750
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 120
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "coinMultiplier",
+          "value": 1.5
+        }
+      ],
+      "description": "TBD",
+      "detail": "Coin bonus: 1.5x."
+    },
+    {
+      "_note": "SURE SHOT (legendary): the NEXT throw hits, also a face during the banana event. NEEDS A NEW MECHANIC in the game (effect 'guaranteedHit', lasts until that throw is thrown - there is no time based duration). Worth 3000 on an ordinary throw, 7500 with a face event: priced 1800-3000.",
+      "id": "sure_shot",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "legendary",
+      "priceRange": {
+        "min": 1800,
+        "max": 3000
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 3600
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "guaranteedHit",
+          "value": 1
+        }
+      ],
+      "description": "TBD"
+    }
+  ],
+  "price_ladder_summary": {
+    "projectile_average_stack_price": {
+      "common": 50,
+      "rare": 400,
+      "epic": 3000,
+      "legendary": 15000
+    },
+    "projectile_hit_value_standard": {
+      "default_snowball": 4,
+      "common": 16,
+      "rare": 128,
+      "epic": 960,
+      "legendary": 4800
+    },
+    "projectile_hit_value_heavy_hitter": {
+      "common": 40,
+      "rare": 320,
+      "epic": 2400,
+      "legendary": 12000
+    },
+    "save_and_multiplier_buff_price_by_tier_avg": {
+      "common": 3,
+      "rare": 50,
+      "epic": 550,
+      "legendary": 5000
+    },
+    "face_multiplier": "x2.5 fits a legendary standard projectile; with a lower-tier projectile it pays little (a buff for the best projectile). If it should depend on the projectile: 2.5 x the buff's price / the hit value, kept between x2 and x20."
+  }
+}

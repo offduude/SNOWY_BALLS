@@ -58,6 +58,11 @@ def check(eco):
         if hit_value(eco, p) is None:
             problems.append(f"projectile {pid}: no hit value (its rarity '{p.get('rarity')}' has no projectileHitValue)")
     for i in shop["items"]:
+        if i.get("category") == "projectile" and i.get("id") in projectiles and "unitPrice" in i:
+            hv = hit_value(eco, projectiles[i["id"]])
+            if hv is not None and hv <= i["unitPrice"]["max"]:
+                problems.append(f"{i['id']}: hit value {hv} is not above its highest price per piece {i['unitPrice']['max']} (a hit would lose coins)")
+    for i in shop["items"]:
         if i.get("category") == "projectile" and i.get("id") not in projectiles:
             problems.append(f"{i['id']}: projectile has no entry in the top-level \"projectiles\" section")
     # Rarities: every projectile and shop item that names a rarity must name one that exists (none at all is allowed); chances must be positive.

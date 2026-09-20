@@ -28,8 +28,8 @@ start with "economy.json failed to load or has a JSON syntax error".
 
 `coins = floor( base x faceMultiplier x buffs.coinMultiplier )`
 
-- `base` = the equipped projectile's **hit value** - ONE number for both goal windows (W21 pays the same as W20), from its rarity (`rarities[].projectileHitValue`: snowball/default 5, common 12, rare 60, epic 300, legendary 1500)
-- `faceMultiplier` = `events.faceWindow.faceMultiplier` (40) when the banana face is hit during the face event, otherwise 1 - so a snowball face hit pays 5 x 40 = 200, a common projectile's 12 x 40 = 480
+- `base` = the equipped projectile's **hit value** - ONE number for both goal windows (W21 pays the same as W20), from its rarity (`rarities[].projectileHitValue`: snowball/default 4, common 16, rare 128, epic 960, legendary 4800) unless the projectile has a `hitValue` of its own (the heavy hitters: Stone 40, Egg 320, Grenade 2400)
+- `faceMultiplier` = `events.faceWindow.faceMultiplier` (2.5; it was 40) when the banana face is hit during the face event, otherwise 1 - so a snowball face hit pays 4 x 2.5 = 10, a common projectile's 16 x 2.5 = 40, a Grenade's 2400 x 2.5 = 6000 (fractions of a coin are carried over to the next payout)
 - then the buffs' multiplier (read when the player tapped to aim), rounded down once at the end
 
 **The streak adds nothing.** It is only a counter (STREAK: n under the top-right buttons, saved across reloads, reset by a miss);
@@ -46,7 +46,7 @@ it no longer adds coins or speeds the markers up.
 | `chancePerThrow` | chance (0-1) that the event starts after each throw, hit or miss - `0.001` = 0.1% (1 in 1000 throws; it was 1%). It never starts while an event is already running. (It used to start at a streak of 3; the streak no longer matters.) |
 | `durationMs` | how long the face texture stays (20000 = 20s) |
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
-| `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`40`) |
+| `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`2.5`) |
 
 ## aim (live)
 
@@ -76,7 +76,7 @@ rarity are equally likely). Only rarities that have an item to sell take part - 
 common chestnut and epic grenade and skyr on sale: chestnut 87%, grenade 6.5%, skyr 6.5%). `py tools/economy_report.py` prints each item's chance.
 
 **Where a rarity is set:** a projectile's in `projectiles.<id>.rarity` (also used by its shop item), a buff's on the shop item (`rarity`).
-Snowball = default, chestnut = common, grenade = epic, Skyr = epic. A rarity with `chance` 0 (default) is never rolled for the shop.
+Snowball = default, chestnut / rowan berry / stone = common, pinecone / egg = rare, grenade = epic; buffs: Water Bottle = common, Kaiser Roll / Triangles / **Skyr** = rare, Tomato Juice = legendary. A rarity with `chance` 0 (default) is never rolled for the shop.
 An item with **no rarity** is treated as common when the shop picks, and in the tabs it always goes at the very end - after every
 rarity, default and common included, however many of those there are (the tabs list: legendary, epic, rare, common, default, then no rarity).
 
@@ -118,12 +118,12 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 |---|---|
 | `regen` `{ max, everySeconds }` | a **refilling stock** (the snowball: `max` 50, `everySeconds` 30): the player starts with `max`; every one thrown comes back at one per `everySeconds` from the first throw, counted by the device clock so it also runs while the app is closed. The card never leaves the PROJECTILES list, not even at x0; with 0 left you can't start a throw (the middle of the screen shows "OUT of SNOWBALLS" with "+1 in 00:xx" under it). Buying can't push it over `max` |
 | `infinite` | `true` = never runs out (nothing uses it right now). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim" (and is NOT given back if the aim is abandoned - opening the shop, equipping something else, closing the app; an abandoned aim also loses the streak); when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
-| `rarity` | its tier; it decides the hit value (`rarities[].projectileHitValue`: default 5, common 12, rare 60, epic 300, legendary 1500 - the same for W20 and W21 and for every projectile of the rarity). A projectile may set a `hitValue` of its own |
+| `rarity` | its tier; it decides the hit value (`rarities[].projectileHitValue`: default 4, common 16, rare 128, epic 960, legendary 4800 - the same for W20 and W21 and for every projectile of the rarity). A projectile may set a `hitValue` of its own (the **heavy hitters**) |
 | `weight` | the weight TIER id: `very_light`, `light`, `moderate`, `heavy`, `very_heavy` (see "weightTiers") |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
 | `spins` | the projectile rotates in flight |
 
-Every projectile of a rarity has the same hit value, stack size (3-7 pieces) and price per piece (20% under the hit value), so a stack costs 50 / 250 / 1250 / 6250 on average (common / rare / epic / legendary) and pays 12 / 60 / 300 / 1500 a hit: a x5 step per tier. What tells projectiles of one rarity apart is their weight tier (where the strength band is, how wide the offset swing is), their look, sound and whether they leave a mark.
+**The numbers.** A *standard* projectile has a stack of 3-7 pieces and a price per piece of 8-12 / 60-100 / 450-750 / 2250-3750 (common / rare / epic / legendary; average stack 50 / 400 / 3000 / 15000) and pays 16 / 128 / 960 / 4800 a hit - always more than its highest price per piece, so every purchase is profitable at a 100% hit rate (`tools/economy_report.py` checks this). A **heavy hitter** (Stone, Egg, Grenade) takes more risk for more reward: a stack of 1-3, a price per piece 2.5x higher and a hit value 2.5x higher (Stone 40, Egg 320, Grenade 2400; each one's `hitValue`), for the same average stack price. What tells projectiles of one rarity apart is their weight tier, look, sound and whether they leave a mark. The planned items that are not in the game yet (epic standard, legendary projectiles, new buffs) are in `docs/FUTURE_PRICES.md` and `docs/future_items.json`.
 
 ## shop
 
@@ -159,7 +159,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 | `category` | `consumable` (a timed buff: used up over `duration`) or `projectile` (a stack of consumable projectiles). Either can be on sale in several slots at once |
 | `price` | coins |
 | `detail` | optional (buffs): a bottom line on the item's card in the BUFFS tab, e.g. `"Coin bonus: 1.2x."` |
-| `priceRange` | optional, instead of `price`: `{ "min": 39, "max": 59 }` - the price is rolled in that range each time the item is put on sale (saved with the stock, so no reroll by leaving) |
+| `priceRange` | optional, instead of `price`: `{ "min": 43, "max": 72 }` - the price is rolled in that range each time the item is put on sale (saved with the stock, so no reroll by leaving) |
 | `amount`, `unitPrice` | **stack items (projectiles)**: `{min, max}` ranges. Each time the item is put on sale (first fill and every restock) an `amount` and the price of ONE are rolled inside the ranges (chestnut: 10-20 pieces at 4-6 coins each); the slot costs `amount x unitPrice` and shows "x14" on its card. Saved with the stock, so leaving the shop can't reroll it. Buying adds the whole stack to the inventory. |
 | `image` | optional: picture path shown on the shop card (the chestnut has one; other items show an empty picture box) |
 | `ignorePriceOverride` | optional. `true` = always costs its own `price`, even while `shop.priceOverride` makes everything else 1 coin (the chestnut is 10) |
@@ -182,7 +182,7 @@ when none are left. Effects do not stack from the same buff; different buffs mul
 | `coinMultiplier` | multiplies the coins of a hit. Only whole coins are paid; the fraction is carried over to the next payout (5 x 1.1 = 5.5 pays 5 now and 6 next time), so a small multiplier is never rounded away |
 | `sliderSpeed` | both sliders move at this fraction of their speed (`0.8` = 20% slower); several such buffs can run at once but only the best counts - the slowest - they do not multiply |
 | `saveProjectile` | chance (0-1, e.g. `0.1` = 10%) that a throw does not use up its projectile (any projectile, the snowball included); several such buffs can run at once (each keeps its timer) but only the highest chance counts. When one saves a projectile the result text gets a "Saved Projectile" line |
-| `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 20 s, the same as the natural event). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual x40 |
+| `triggerEvent` | the name of an event (`"face"` = the banana face) that is ON for as long as the buff runs (Tomato Juice: 20 s, the same as the natural event; its hit pays the face multiplier x2.5). It starts between throws (if the natural face event is already up, the buff takes it over and it now lasts as long as the buff). Hitting the face concludes the event AND ends the buff; the buff running out or being cancelled (tap its card) ends the event. The face hit pays the usual face multiplier (x2.5) |
 
 **When buffs are read:** only at the moment the player taps "TAP to aim". That snapshot is used for the whole throw
 (sliders, green lines, event dots and payout), so a buff expiring or being bought mid-aim never changes anything under the

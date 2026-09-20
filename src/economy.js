@@ -8,11 +8,18 @@ const Economy = (() => {
   // an earlier economy: it is thrown away on load and the player starts a new game (and sees "The grand cleansing has struck."
   // once, see wasCleansed). To reset everybody again, raise this number.
   const SAVE_EPOCH = 1;
+  // ITEM ID RENAMES: every save records the version of the item ids it uses (idsV). A save with an older version has its ids renamed when it is
+  // loaded / imported (clean()), so nobody loses or swaps an item. Version 2 (2026-09-20): the ids of the three Skyrs follow their names -
+  // Orange Skyr was "skyr" -> "skyr_orange", Blue Skyr was "blue_skyr" -> "skyr_blue", and the epic Skyr, "skyr_epic", takes the id "skyr"
+  // (the mapping is applied all at once, so the old "skyr" and the new "skyr" are never confused).
+  const IDS_VERSION = 2;
+  const ID_RENAMES_V2 = { skyr: "skyr_orange", blue_skyr: "skyr_blue", skyr_epic: "skyr" };
   let cleansed = false; // this page load threw an existing save away (kept in memory only, so the message shows once)
 
   function fresh() {
     return {
       epoch: SAVE_EPOCH,
+      idsV: IDS_VERSION,
       coins: 0,
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
@@ -68,8 +75,16 @@ const Economy = (() => {
   // The save as it is stored, cleaned into the shape the game expects (anything missing gets its default).
   function clean(p, base) {
     const shop = p.shop || {};
+    const ren = p.idsV === IDS_VERSION ? null : ID_RENAMES_V2; // an older save: its ids are renamed (see IDS_VERSION)
+    const rn = (id) => (ren && typeof id === "string" && Object.prototype.hasOwnProperty.call(ren, id) ? ren[id] : id);
+    const rnCounts = (o) => {
+      const out = {};
+      for (const [id, n] of Object.entries(o)) out[rn(id)] = (out[rn(id)] || 0) + n;
+      return out;
+    };
     return {
       epoch: SAVE_EPOCH,
+      idsV: IDS_VERSION,
       coins: p.coins || 0,
       // Saves from before lifetimeCoins existed: the best honest guess is what they hold now.
       lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
@@ -81,20 +96,20 @@ const Economy = (() => {
       aiming: p.aiming === true,
       projectiles: cleanCounts(p.projectiles),
       regen: cleanRegen(p.regen),
-      buffItems: cleanCounts(p.buffItems),
-      newBuffs: cleanIds(p.newBuffs),
+      buffItems: rnCounts(cleanCounts(p.buffItems)),
+      newBuffs: [...new Set(cleanIds(p.newBuffs).map(rn))],
       newProjectiles: cleanIds(p.newProjectiles),
       buffsUnseen: p.buffsUnseen === true,
       projectilesUnseen: p.projectilesUnseen === true,
       unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
       equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
-      buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number") : [],
+      buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number").map((b) => ({ ...b, id: rn(b.id) })) : [],
       shop: {
-        stock: Array.isArray(shop.stock) ? shop.stock : null,
+        stock: Array.isArray(shop.stock) ? shop.stock.map(rn) : null,
         offers: Array.isArray(shop.offers) ? shop.offers : [],
-        owned: Array.isArray(shop.owned) ? shop.owned : [],
-        consumables: shop.consumables && typeof shop.consumables === "object" ? shop.consumables : {},
-        restock: Array.isArray(shop.restock) ? shop.restock : [],
+        owned: Array.isArray(shop.owned) ? shop.owned.map(rn) : [],
+        consumables: shop.consumables && typeof shop.consumables === "object" ? rnCounts(shop.consumables) : {},
+        restock: Array.isArray(shop.restock) ? shop.restock.map((t) => (t && typeof t === "object" ? { ...t, prev: rn(t.prev) } : t)) : [],
         expires: Array.isArray(shop.expires) ? shop.expires.map((x) => (typeof x === "number" ? x : null)) : [],
         unseen: shop.unseen === true,
       },

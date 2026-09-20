@@ -468,7 +468,8 @@ class MainScene extends Phaser.Scene {
       angleRange: offsetRangeForZone(zone),
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
-      guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Skyr) gives them
+      guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Orange Skyr) gives them
+      centerLine: b.centerLine > 0, // one green line at the middle of the hit zone on each slider (Blue Skyr)
       saveProjectile: b.saveProjectile, // chance (0-1) that this throw does not use up its projectile (Water Bottle) - the best running buff's
       saveProjectileBy: b.saveProjectileBy, // ... and which buff that is (its icon is shown when it saves one)
     };
@@ -1356,6 +1357,8 @@ class MainScene extends Phaser.Scene {
       const guide = this.aim.guideLines;
       // The two lines that guarantee a hit on W20 (sideways) - nothing else is drawn between them. Buff only.
       if (guide) lineAt(W20_SWING_GUARANTEE, 0x5cff5c, 1, 2, 5);
+      // Blue Skyr: ONE line in the middle of that zone (the middle of the bar).
+      if (this.aim.centerLine) lineAt(0, 0x5cff5c, 1, 2, 5);
 
       const target = this.activeEventTarget();
       if (target) {
@@ -1393,6 +1396,7 @@ class MainScene extends Phaser.Scene {
         lineAtPower(lo, 0x5cff5c, 1, 2, 5);
         lineAtPower(hi, 0x5cff5c, 1, 2, 5);
       }
+      if (band && this.aim.centerLine) lineAtPower((lo + hi) / 2, 0x5cff5c, 1, 2, 5); // Blue Skyr: the middle of the strength band
 
       const target = this.activeEventTarget(swingNow);
       if (target && target.powerFrom !== null) {

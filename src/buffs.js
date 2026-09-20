@@ -9,6 +9,8 @@
 //
 // Effect types (economy.json item `effects`: [{ "type", "value" }], values multiply if several buffs share a type):
 //   guideLines       1     shows the green guarantee lines on both sliders (hidden without this buff)
+//   centerLine       1     draws ONE green line on each slider, at the middle of the hit zone (the middle of the offset bar; the middle of the
+//                          strength band that hits W20 from the chosen offset) - Blue Skyr. Any active source turns it on; it works with or without guideLines
 //   precision        x     offset (angle) slider: its hit zone gets x times bigger (x1.2 = 20% bigger, e.g. 25% of the bar -> 30%, never over
 //                          100%), so the bar's range shrinks to 1/x and the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
@@ -60,11 +62,11 @@ const Buffs = (() => {
 
   // The combined effect of everything active right now. Read this once per throw (see the top comment).
   function modifiers() {
-    const m = { guideLines: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, sliderSpeed: 1 };
+    const m = { guideLines: 0, centerLine: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, sliderSpeed: 1 };
     for (const b of active()) {
       for (const e of b.item.effects || []) {
         if (!(e.type in m)) continue;
-        if (e.type === "guideLines") m.guideLines += e.value; // a switch: any active source turns it on
+        if (e.type === "guideLines" || e.type === "centerLine") m[e.type] += e.value; // a switch: any active source turns it on
         else if (e.type === "sliderSpeed") m.sliderSpeed = Math.min(m.sliderSpeed, e.value); // only the slowest counts
         else if (e.type === "coinMultiplier") m.coinMultiplier = Math.max(m.coinMultiplier, e.value); // only the highest counts
         else if (e.type === "saveProjectile") {

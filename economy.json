@@ -83,6 +83,19 @@
         "detail": "Shows the hit zone."
       },
       {
+        "id": "blue_skyr",
+        "name": "Blue Skyr",
+        "category": "consumable",
+        "rarity": "common",
+        "priceRange": { "min": 4, "max": 7 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 180 },
+        "image": "assets/items/skyr_blue.png",
+        "effects": [{ "type": "centerLine", "value": 1 }],
+        "description": "Improves brain function.",
+        "detail": "Shows the sweet spot."
+      },
+      {
         "id": "kaiser_roll",
         "name": "Kaiser Roll",
         "category": "consumable",

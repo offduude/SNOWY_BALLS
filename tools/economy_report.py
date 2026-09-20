@@ -103,6 +103,33 @@ def slot_odds(eco):
     return odds
 
 
+def event_rarity(eco, name):
+    """The rarity of an event = the rarity of its summon buff (the shop item whose triggerEvent effect names it)."""
+    for it in eco["shop"]["items"]:
+        for e in it.get("effects", []):
+            if e.get("type") == "triggerEvent" and e.get("value") == name:
+                return it.get("rarity")
+    return "legendary"
+
+
+def event_chances(eco):
+    """Per rarity that has shop items: (share of the shop's rarity roll, minutes to see one in the shop, chance per throw of a natural event,
+    throws on average). The same rule as main.js eventRarityChance."""
+    has = set()
+    for it in eco["shop"]["items"]:
+        has.add(eco["projectiles"].get(it["id"], {}).get("rarity") if it["category"] == "projectile" else it.get("rarity"))
+    rar = [r for r in eco["rarities"] if r.get("chance", 0) > 0 and r["id"] in has]
+    total = sum(r["chance"] for r in rar)
+    tph = eco.get("events", {}).get("throwsPerHour", 150)
+    out = {}
+    for r in rar:
+        share = r["chance"] / total
+        rolls_per_hour = eco["shop"]["slots"] * 3600 / r.get("availabilitySeconds", 1800)
+        hours = 1 / (share * rolls_per_hour)
+        out[r["id"]] = (share, hours * 60, 1 / (hours * tph), hours * tph)
+    return out
+
+
 def hit_value(eco, p):
     """One hit's base coins: the projectile's own hitValue, else its rarity's projectileHitValue."""
     if isinstance(p.get("hitValue"), (int, float)):
@@ -144,6 +171,20 @@ def main():
     print("\nChance that a shop slot shows each item (rarity roll, then a random item of that rarity):")
     for iid, pr in sorted(slot_odds(eco).items(), key=lambda kv: -kv[1]):
         print(f"  {iid:<12}{pr * 100:5.1f}%")
+
+    print("\nNatural events by rarity (an event has the rarity of its summon buff; one roll per RARITY after every throw):")
+    events = {}
+    for name in ("face", "disco"):
+        events.setdefault(event_rarity(eco, name), []).append(name)
+    tph = eco.get("events", {}).get("throwsPerHour", 150)
+    real_tph = 3600 / eco["projectiles"]["snowball"]["regen"]["everySeconds"]
+    print(f"  (throws an hour: {tph:.0f} in the rules; the snowball's regen really gives {real_tph:.0f} an hour)")
+    print(f"  {'rarity':<10}{'shop share':>11}{'shop wait':>12}{'chance/throw':>14}{'1 in':>7}{'at real regen':>15}  events")
+    for rid, (share, mins, chance, throws) in event_chances(eco).items():
+        wait = f"{mins / 60:.1f} h" if mins >= 120 else f"{mins:.1f} min"
+        real_mins = throws / real_tph * 60
+        real = f"{real_mins / 60:.1f} h" if real_mins >= 120 else f"{real_mins:.1f} min"
+        print(f"  {rid:<10}{share * 100:>10.0f}%{wait:>12}{chance * 100:>13.3f}%{throws:>7.0f}{real:>15}  {', '.join(events.get(rid, [])) or '-'}")
 
     problems = check(eco)
     print("\nChecks:", "all good" if not problems else "")

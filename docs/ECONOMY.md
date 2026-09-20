@@ -43,12 +43,12 @@ it no longer adds coins or speeds the markers up.
 
 | field | meaning |
 |---|---|
-| `chancePerThrow` | chance (0-1) that the event starts after each throw, hit or miss - `0.001` = 0.1% (1 in 1000 throws; it was 1%). It never starts while an event is already running. (It used to start at a streak of 3; the streak no longer matters.) |
+| `throwsPerHour` | how many throws an hour the snowball stock allows (150 = 50 every 20 minutes); used to turn "hours in the shop" into "throws" for the natural event chance (see below). **The chance of a natural event is no longer set per event - it is by RARITY, see "Event rarities"** |
 | `durationMs` | how long the face texture stays (20000 = 20s) |
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`2.5`) |
 
-**Disco event** (`events.discoWindow`, see NOTES.md "Disco event"): `chancePerThrow` `0.001`, `faceMultiplier` `1.25` (paid on EVERY hit of the singer's face while disco.mp3 plays - the face stays - so it is far below the banana face's x2.5), `beatMs` `500` (120 bpm: W20 shows a new one of discoface1-6 every beat). A plain W20 hit pays as usual. After the song: applause.mp3 and falling roses, then normal. Only one event runs at a time; no event buff (`triggerEvent`) can be used while one runs.
+**Disco event** (`events.discoWindow`, see NOTES.md "Disco event"): `faceMultiplier` `1.25` (paid on EVERY hit of the singer's face while disco.mp3 plays - the face stays - so it is far below the banana face's x2.5), `beatMs` `500` (120 bpm: W20 shows a new one of discoface1-6 every beat). A plain W20 hit pays as usual. After the song: applause.mp3 and falling roses, then normal. Only one event runs at a time; no event buff (`triggerEvent`) can be used while one runs.
 
 ## aim (live)
 
@@ -224,3 +224,19 @@ player's finger. The buff cards and list always show the live state.
   `hitPaddingPx`) compound with that - watch total hit rate, not just coin rate.
 - Permanent items leave the pool once bought; consumables never do. If nothing is eligible when a
   slot restocks it just stays SOLD OUT (no timer) until something is.
+
+
+## Event rarities (2026-09-20)
+
+- An event has the rarity of its **summon buff** (the shop item whose `triggerEvent` effect names the event): the banana face (Tomato Juice) and the disco (Disco Ticket) are **legendary**. A future event takes the rarity of its buff; one with no buff can name its `rarity` in its own `events` block.
+- **Natural spawning is rolled by rarity, not by event.** After every throw the game makes ONE roll per rarity that has events (in a random order); the first that hits picks one of that rarity's events at random. So adding an event to a rarity never makes that rarity's events more frequent. An event never starts while another runs.
+- **The chance of a rarity** is set so that, on average, it takes as many throws to get one of its events as it takes to see an item of that rarity in the shop: `meanShopHours = 1 / (the rarity's share of the shop's rarity roll x slots x 3600 / availabilitySeconds)`, `chance per throw = 1 / (meanShopHours x throwsPerHour)`. With the shop odds common 60 / rare 30 / epic 9 / legendary 1 (of 100), 6 slots, 30-minute timers and 150 throws an hour:
+
+| rarity | time to see one in the shop | chance per throw | 1 in | at the snowball's real regen (120 an hour) |
+|---|---|---|---|---|
+| common | 8.3 min | 4.8% | 21 | 10.4 min |
+| rare | 16.7 min | 2.4% | 42 | 20.8 min |
+| epic | 55.6 min | 0.72% | 139 | 69.4 min |
+| legendary | 8.3 h | 0.08% | 1250 | 10.4 h |
+
+  Only legendary has events today (the banana face and the disco, half each: about 1 in 2500 throws each). It follows the shop by itself: change a rarity's shop odds, the slots or the timers and the events follow (`py tools/economy_report.py` prints this table); `events.rarityChances { legendary: 0.0008 }` overrides a rarity by hand. A rarity that has no item in the shop cannot spawn events.

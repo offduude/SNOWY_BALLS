@@ -1331,7 +1331,7 @@ class MainScene extends Phaser.Scene {
   }
 
   // ---- DISCO event ----
-  // Chance per throw: economy.json events.discoWindow.chancePerThrow (0.001, like the banana face). What happens, in order:
+  // Natural chance: by RARITY (legendary, like its summon buff - see rollNaturalEvent). What happens, in order:
   //  1. "song": disco.mp3 plays (about 2:44); W20 shows discoface1..6, changing every beat (120 bpm = every 0.5 s). Hitting the singer's FACE
   //     pays events.discoWindow.faceMultiplier times the coins of that throw; a plain W20 hit pays as usual. The face does NOT go away when it
   //     is hit: every hit during the song counts. A purple dot marks it on the aim bars.
@@ -1346,7 +1346,7 @@ class MainScene extends Phaser.Scene {
   // (heldEventStep). While the song plays no other event can start and no event buff can be used (Buffs.eventBlocked); during the APPLAUSE
   // another event may start: the applause fades out, no new rose is spawned (those in the air come down) - see cutApplause.
   discoConfig() {
-    return { chancePerThrow: 0.001, faceMultiplier: 1.25, beatMs: DISCO_BEAT_MS, ...((this.eco.events && this.eco.events.discoWindow) || {}) };
+    return { faceMultiplier: 1.25, beatMs: DISCO_BEAT_MS, ...((this.eco.events && this.eco.events.discoWindow) || {}) };
   }
 
   // How long the two tracks are (ms).
@@ -1554,9 +1554,48 @@ class MainScene extends Phaser.Scene {
   // one event can run at a time is enforced in startEvent(), so a new event can't overlap the others.
   eventDefs() {
     return [
-      { name: "face", chance: this.eco.events.faceWindow.chancePerThrow, start: () => this.startBananaEvent() },
-      { name: "disco", chance: this.discoConfig().chancePerThrow, start: () => this.startDiscoEvent() },
-    ];
+      { name: "face", start: () => this.startBananaEvent() },
+      { name: "disco", start: () => this.startDiscoEvent() },
+    ].map((d) => ({ ...d, rarity: this.eventRarity(d.name) }));
+  }
+
+  // The rarity of an event: the rarity of its SUMMON BUFF (the shop item whose triggerEvent effect names the event); failing that the
+  // event's own "rarity" in economy.json (events.<block>.rarity), failing that legendary.
+  eventRarity(name) {
+    const item = (this.eco.shop.items || []).find((it) => (it.effects || []).some((e) => e.type === "triggerEvent" && e.value === name));
+    return (item && item.rarity) || "legendary";
+  }
+
+  // The chance per throw that an event of this RARITY starts by itself, so that on average it takes as many throws as it takes to see an item
+  // of that rarity in the shop (see events._rarityNote in economy.json): 1 / (meanShopHours x throwsPerHour), where meanShopHours = 1 / (the
+  // rarity's share of the shop's rarity roll x slots x 3600 / availabilitySeconds). 0 if the rarity cannot come up in the shop.
+  eventRarityChance(rarityId) {
+    const ev = this.eco.events || {};
+    if (ev.rarityChances && typeof ev.rarityChances[rarityId] === "number") return ev.rarityChances[rarityId];
+    const rarities = this.eco.rarities || [];
+    const has = new Set((this.eco.shop.items || []).map((it) => (it.category === "projectile" ? (this.eco.projectiles[it.id] || {}).rarity : it.rarity)));
+    const total = rarities.filter((r) => r.chance > 0 && has.has(r.id)).reduce((a, r) => a + r.chance, 0);
+    const r = rarities.find((x) => x.id === rarityId);
+    if (!r || !(r.chance > 0) || !has.has(rarityId) || total <= 0) return 0;
+    const rollsPerHour = (this.eco.shop.slots * 3600) / (r.availabilitySeconds || 1800);
+    const meanShopHours = 1 / ((r.chance / total) * rollsPerHour);
+    return 1 / (meanShopHours * (ev.throwsPerHour || 150));
+  }
+
+  // One throw's roll for a natural event: ONE roll per RARITY that has events (in a random order, so no rarity is favoured), not one per
+  // event; the first that hits picks one of its rarity's events at random. Returns the event's name or null. (So adding an event to a
+  // rarity does not make that rarity's events more frequent.)
+  rollNaturalEvent() {
+    const byRarity = {};
+    for (const d of this.eventDefs()) (byRarity[d.rarity] = byRarity[d.rarity] || []).push(d.name);
+    const order = Object.keys(byRarity).sort(() => Math.random() - 0.5);
+    for (const rar of order) {
+      if (Math.random() < this.eventRarityChance(rar)) {
+        const names = byRarity[rar];
+        return names[Math.floor(Math.random() * names.length)];
+      }
+    }
+    return null;
   }
 
   // Tomato Juice (buff effect triggerEvent "face"): while it runs the banana face is on. Checked every frame:
@@ -1608,17 +1647,11 @@ class MainScene extends Phaser.Scene {
   }
 
   // After every throw (hit, miss or escape) roll for a random event - but never while one is running.
-  // Chance per event is in economy.json (events.faceWindow.chancePerThrow, 0.01 = 1%).
+  // The chances are by rarity (eventRarityChance / rollNaturalEvent; economy.json events._rarityNote).
   maybeStartRandomEvent() {
     if (this.isEventActive()) return;
-    // One roll per event, in a random order so no event is favoured; the first success starts and the rest are skipped.
-    const defs = this.eventDefs().sort(() => Math.random() - 0.5);
-    for (const def of defs) {
-      if (Math.random() < def.chance) {
-        this.startEvent(def.name);
-        return;
-      }
-    }
+    const name = this.rollNaturalEvent();
+    if (name) this.startEvent(name);
   }
 
   // Random face-window event (1% chance after each throw): swaps W20's texture to the banana art for events.faceWindow.durationMs, then fades

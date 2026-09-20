@@ -145,6 +145,19 @@
         "detail": "Save chance: 50%."
       },
       {
+        "id": "skyr_epic",
+        "name": "Skyr",
+        "category": "consumable",
+        "rarity": "epic",
+        "priceRange": { "min": 675, "max": 1125 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 180 },
+        "image": "assets/items/skyr.png",
+        "effects": [{ "type": "eventDot", "value": 1 }],
+        "description": "Improves brain function.",
+        "detail": "Shows event dot."
+      },
+      {
         "id": "water_bottle",
         "name": "Water Bottle",
         "category": "consumable",

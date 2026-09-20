@@ -13,6 +13,8 @@
 //                          that throw. A "charge" buff (`charge: true` on the item, no `duration`): no timer, its card shows "+1" instead
 //   centerLine       1     draws ONE green line on each slider, at the middle of the hit zone (the middle of the offset bar; the middle of the
 //                          strength band that hits W20 from the chosen offset) - Blue Skyr. Any active source turns it on; it works with or without guideLines
+//   eventDot         1     shows the DOT that marks the running event's face on both sliders (yellow for the banana face, purple for the disco);
+//                          without a buff with this effect no dot is drawn - the epic Skyr. Any active source turns it on
 //   precision        x     offset (angle) slider: its hit zone gets x times bigger (x1.2 = 20% bigger, e.g. 25% of the bar -> 30%, never over
 //                          100%), so the bar's range shrinks to 1/x and the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
@@ -110,14 +112,14 @@ const Buffs = (() => {
   function modifiers() {
     let notSaved = 1; // the chance that no running buff saves the projectile
     let bestSave = 0;
-    const m = { guideLines: 0, centerLine: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1, miracle: 0, miracleBy: null };
+    const m = { guideLines: 0, centerLine: 0, eventDot: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1, miracle: 0, miracleBy: null };
     for (const b of active()) {
       for (const e of b.item.effects || []) {
         if (!(e.type in m)) continue;
         if (e.type === "miracle") {
           m.miracle += e.value;
           m.miracleBy = b.id;
-        } else if (e.type === "guideLines" || e.type === "centerLine") m[e.type] += e.value; // a switch: any active source turns it on
+        } else if (e.type === "guideLines" || e.type === "centerLine" || e.type === "eventDot") m[e.type] += e.value; // a switch: any active source turns it on
         else if (e.type === "saveProjectile") {
           notSaved *= 1 - e.value; // independent rolls: the projectile is used up only if EVERY buff's roll fails
           if (e.value > bestSave) {

@@ -523,6 +523,7 @@ class MainScene extends Phaser.Scene {
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Orange Skyr) gives them
       miracleId: b.miracle > 0 ? b.miracleBy : null, // the Diamond Cross that helps THIS throw (used up when the throw reaches its apex)
       centerLine: b.centerLine > 0, // one green line at the middle of the hit zone on each slider (Blue Skyr)
+      eventDot: b.eventDot > 0, // the dot that marks an event's face on the sliders is only drawn with a buff that shows it (the epic Skyr)
       saveProjectile: b.saveProjectile, // chance (0-1) that this throw does not use up its projectile (Water Bottle) - the best running buff's
       saveProjectileBy: b.saveProjectileBy, // ... and which buff that is (its icon is shown when it saves one)
     };
@@ -1860,7 +1861,7 @@ class MainScene extends Phaser.Scene {
       // Blue Skyr: ONE line in the middle of that zone (the middle of the bar).
       if (this.aim.centerLine) lineAt(0, 0x5cff5c, 1, 2, 5);
 
-      const target = this.activeEventTarget();
+      const target = this.aim.eventDot ? this.activeEventTarget() : null; // (no dot without the buff)
       if (target) {
         const swing = (target.swingFrom + target.swingTo) / 2;
         if (Math.abs(swing) < range) {
@@ -1898,7 +1899,7 @@ class MainScene extends Phaser.Scene {
       }
       if (band && this.aim.centerLine) lineAtPower((lo + hi) / 2, 0x5cff5c, 1, 2, 5); // Blue Skyr: the middle of the strength band
 
-      const target = this.activeEventTarget(swingNow);
+      const target = this.aim.eventDot ? this.activeEventTarget(swingNow) : null; // (no dot without the buff)
       if (target && target.powerFrom !== null) {
         // The hit band can stick out past the ends of the bar (a heavy projectile's band ends beyond the tip):
         // aim the dot at the part that is on the bar.

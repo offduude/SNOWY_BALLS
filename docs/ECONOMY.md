@@ -188,7 +188,8 @@ when none are left. Effects do not stack from the same buff. Different buffs of 
 
 | type | value means |
 |---|---|
-| `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise). Does NOT affect the yellow event dots, which always show |
+| `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise). Does NOT affect the event dots (see `eventDot`) |
+| `eventDot` | `1` = the dot that marks the running event's face on both sliders (yellow for the banana face, purple for the disco) is drawn while the buff is active; **without it no event dot is shown** (the epic Skyr) |
 | `centerLine` | `1` = ONE green line at the middle of the hit zone on each slider: the middle of the offset bar, and the middle of the strength band that hits W20 from the chosen offset (Blue Skyr). Independent of `guideLines` (both can be on) |
 | `miracle` | `1` = the Diamond Cross: the NEXT throw is helped (see NOTES.md, "Diamond Cross"): no event running - a throw that misses is carried to the middle of W20; the face event running - anything but a face hit is carried to the middle of the face. Used up by that throw. Needs `"charge": true` on the item (no `duration`): it has no timer, its card shows "+1" |
 | `precision` | offset (angle) slider: its hit zone gets `value` times bigger (1.2 = 20% bigger, 25% -> 30%; at most the whole bar), so its range shrinks to 1/value (same marker speed) |

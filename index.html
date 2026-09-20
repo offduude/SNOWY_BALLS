@@ -1098,7 +1098,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=20"></script>
+  <script src="src/economy.js?v=21"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1109,11 +1109,15 @@
       // taps must not reach the game underneath while it is up
       ["touchstart", "touchend", "mousedown", "mouseup", "pointerdown", "pointerup", "click"].forEach((ev) => el.addEventListener(ev, (e) => e.stopPropagation()));
       const start = performance.now();
+      let tapped = false; // a tap on the screen ends the wait (once the sentence has had a moment to be read)
+      el.addEventListener("click", () => {
+        if (performance.now() - start > 1200) tapped = true;
+      });
       const fontsReady = document.fonts && document.fonts.load ? document.fonts.load('16px "Press Start 2P"') : Promise.resolve();
       Promise.race([fontsReady, new Promise((r) => setTimeout(r, 1500))]).then(() => el.classList.add("text-in"));
       const timer = setInterval(() => {
         const held = performance.now() - start;
-        if ((window.snowyBallsReady && held > 3200) || held > 14000) {
+        if ((window.snowyBallsReady && (held > 3200 || tapped)) || held > 14000) {
           clearInterval(timer);
           el.classList.add("fade");
           setTimeout(() => el.remove(), 2600);

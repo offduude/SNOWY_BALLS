@@ -124,11 +124,12 @@ const Economy = (() => {
     }
   }
 
+  // While the save slots are being swapped (see saves.js) nothing may write this page's old state over the new one.
+  // (Declared BEFORE the first save() below: calling save() before this line ran crashed Economy on the cleansing path.)
+  let locked = false;
+
   let state = load();
   if (cleansed) save(); // write the fresh save over the old one right away, so it can only ever be cleansed once
-
-  // While the save slots are being swapped (see saves.js) nothing may write this page's old state over the new one.
-  let locked = false;
 
   function save() {
     if (locked) return;

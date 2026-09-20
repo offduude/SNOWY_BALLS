@@ -965,3 +965,5 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 - **God mode fills in new items:** a god save is made with 999 of what existed at that moment, so items added later were missing (Mints showed 0). `Economy.fillGod(projectileIds, buffIds)` (called from `Collection.setEconomy`) now gives 999 of every projectile / buff a god save lacks, on every load. Verified by deleting entries from a god save and reloading. `economy.js?v=24`, `collection.js?v=41`.
 
 - **Water Bottle text** (2026-09-20): description is now "Contains hydration. Hydrates." and it has the bottom line "Save chance: 10%." (like Mints and Snowy Cube; economy.json only).
+
+- **Buff bottom lines** (2026-09-20): Triangles "Slows pointer by 20%." (its 0.8x slider speed), Orange Skyr "Marks the sweet spot." (the green guide lines); every buff now has one (economy.json only).

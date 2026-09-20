@@ -79,7 +79,8 @@
         "duration": { "seconds": 180 },
         "image": "assets/items/skyr_orange.png",
         "effects": [{ "type": "guideLines", "value": 1 }],
-        "description": "Improves brain function."
+        "description": "Improves brain function.",
+        "detail": "Marks the sweet spot."
       },
       {
         "id": "kaiser_roll",
@@ -143,7 +144,8 @@
         "duration": { "seconds": 120 },
         "image": "assets/items/triangles.png",
         "effects": [{ "type": "sliderSpeed", "value": 0.8 }],
-        "description": "Tasty shapes to make your hand steadier."
+        "description": "Tasty shapes to make your hand steadier.",
+        "detail": "Slows pointer by 20%."
       },
       {
         "id": "tomato_juice",

@@ -23,6 +23,7 @@ const Economy = (() => {
       projectiles: {}, // how many of each consumable projectile the player has (not the snowball - see regen)
       regen: {}, // projectiles that refill over time (the snowball): id -> { count, next } - `next` is the Date.now() timestamp (device clock) at which the next one arrives, null while the stock is full
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
+      event: null, // the event that is running: { name, startedAt } (startedAt on the device clock) - it goes on while the app is closed, like the shop timers
       god: false, // GOD MODE (the import code "god mode", see saves.js): nothing is ever used up or paid for - coins, projectiles and buffs are infinite
       coinCarry: 0, // the fraction of a coin left over from a payout with a coin multiplier (0 <= x < 1), added to the next payout
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
@@ -75,6 +76,7 @@ const Economy = (() => {
       bestStreak: p.bestStreak || 0,
       streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
       god: p.god === true,
+      event: p.event && typeof p.event === "object" && typeof p.event.name === "string" && typeof p.event.startedAt === "number" ? { name: p.event.name, startedAt: p.event.startedAt } : null,
       coinCarry: typeof p.coinCarry === "number" && p.coinCarry >= 0 && p.coinCarry < 1 ? p.coinCarry : 0,
       aiming: p.aiming === true,
       projectiles: cleanCounts(p.projectiles),
@@ -493,6 +495,11 @@ const Economy = (() => {
     sanitize,
     snapshot: () => JSON.stringify(state), // the save as it is right now (for exporting)
     isGod: () => state.god === true,
+    getEvent: () => state.event,
+    setEvent: (ev) => {
+      state.event = ev || null;
+      save();
+    },
     // God mode: a god save made before an item existed has none of it - give 999 of every listed projectile / buff it lacks.
     fillGod: (projectileIds, buffIds) => {
       if (!state.god) return;

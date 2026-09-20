@@ -61,7 +61,7 @@ const Buffs = (() => {
 
   // What a card shows as its time: mm:ss, or "+1" for a charge buff.
   function timeText(item, ms) {
-    return isCharge(item) ? "+1" : formatTime(ms);
+    return isCharge(item) && ms > CHARGE_MS / 2 ? "+1" : formatTime(ms); // (a summon buff that has started counts its event down)
   }
 
   function durationMs(item) {
@@ -121,7 +121,7 @@ const Buffs = (() => {
   // no throw is being made and no event runs" (main.js syncSummonBuff); the charge is used up when the event starts. Returns { id, event }
   // or null.
   function summonBuff() {
-    const b = active().find((x) => isCharge(x.item) && hasTrigger(x.item));
+    const b = active().find((x) => isCharge(x.item) && hasTrigger(x.item) && x.msLeft > CHARGE_MS / 2); // (waiting: not started yet)
     if (!b) return null;
     const e = b.item.effects.find((x) => x.type === "triggerEvent");
     return { id: b.id, event: e.value };
@@ -170,11 +170,22 @@ const Buffs = (() => {
     changed();
   }
 
+  // A summon buff whose event is running counts it down: from `endsAt` on the card shows a real timer instead of "+1".
+  function setBuffEnd(id, endsAt) {
+    const b = Economy.getBuffList().find((x) => x.id === id);
+    if (!b) return;
+    b.endsAt = endsAt;
+    Economy.saveBuffs();
+    changed();
+  }
+
   // Tapping a buff card in the game cancels that buff for good.
   function cancel(id) {
     const list = Economy.getBuffList();
     const i = list.findIndex((b) => b.id === id);
     if (i === -1) return;
+    const item = itemById(id);
+    if (item && isCharge(item) && hasTrigger(item) && list[i].endsAt - Date.now() < CHARGE_MS / 2) return; // a summon buff whose event is on cannot be cancelled
     list.splice(i, 1);
     Economy.saveBuffs();
     changed();
@@ -255,6 +266,7 @@ const Buffs = (() => {
     },
     active,
     summonBuff,
+    setBuffEnd,
     eventBlocked,
     setEventGate: (fn) => {
       eventGate = fn;

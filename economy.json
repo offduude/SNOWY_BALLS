@@ -206,7 +206,8 @@
         "duration": { "seconds": 20 },
         "image": "assets/items/tomato_juice.png",
         "effects": [{ "type": "triggerEvent", "value": "face" }],
-        "description": "It's insides carry a scent that few people adore."
+        "description": "It's insides carry a scent that few people adore.",
+        "detail": "Somebody comes to the window."
       },
       {
         "id": "diamond_cross",
@@ -218,7 +219,8 @@
         "charge": true,
         "image": "assets/items/diamond_cross.png",
         "effects": [{ "type": "miracle", "value": 1 }],
-        "description": "Shines brighter with stronger projectiles."
+        "description": "Shines brighter with stronger projectiles.",
+        "detail": "Next throw won't miss."
       },
       {
         "id": "daniels_coin",

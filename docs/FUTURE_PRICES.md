@@ -42,7 +42,7 @@ legendary 12.5 h / 6.6 h.
 | common | Snowy Cube | 1.1x coins | 2 min | 6 | 3-5 (4) | in the game (added 2026-09-20) |
 | rare | Triangles | both sliders at 0.8x speed | 2 min (as now) | 64 | 29-48 (38) | in the game (was 93-156, now the range above) |
 | rare | Skyr | green guide lines on both sliders | 3 min (as now) | 96 | 43-72 (58) | in the game (now rare; was epic, 530-719) |
-| rare | *(new)* save | 20% chance not to use up the projectile | 2 min | 80 | 36-60 (48) | future |
+| rare | Mints | 20% chance not to use up the projectile | 2 min | 80 | 36-60 (48) | in the game (added 2026-09-20) |
 | rare | Kaiser Roll | 1.2x coins | 2 min (as now) | 96 | 43-72 (58) | in the game (was 93-156, now the range above) |
 | epic | *(new)* save | 30% chance not to use up the projectile | 2 min | 900 | 400-680 (540) | future |
 | epic | *(new)* coin bonus | 1.35x coins | 2 min | 1,260 | 570-940 (756) | future |

@@ -493,6 +493,14 @@ const Economy = (() => {
     sanitize,
     snapshot: () => JSON.stringify(state), // the save as it is right now (for exporting)
     isGod: () => state.god === true,
+    // God mode: a god save made before an item existed has none of it - give 999 of every listed projectile / buff it lacks.
+    fillGod: (projectileIds, buffIds) => {
+      if (!state.god) return;
+      let changed = false;
+      for (const id of projectileIds) if (!state.projectiles[id]) ((state.projectiles[id] = 999), (changed = true));
+      for (const id of buffIds) if (!state.buffItems[id]) ((state.buffItems[id] = 999), (changed = true));
+      if (changed) save();
+    },
     freshJson: () => JSON.stringify(fresh()), // a brand-new game
     lockSaves: () => {
       locked = true;

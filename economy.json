@@ -95,6 +95,19 @@
         "detail": "Coin bonus: 1.2x."
       },
       {
+        "id": "mints",
+        "name": "Mints",
+        "category": "consumable",
+        "rarity": "rare",
+        "priceRange": { "min": 36, "max": 60 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 120 },
+        "image": "assets/items/mints.png",
+        "effects": [{ "type": "saveProjectile", "value": 0.2 }],
+        "description": "Hmmm.. I can't read the label.",
+        "detail": "Save chance: 20%."
+      },
+      {
         "id": "water_bottle",
         "name": "Water Bottle",
         "category": "consumable",

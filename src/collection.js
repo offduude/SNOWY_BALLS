@@ -356,6 +356,11 @@ const Collection = (() => {
     close,
     setEconomy(economyJson) {
       eco = economyJson;
+      const items = (eco.shop && eco.shop.items) || [];
+      Economy.fillGod(
+        Object.entries(eco.projectiles || {}).filter(([id, p]) => id !== "snowball" && !p.infinite && !p.regen).map(([id]) => id),
+        items.filter((it) => it.category === "consumable").map((it) => it.id)
+      );
     },
     init() {
       container = document.getElementById("game-container");

@@ -1,5 +1,5 @@
 {
-  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece.",
+  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.)",
   "projectiles": [
     {
       "_note": "EPIC STANDARD: the ordinary epic projectile (the Grenade is the epic heavy hitter). Average stack 3000, hit value 960 (the epic rarity default).",
@@ -97,30 +97,6 @@
     }
   ],
   "buffs": [
-    {
-      "_note": "COMMON coin bonus 1.1x (coin fractions are carried over, so 1.1x works on cheap hits).",
-      "id": "common_coin_bonus",
-      "name": "TBD",
-      "category": "consumable",
-      "rarity": "common",
-      "priceRange": {
-        "min": 3,
-        "max": 5
-      },
-      "ignorePriceOverride": true,
-      "duration": {
-        "seconds": 120
-      },
-      "image": "assets/items/TBD.png",
-      "effects": [
-        {
-          "type": "coinMultiplier",
-          "value": 1.1
-        }
-      ],
-      "description": "TBD",
-      "detail": "Coin bonus: 1.1x."
-    },
     {
       "_note": "RARE save chance 20%.",
       "id": "rare_save",

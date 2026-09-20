@@ -107,6 +107,19 @@
         "description": "Has 10% chance to not consume projectile."
       },
       {
+        "id": "snowy_cube",
+        "name": "Snowy Cube",
+        "category": "consumable",
+        "rarity": "common",
+        "priceRange": { "min": 3, "max": 5 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 120 },
+        "image": "assets/items/snowy_cube.png",
+        "effects": [{ "type": "coinMultiplier", "value": 1.1 }],
+        "description": "Stay frosty geeza.",
+        "detail": "Coin bonus: 1.1x."
+      },
+      {
         "id": "triangles",
         "name": "Triangles",
         "category": "consumable",

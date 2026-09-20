@@ -32,7 +32,7 @@
     { "id": "very_heavy", "label": "very heavy", "from": 0.75, "to": 1 }
   ],
 
-  "_raritiesNote": "Rarities, from the lowest to the rarest. projectileHitValue: what ONE HIT pays (base coins, before buffs and events) with a projectile of this rarity - the same for both goal windows and for every projectile of the rarity: default (the snowball) 5, common 12, rare 60, epic 300, legendary 1500 (x5 per tier; a stack of 3-7 pieces at a price per piece 20% under the hit value, so a stack costs 50 / 250 / 1250 / 6250 on average). A projectile can override it with its own hitValue. availabilitySeconds: how long an item of that rarity stays on sale in the shop before its slot REROLLS (a new item, amount and price) - 30 min for every rarity (better rarity no longer means longer); the timer is shown on the card and runs on the device clock (also while the app is closed); a rarity without it (default) has no timer. default (light grey, chance 0) is the snowball's: it can never come up in the shop. For the others a shop slot first rolls a rarity by chance (percent - only rarities that have an item to sell take part, and their chances are rescaled to 100), then picks one of that rarity's items at random. color is CSS text colour, or rainbow (animated waves + a pulsing shine). Every projectile (in projectiles) and every shop item names one with rarity; the PROJECTILES and BUFFS tabs list the rarest first and an item with NO rarity always goes at the very end, after default and common.",
+  "_raritiesNote": "Rarities, from the lowest to the rarest. projectileHitValue: what ONE HIT pays (base coins, before buffs and events) with a projectile of this rarity - the same for both goal windows and for every projectile of the rarity: default (the snowball) 5, common 12, rare 60, epic 300, legendary 1500 (x5 per tier; a stack of 3-7 pieces at a price per piece 20% under the hit value, so a stack costs 50 / 250 / 1250 / 6250 on average). A projectile can override it with its own hitValue - the HEAVY HITTERS do (Stone 30, Egg 150, Grenade 750): a smaller stack (1-3 instead of 3-7), a price per piece 2.5x higher and a hit value 2.5x higher, for the same average stack price - higher risk, higher reward. availabilitySeconds: how long an item of that rarity stays on sale in the shop before its slot REROLLS (a new item, amount and price) - 30 min for every rarity (better rarity no longer means longer); the timer is shown on the card and runs on the device clock (also while the app is closed); a rarity without it (default) has no timer. default (light grey, chance 0) is the snowball's: it can never come up in the shop. For the others a shop slot first rolls a rarity by chance (percent - only rarities that have an item to sell take part, and their chances are rescaled to 100), then picks one of that rarity's items at random. color is CSS text colour, or rainbow (animated waves + a pulsing shine). Every projectile (in projectiles) and every shop item names one with rarity; the PROJECTILES and BUFFS tabs list the rarest first and an item with NO rarity always goes at the very end, after default and common.",
   "rarities": [
     { "id": "default", "label": "default", "color": "#c9c9c9", "chance": 0, "projectileHitValue": 5 },
     { "id": "common", "label": "common", "color": "#62c0ff", "chance": 60, "availabilitySeconds": 1800, "projectileHitValue": 12 },
@@ -45,11 +45,11 @@
   "projectiles": {
     "snowball": { "infinite": false, "regen": { "max": 50, "everySeconds": 30 }, "rarity": "default", "weight": "moderate", "leavesMark": true, "spins": false },
     "chestnut": { "infinite": false, "rarity": "common", "weight": "moderate", "leavesMark": false, "spins": true },
-    "egg": { "infinite": false, "rarity": "rare", "weight": "heavy", "leavesMark": true, "spins": true },
+    "egg": { "infinite": false, "rarity": "rare", "hitValue": 150, "weight": "heavy", "leavesMark": true, "spins": true },
     "rowan_berry": { "infinite": false, "rarity": "common", "weight": "light", "leavesMark": false, "spins": true },
-    "stone": { "infinite": false, "rarity": "common", "weight": "heavy", "leavesMark": false, "spins": true },
+    "stone": { "infinite": false, "rarity": "common", "hitValue": 30, "weight": "heavy", "leavesMark": false, "spins": true },
     "pinecone": { "infinite": false, "rarity": "rare", "weight": "heavy", "leavesMark": false, "spins": true },
-    "grenade": { "infinite": false, "rarity": "epic", "weight": "heavy", "leavesMark": true, "spins": false }
+    "grenade": { "infinite": false, "rarity": "epic", "hitValue": 750, "weight": "heavy", "leavesMark": true, "spins": false }
   },
 
 
@@ -134,8 +134,8 @@
         "id": "grenade",
         "name": "Grenade",
         "category": "projectile",
-        "amount": { "min": 3, "max": 7 },
-        "unitPrice": { "min": 200, "max": 300 },
+        "amount": { "min": 1, "max": 3 },
+        "unitPrice": { "min": 500, "max": 750 },
         "ignorePriceOverride": true,
         "image": "assets/snowball/grenade.png",
         "effect": { "type": "givesProjectile", "value": "grenade" },
@@ -167,8 +167,8 @@
         "id": "stone",
         "name": "Stone",
         "category": "projectile",
-        "amount": { "min": 3, "max": 7 },
-        "unitPrice": { "min": 8, "max": 12 },
+        "amount": { "min": 1, "max": 3 },
+        "unitPrice": { "min": 20, "max": 30 },
         "ignorePriceOverride": true,
         "image": "assets/snowball/stone.png",
         "effect": { "type": "givesProjectile", "value": "stone" },
@@ -189,8 +189,8 @@
         "id": "egg",
         "name": "Egg",
         "category": "projectile",
-        "amount": { "min": 3, "max": 7 },
-        "unitPrice": { "min": 40, "max": 60 },
+        "amount": { "min": 1, "max": 3 },
+        "unitPrice": { "min": 100, "max": 150 },
         "ignorePriceOverride": true,
         "image": "assets/snowball/egg.png",
         "effect": { "type": "givesProjectile", "value": "egg" },

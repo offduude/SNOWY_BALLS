@@ -528,6 +528,13 @@
       justify-content: space-between;
     }
 
+    /* A card with a bottom line keeps room for it under the text: the detail is drawn over the bottom of the card, so without this a long
+       name (2 lines) plus a long description (3 lines) ran into it (Salt / Cheese Triangles). The card is as tall as before when the text is
+       short (min-height above) and grows only when the text needs more. */
+    .pick-row.buff-row.buff-detail {
+      padding-bottom: calc(var(--u) * 3.1);
+    }
+
     /* A buff's bottom line ("Coins bonus: 1.2x.") sits at the bottom of the card, under the text column (picture: 9u + gap). */
     .pick-row.buff-row .pick-stats {
       position: absolute;
@@ -1146,7 +1153,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=191"></script>
+  <script src="src/version.js?v=192"></script>
   <script src="src/economy.js?v=26"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1178,7 +1185,7 @@
   <script src="src/buffs.js?v=27"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=55"></script>
+  <script src="src/collection.js?v=57"></script>
   <script src="src/main.js?v=131"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

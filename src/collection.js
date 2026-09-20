@@ -213,7 +213,7 @@ const Collection = (() => {
     const maxTime = `<div class="pick-regen"><span>${maxText}</span>${amount}</div>`;
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (
-      `<div class="pick-row buff-row" data-id="${esc(b.id)}">` +
+      `<div class="pick-row buff-row${b.item.detail ? " buff-detail" : ""}" data-id="${esc(b.id)}">` +
       (Economy.isNewBuff(b.id) ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(b.item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +
@@ -227,8 +227,14 @@ const Collection = (() => {
 
   // A long name next to a wide corner ("legendary x99") would run into it: the name gets a max width that stops short of the
   // corner (so it wraps instead). Measured after the list is drawn; redone when the window is resized.
+  // (Also: every card of the list is as tall as the TALLEST one - a card whose text needs more room (a long name and a long description)
+  // makes all the others grow to match, in the BUFFS and the PROJECTILES list alike. Measured after the names are fitted, redone on a resize.)
   function fitNames() {
-    scrollEl.querySelectorAll(".pick-row").forEach((row) => {
+    const rows = [...scrollEl.querySelectorAll(".pick-row")];
+    rows.forEach((row) => {
+      row.style.minHeight = ""; // back to the natural height before measuring
+    });
+    rows.forEach((row) => {
       const name = row.querySelector(".pick-name");
       const corner = row.querySelector(".pick-corner");
       if (!name || !corner) return;
@@ -240,6 +246,12 @@ const Collection = (() => {
       const textRight = inner.getBoundingClientRect().right;
       const gap = 8; // px of air between the name and the label
       if (textRight > c.left - gap) name.style.maxWidth = Math.max(40, c.left - gap - n.left) + "px";
+    });
+    if (rows.length < 2) return;
+    const tallest = Math.max(...rows.map((row) => row.getBoundingClientRect().height));
+    rows.forEach((row) => {
+      row.style.boxSizing = "border-box";
+      row.style.minHeight = tallest + "px";
     });
   }
 
@@ -426,6 +438,7 @@ const Collection = (() => {
       buttons.character?.addEventListener("click", () => toggle("character")); // no CHARACTERS button for now
       scrollEl.addEventListener("click", onEquip);
       window.addEventListener("resize", () => openKind && fitNames());
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => openKind && fitNames()); // (the pixel font arriving changes every height)
       // Tapping the dimmed game area outside the list closes it.
       document.getElementById("list-backdrop").addEventListener("click", close);
     },

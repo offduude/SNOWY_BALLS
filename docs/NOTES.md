@@ -978,3 +978,5 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 - **Orange Skyr's bottom line** (2026-09-20): "Shows the hit zone." (was "Marks the sweet spot.", kept free for a planned buff that marks the middle of the green lines; economy.json only).
 
 - **Rowan Berry description** (2026-09-20): "Not yummy if you're not a bird." (was "Annoyingly imprecise. Not yummy."; economy.json only).
+
+- **Rowan Berry description, really** (2026-09-20): the PROJECTILES list takes projectile names and descriptions from the hard-coded `CATALOG` in `src/collection.js`, not from economy.json (which only the shop cards use), so the first change (economy.json) did not show there. Both now say "Not yummy if you're not a bird."; changing a projectile's text means editing BOTH files. `collection.js?v=44`. Verified in the PROJECTILES list after a hard reload (the browser had kept the old index.html, and with it `collection.js?v=43`).

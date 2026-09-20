@@ -747,7 +747,7 @@ class MainScene extends Phaser.Scene {
   }
 
   // The miracle of the Diamond Cross: the music (theme, and the event music if it is on) fades out quickly so only the angels are
-  // heard, and fades back in when they are done. The volumes it fades back to are read at that moment (an event may have changed them).
+  // heard, and fades back in after the projectile's impact. The volumes it fades back to are read at that moment (an event may have changed them).
   duckMusic() {
     (this.musicTweens || []).forEach((tw) => tw.stop());
     if (this.duckTween) this.duckTween.forEach((tw) => tw.stop());
@@ -757,10 +757,15 @@ class MainScene extends Phaser.Scene {
 
   unduckMusic() {
     if (this.duckTween) this.duckTween.forEach((tw) => tw.stop());
-    const back = (sound, to) => (sound ? this.tweens.add({ targets: sound, volume: to, duration: MIRACLE_MUSIC_FADE_MS, ease: "Sine.easeInOut" }) : null);
+    // (a crossfade that finishThrow may just have started - a face hit ends the event music - is replaced by this one, which goes to the same volumes)
+    (this.musicTweens || []).forEach((tw) => tw.stop());
+    const back = (sound, to, onDone) =>
+      sound ? this.tweens.add({ targets: sound, volume: to, duration: MIRACLE_MUSIC_FADE_MS, ease: "Sine.easeInOut", onComplete: onDone }) : null;
     this.duckTween = [
       back(this.theme, this.eventMusicOn ? 0 : THEME_VOLUME),
-      back(this.eventMusic, this.eventMusicOn ? EVENT_MUSIC_VOLUME : 0),
+      back(this.eventMusic, this.eventMusicOn ? EVENT_MUSIC_VOLUME : 0, () => {
+        if (!this.eventMusicOn && this.eventMusic) this.eventMusic.stop(); // (the event is over: it starts from the beginning next time)
+      }),
     ].filter(Boolean);
   }
 
@@ -1080,7 +1085,6 @@ class MainScene extends Phaser.Scene {
       if (k >= 1) {
         m.phase = "hang2";
         m.t = 0;
-        this.unduckMusic(); // the angels are done: the music comes back
       }
     } else if (m.phase === "hang2") {
       this.followBallCamera(this.worldY(tg.h), dt);
@@ -1089,6 +1093,7 @@ class MainScene extends Phaser.Scene {
         this.destroyMiracleGlow(m);
         this.miracle = null;
         this.finishThrow(true, tg.win, tg.x, tg.h, tg.faceHit);
+        this.unduckMusic(); // the music comes back only now, after the projectile's impact (its sound has just started)
       }
     }
   }

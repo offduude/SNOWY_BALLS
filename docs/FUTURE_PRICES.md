@@ -48,7 +48,7 @@ legendary 12.5 h / 6.6 h.
 | epic | *(new)* coin bonus | 1.35x coins | 2 min | 1,260 | 570-940 (756) | future |
 | legendary | *(new)* free throw | replaces the 50% save: the next throw does not use up a bought projectile (a one-time charge, no timer; needs a new mechanic) | until thrown | 3,000 (7,500 on a heavy hitter) | 2,250-3,750 (3,000) | future |
 | legendary | *(new)* coin bonus | 1.5x coins | 2 min | 9,000 | 4,050-6,750 (5,400) | future |
-| legendary | Diamond Cross (was Sure Shot) | the next throw is carried to W20 (or the banana face during the event) if it misses; a charge, no timer | until thrown | 3,000 (7,500 with a face event) | 1,800-3,000 (2,400) | built on branch `diamond-cross`, not pushed |
+| legendary | Diamond Cross (was Sure Shot) | the next throw is carried to W20 (or the banana face during the event) if it misses; a charge, no timer | until thrown | 3,000 (7,500 with a face event) | 1,800-3,000 (2,400) | in the game (added 2026-09-20) |
 | legendary | Tomato Juice | starts the banana face event (face multiplier x2.5) | 20 s (as now) | 6,840 on a standard stack, 17,100 on a heavy hitter | 3,100-5,100 (4,100) | in the game (3,100-5,100, face x2.5; was 2,343-3,906, face x40) |
 
 Buff price ladder by tier: about 3 / 50 / 550 / 5,000 for the save and multiplier buffs.

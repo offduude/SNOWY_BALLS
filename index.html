@@ -504,6 +504,15 @@
       min-height: calc(var(--u) * 13.05);
     }
 
+    /* A buff card's amount (x3, xINF) is in its bottom-right corner (the rarity label alone is in the top-right one). */
+    .pick-row.buff-row .buff-amount {
+      position: absolute;
+      right: calc(var(--u) * 1.2);
+      bottom: calc(var(--u) * 1.2);
+      font-size: calc(var(--u) * 1.3);
+      line-height: 1;
+    }
+
     /* A buff's bottom line ("Coins bonus: 1.2x.") sits at the bottom of the card, under the text column (picture: 9u + gap). */
     .pick-row.buff-row .pick-stats {
       position: absolute;
@@ -1150,7 +1159,7 @@
   <script src="src/buffs.js?v=20"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=48"></script>
+  <script src="src/collection.js?v=49"></script>
   <script src="src/main.js?v=123"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

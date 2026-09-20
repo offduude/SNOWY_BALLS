@@ -208,7 +208,8 @@ const Collection = (() => {
       `<div class="pick-desc">${esc(b.item.description || "")}</div></div>` +
       `<div class="pick-action">${control}${maxTime}</div>` +
       detail +
-      cornerHtml(Rarity.ofItem(b.item), b.count > 0 ? countText(b.count) : "") +
+      cornerHtml(Rarity.ofItem(b.item), "") + // the rarity label stays in the top-right corner ...
+      (b.count > 0 ? `<span class="pick-count buff-amount">${countText(b.count)}</span>` : "") + // ... the amount is in the bottom-right one
       `</div>`
     );
   }

@@ -4,9 +4,15 @@
 // you want shows up).
 const Economy = (() => {
   const KEY = "snowyBallsSave";
+  // THE GRAND RESET: every save records the reset number it was made under. A save without it, or with a lower one, belongs to
+  // an earlier economy: it is thrown away on load and the player starts a new game (and sees "The grand cleansing has struck."
+  // once, see wasCleansed). To reset everybody again, raise this number.
+  const SAVE_EPOCH = 1;
+  let cleansed = false; // this page load threw an existing save away (kept in memory only, so the message shows once)
 
   function fresh() {
     return {
+      epoch: SAVE_EPOCH,
       coins: 0,
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
@@ -63,8 +69,13 @@ const Economy = (() => {
       const raw = localStorage.getItem(KEY);
       if (!raw) return base;
       const p = JSON.parse(raw);
+      if (!(typeof p.epoch === "number" && p.epoch >= SAVE_EPOCH)) {
+        cleansed = true; // an old save: the grand reset - start again
+        return base;
+      }
       const shop = p.shop || {};
       return {
+        epoch: SAVE_EPOCH,
         coins: p.coins || 0,
         // Saves from before lifetimeCoins existed: the best honest guess is what they hold now.
         lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
@@ -98,6 +109,7 @@ const Economy = (() => {
   }
 
   let state = load();
+  if (cleansed) save(); // write the fresh save over the old one right away, so it can only ever be cleansed once
 
   function save() {
     try {
@@ -451,6 +463,7 @@ const Economy = (() => {
     clearUnseenBuffs,
     takeBuff,
     setRegenConfig,
+    wasCleansed: () => cleansed,
     setBuffMax,
     getBuffMax,
     regenInfo,

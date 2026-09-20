@@ -866,6 +866,41 @@
       transform: translateX(-50%);
     }
 
+    /* THE GRAND CLEANSING: shown once, on the first load after the grand reset (see Economy SAVE_EPOCH) - a completely black screen with
+       white text, held for a moment, then faded out into the game. Never shown again. */
+    #cleansing {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: calc(var(--u) * 4);
+      box-sizing: border-box;
+      background: #000;
+      color: #fff;
+      font-family: "Press Start 2P", monospace;
+      font-size: calc(var(--u) * 2.2);
+      line-height: 1.7;
+      text-align: center;
+      opacity: 1;
+    }
+
+    #cleansing.show { display: flex; }
+
+    #cleansing span {
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+
+    #cleansing.text-in span { opacity: 1; }
+
+    #cleansing.fade {
+      opacity: 0;
+      transition: opacity 2.4s ease;
+      pointer-events: none;
+    }
+
     #coin-counter .coin {
       flex: none;
       width: 9px;
@@ -879,6 +914,7 @@
 </head>
 <body>
   <div id="game-container">
+    <div id="cleansing"><span>The grand cleansing has struck.</span></div>
     <div id="message"></div>
     <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
     <div id="shop-items"></div>
@@ -905,12 +941,34 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=18"></script>
+  <script src="src/economy.js?v=19"></script>
+  <script>
+    // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
+    // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
+    (function () {
+      if (typeof Economy === "undefined" || !Economy.wasCleansed()) return;
+      const el = document.getElementById("cleansing");
+      el.classList.add("show");
+      // taps must not reach the game underneath while it is up
+      ["touchstart", "touchend", "mousedown", "mouseup", "pointerdown", "pointerup", "click"].forEach((ev) => el.addEventListener(ev, (e) => e.stopPropagation()));
+      const start = performance.now();
+      const fontsReady = document.fonts && document.fonts.load ? document.fonts.load('16px "Press Start 2P"') : Promise.resolve();
+      Promise.race([fontsReady, new Promise((r) => setTimeout(r, 1500))]).then(() => el.classList.add("text-in"));
+      const timer = setInterval(() => {
+        const held = performance.now() - start;
+        if ((window.snowyBallsReady && held > 3200) || held > 14000) {
+          clearInterval(timer);
+          el.classList.add("fade");
+          setTimeout(() => el.remove(), 2600);
+        }
+      }, 100);
+    })();
+  </script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=11"></script>
   <script src="src/shop.js?v=22"></script>
   <script src="src/collection.js?v=37"></script>
-  <script src="src/main.js?v=113"></script>
+  <script src="src/main.js?v=114"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

@@ -439,6 +439,7 @@ class MainScene extends Phaser.Scene {
     // Loops forever so the theme doesn't just play once and go silent - it's a few minutes
     // long, not actually infinite on its own.
     this.startThemeMusic();
+    window.snowyBallsReady = true; // the game is up: the "grand cleansing" screen (index.html) may fade out now
 
     // Mobile-only from here on - no keyboard control, tap is the only input.
     this.input.on("pointerdown", () => this.handleFreezeInput());

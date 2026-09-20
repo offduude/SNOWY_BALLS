@@ -504,6 +504,15 @@
       min-height: calc(var(--u) * 13.05);
     }
 
+    /* Under a buff's USE button / timer: the max time ("02:00") at the left edge of the button, the amount ("x3") at its right edge. */
+    .pick-row.buff-row .pick-regen {
+      left: 0;
+      right: 0;
+      transform: none;
+      display: flex;
+      justify-content: space-between;
+    }
+
     /* A buff's bottom line ("Coins bonus: 1.2x.") sits at the bottom of the card, under the text column (picture: 9u + gap). */
     .pick-row.buff-row .pick-stats {
       position: absolute;
@@ -1150,7 +1159,7 @@
   <script src="src/buffs.js?v=20"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=50"></script>
+  <script src="src/collection.js?v=51"></script>
   <script src="src/main.js?v=123"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

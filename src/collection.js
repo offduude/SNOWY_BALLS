@@ -199,8 +199,9 @@ const Collection = (() => {
     // Under the USE button: how long the buff lasts once used ("03:00") - the same style as "MAX" under a snowball's EQUIP button.
     // (Not the running timer: while the buff is active its own countdown takes the button's place, and this stays under it.)
     // ... followed by how many the player has: "02:00 x3" ("+1 x3" for a charge buff, "02:00 xINF" in god mode).
-    const amount = b.count > 0 ? ` ${countText(b.count)}` : "";
-    const maxTime = `<div class="pick-regen">${Buffs.isCharge(b.item) ? "+1" : clock(Buffs.durationMs(b.item))}${amount}</div>`;
+    // The time is at the button's left edge and the amount at its right edge (see .buff-row .pick-regen).
+    const amount = b.count > 0 ? `<span>${countText(b.count)}</span>` : "";
+    const maxTime = `<div class="pick-regen"><span>${Buffs.isCharge(b.item) ? "+1" : clock(Buffs.durationMs(b.item))}</span>${amount}</div>`;
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (
       `<div class="pick-row buff-row" data-id="${esc(b.id)}">` +

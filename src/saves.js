@@ -2,8 +2,8 @@
 //
 // Two slots. The one being played is the live save (Economy's own localStorage entry); the other slot keeps its data next to it
 // (`snowyBallsSlotData<i>`), and `snowyBallsSlots` remembers the slot names, the last time each was loaded and which one is
-// active. Loading another slot swaps the two saves over and reloads the page. Slot 1 can never be empty (the game is always
-// running on something): deleting it starts a brand-new game in it.
+// active. Loading another slot swaps the two saves over and reloads the page. Deleting a save (either slot) opens one dialog:
+// the save is replaced by a new one the player names and starts as a new game or imports - it is never simply removed.
 //
 // A save code looks like  SB1.<compressed save>.<check>  (about 450-650 characters): the save JSON, deflated, as URL-safe
 // base64, with a checksum that catches a code that was copied only in part. (SB0 is the same without compression, for a
@@ -222,46 +222,6 @@ const Saves = (() => {
     switchTo(i);
   }
 
-  function deleteSlot(i) {
-    if (!meta.slots[i]) return;
-    if (meta.active === i) {
-      Economy.lockSaves();
-      if (i === 0) {
-        write(Economy.storageKey, Economy.freshJson()); // slot 1: a brand-new game in it
-        meta.slots[0] = { name: defaultName(0), lastLoaded: Date.now() };
-        saveMeta();
-        location.reload();
-      } else {
-        // The slot being played is deleted: go back to slot 1 and leave this one empty.
-        write(Economy.storageKey, localStorage.getItem(DATA_PREFIX + 0));
-        try {
-          localStorage.removeItem(DATA_PREFIX + 0);
-        } catch (e) {
-          /* ignore */
-        }
-        meta.active = 0;
-        meta.slots[0].lastLoaded = Date.now();
-        meta.slots[i] = null;
-        saveMeta();
-        location.reload();
-      }
-      return;
-    }
-    if (i === 0) {
-      write(DATA_PREFIX + 0, Economy.freshJson()); // slot 1 is never empty
-      meta.slots[0] = { name: defaultName(0), lastLoaded: null };
-    } else {
-      meta.slots[i] = null;
-      try {
-        localStorage.removeItem(DATA_PREFIX + i);
-      } catch (e) {
-        /* ignore */
-      }
-    }
-    saveMeta();
-    refresh();
-  }
-
   // ---------- popups ----------
   let layer = null;
 
@@ -343,17 +303,9 @@ const Saves = (() => {
     );
   }
 
+  // Deleting any save opens the same dialog: name the save that replaces it, then start a new game or import a code.
   function showDelete(i) {
-    if (i === 0) return showReplace(0);
-    const s = meta.slots[i];
-    const text =
-      i === 0
-        ? `"${esc(s.name)}" will be erased and a brand-new game will start in it. This cannot be undone.`
-        : `"${esc(s.name)}" will be erased and the slot will be empty. This cannot be undone.`;
-    openModal("DELETE SAVE?", `<div class="modal-text">${text}</div>`, [
-      { label: "DELETE", cls: "danger", onClick: () => deleteSlot(i) },
-      { label: "CANCEL", cls: "ghost" },
-    ]);
+    showReplace(i);
   }
 
   function showLoad(i) {

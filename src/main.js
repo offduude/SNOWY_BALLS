@@ -791,6 +791,8 @@ class MainScene extends Phaser.Scene {
     ].filter(Boolean);
   }
 
+  // INTENTIONAL (owner's decision, 2026-09-20 - keep it): this ducks the THEME and the banana event music only. A disco track (or its applause)
+  // that is playing is NOT ducked, so the angels of a miracle in the middle of the disco play over it.
   // The miracle of the Diamond Cross: the music (theme, and the event music if it is on) fades out quickly so only the angels are
   // heard, and fades back in after the projectile's impact. The volumes it fades back to are read at that moment (an event may have changed them).
   duckMusic() {

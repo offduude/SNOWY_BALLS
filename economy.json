@@ -154,11 +154,24 @@
         "rarity": "rare",
         "priceRange": { "min": 29, "max": 48 },
         "ignorePriceOverride": true,
-        "duration": { "seconds": 120 },
+        "duration": { "seconds": 180 },
         "image": "assets/items/triangles.png",
         "effects": [{ "type": "sliderSpeed", "value": 0.8 }],
         "description": "Tasty shapes to make your hand steadier.",
         "detail": "Slows pointer by 20%."
+      },
+      {
+        "id": "triangles_common",
+        "name": "Triangles",
+        "category": "consumable",
+        "rarity": "common",
+        "priceRange": { "min": 3, "max": 5 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 180 },
+        "image": "assets/items/triangles_common.png",
+        "effects": [{ "type": "sliderSpeed", "value": 0.9 }],
+        "description": "Tasty shapes to make your hand steadier.",
+        "detail": "Slows pointer by 10%."
       },
       {
         "id": "tomato_juice",

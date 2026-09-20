@@ -199,8 +199,8 @@ const Collection = (() => {
     // Under the USE button: how long the buff lasts once used ("03:00") - the same style as "MAX" under a snowball's EQUIP button.
     // (Not the running timer: while the buff is active its own countdown takes the button's place, and this stays under it.)
     const maxTime = `<div class="pick-regen">${clock(Buffs.durationMs(b.item))}</div>`;
-    // Save chances and coin multipliers do not add up or multiply (only the best running one counts, see Buffs.modifiers): say so on the detail line's row, at its right end.
-    const noStack = (b.item.effects || []).some((e) => e.type === "saveProjectile" || e.type === "coinMultiplier");
+    // Save chances, coin multipliers and slider slow-downs do not add up or multiply (only the best running one counts, see Buffs.modifiers): say so on the detail line's row, at its right end.
+    const noStack = (b.item.effects || []).some((e) => e.type === "saveProjectile" || e.type === "coinMultiplier" || e.type === "sliderSpeed");
     const noStackHtml = noStack ? `<div class="pick-nostack">Doesn't stack.</div>` : "";
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (

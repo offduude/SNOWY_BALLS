@@ -72,3 +72,13 @@ Rare items: Kaiser Roll, Triangles, Skyr, Pinecone, Egg = 6% each (was 7.5% with
 ## Stacking (2026-09-20)
 
 Buffs of the same kind stack: save chances as independent rolls (10 / 20 / 50 = 64% together, never above 90%), coin multipliers multiply (no cap: 1.1 x 1.2 x 1.35 x 1.5 = 2.67x with the planned ladder), the Triangles slow-downs multiply on the offset slider only (no floor). The prices above were set for one buff at a time; with stacking each extra buff of a kind returns a little less than its own price implies.
+
+## Disco buff (legendary, planned) - price estimate (2026-09-20)
+
+The disco event (built) pays a fixed **x1.25** on every hit of the singer's face while the 164 s song plays; the face stays, so it can pay many times. The banana face pays x2.5 once (and ends). A buff that summons the disco is worth what those bonus hits are worth to a player with the best projectile.
+
+- Assumptions: about 10 throws a minute -> **27 throws** in the song; the face (15 x 15 px, about a tenth of the window) is hit on about **35%** of them with the purple dot to aim at -> **9.5 face hits**; each is worth 0.25 x the hit value extra.
+- Return: a legendary standard projectile (hit 4,800): 9.5 x 0.25 x 4,800 = **about 11,400**; a legendary heavy hitter (12,000): about 28,500; today's best, the Grenade (2,400): about 5,700. (Coin multiplier buffs multiply the payout, so they raise it.)
+- Price at the plan's 60% of the standard return: **about 6,800**, with the usual +-25% range: **5,100-8,550**. That is about 1.7x Tomato Juice (3,100-5,100), which fits: the disco lasts about 3 minutes and pays repeatedly, Tomato Juice pays once.
+- Sensitivity: the price scales with the face-hit rate and with (multiplier - 1): at a 20% face-hit rate the average would be about 3,900, at 50% about 9,700; a x1.5 multiplier instead of x1.25 would double it.
+- While it runs it also blocks every other event and every event buff for about 3 minutes (a real cost, not priced).

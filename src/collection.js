@@ -199,7 +199,7 @@ const Collection = (() => {
   function buffRowHtml(b) {
     const control = b.active
       ? `<div class="pick-timer">${Buffs.timeText(b.item, b.msLeft)}</div>`
-      : `<button class="pick-equip pick-use" type="button" data-id="${esc(b.id)}">USE</button>`;
+      : `<button class="pick-equip pick-use${b.blocked ? " off" : ""}" type="button" data-id="${esc(b.id)}">USE</button>`; // (off: an event is running, an event buff cannot be used)
     // The bottom line (the item's `detail`, e.g. "Coin bonus: 1.2x."), drawn over the bottom of the card (it takes no
     // room of its own, so the card's height stays fixed).
     // Under the USE button: how long the buff lasts once used ("03:00") - the same style as "MAX" under a snowball's EQUIP button.
@@ -242,7 +242,7 @@ const Collection = (() => {
 
   // What the list shows, as a string: when it changes (used, expired, bought) the list is redrawn.
   function buffKey(list) {
-    return list.map((b) => `${b.id}:${b.active ? 1 : 0}:${b.count}`).join("|");
+    return list.map((b) => `${b.id}:${b.active ? 1 : 0}:${b.count}:${b.blocked ? 1 : 0}`).join("|");
   }
 
   let buffKeyShown = "";
@@ -348,6 +348,7 @@ const Collection = (() => {
     const use = e.target.closest(".pick-use");
     if (use) {
       Economy.clearNewBuff(use.dataset.id); // using a new buff takes its red dot away (the list redraws without it)
+      if (use.classList.contains("off")) return; // dimmed: an event is running
       if (Buffs.use(use.dataset.id)) playBuffUse(); // takes one from the inventory and starts it; the list redraws itself (Buffs.onChange)
       return;
     }

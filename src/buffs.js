@@ -35,6 +35,19 @@ const Buffs = (() => {
   const listeners = [];
   const tickListeners = []; // called on every tick of the clock below
 
+  // An event buff (effect triggerEvent: Tomato Juice, later the disco one) cannot be used while ANY event is running (the scene says so
+  // through the gate) or while another event buff is running. The BUFFS list shows such a USE button dimmed.
+  let eventGate = null;
+
+  function hasTrigger(item) {
+    return !!(item && (item.effects || []).some((e) => e.type === "triggerEvent"));
+  }
+
+  function eventBlocked(item) {
+    if (!hasTrigger(item)) return false;
+    return (!!eventGate && !!eventGate()) || active().some((b) => hasTrigger(b.item));
+  }
+
   function itemById(id) {
     return eco.shop.items.find((it) => it.id === id) || null;
   }
@@ -119,7 +132,7 @@ const Buffs = (() => {
       .filter((it) => it.category === "consumable")
       .map((it, i) => {
         const r = running.get(it.id);
-        return { id: it.id, item: it, i, count: Economy.getBuffCount(it.id), active: !!r, msLeft: r ? r.msLeft : 0 };
+        return { id: it.id, item: it, i, count: Economy.getBuffCount(it.id), active: !!r, msLeft: r ? r.msLeft : 0, blocked: !r && eventBlocked(it) };
       })
       .filter((b) => b.count > 0 || b.active)
       .sort((a, b) => Rarity.rank(Rarity.ofItem(b.item)) - Rarity.rank(Rarity.ofItem(a.item)) || a.i - b.i);
@@ -130,6 +143,7 @@ const Buffs = (() => {
   function use(id) {
     const item = itemById(id);
     if (!item || active().some((b) => b.id === id)) return false;
+    if (eventBlocked(item)) return false; // an event is running: no second one
     if (!Economy.takeBuff(id)) return false;
     activate(item);
     return true;
@@ -230,6 +244,10 @@ const Buffs = (() => {
       });
     },
     active,
+    eventBlocked,
+    setEventGate: (fn) => {
+      eventGate = fn;
+    },
     durationMs,
     isCharge,
     timeText,

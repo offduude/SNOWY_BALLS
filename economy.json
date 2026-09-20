@@ -13,6 +13,12 @@
       "durationMs": 20000,
       "hitRevertMs": 1000,
       "faceMultiplier": 2.5
+    },
+    "_discoNote": "DISCO event (see main.js startDiscoEvent): chancePerThrow like the banana face (1 in 1000). While disco.mp3 plays (about 2:44) W20 shows discoface1-6 (a new one every beatMs = 500 ms, 120 bpm); a hit on the singer's FACE pays faceMultiplier x the coins of that throw (it is fixed, and the face stays, so every hit of the song counts: it is far below the banana face's x2.5 because it can pay many times); a plain W20 hit pays as usual. Afterwards applause.mp3 plays while roses fall, then everything is normal.",
+    "discoWindow": {
+      "chancePerThrow": 0.001,
+      "faceMultiplier": 1.25,
+      "beatMs": 500
     }
   },
 

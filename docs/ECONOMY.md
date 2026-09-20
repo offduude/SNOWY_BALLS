@@ -48,6 +48,8 @@ it no longer adds coins or speeds the markers up.
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`2.5`) |
 
+**Disco event** (`events.discoWindow`, see NOTES.md "Disco event"): `chancePerThrow` `0.001`, `faceMultiplier` `1.25` (paid on EVERY hit of the singer's face while disco.mp3 plays - the face stays - so it is far below the banana face's x2.5), `beatMs` `500` (120 bpm: W20 shows a new one of discoface1-6 every beat). A plain W20 hit pays as usual. After the song: applause.mp3 and falling roses, then normal. Only one event runs at a time; no event buff (`triggerEvent`) can be used while one runs.
+
 ## aim (live)
 
 The speed of the two aim markers: **fixed, the same for both sliders**, and nothing changes it (not the streak, not buffs,

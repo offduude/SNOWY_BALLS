@@ -114,6 +114,7 @@ const AIM_COLOR_POWER = 0xff6f6f; // the strength marker - and the "STRENGTH" la
 const AIM_COLOR_ANGLE_CSS = "#6fb1ff";
 const AIM_COLOR_POWER_CSS = "#ff6f6f";
 const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's dot on the aim bars
+const EVENT_COLOR_DISCO = 0xb04dff; // the disco event's face: a purple dot on the aim bars
 const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit range, so a marker on the dot always hits)
 
 // ---------------------------------------------------------------------------------------------------------
@@ -167,6 +168,25 @@ const BANANA_FACE_BOX = {
   heightTo: FACE_IMG_TOP_HEIGHT - FACE_RAW.yFrom,
 };
 const BANANA_LEFT_SECTION_XTO = FACE_IMG_X + FACE_RAW_LEFT_DIVIDER_X;
+
+// DISCO event: discoface1-6 are 58x50 like the banana face's picture and are drawn over W20 in the same place. The singer (right pane) is
+// the same in all six; his head (hair, face, glasses; texture px x 30-45, y 13-28) is the face a hit gives the bonus for.
+const DISCO_FACE_RAW = { xFrom: 30, xTo: 45, yFrom: 13, yTo: 28 };
+const DISCO_FACE_BOX = {
+  xFrom: FACE_IMG_X + DISCO_FACE_RAW.xFrom,
+  xTo: FACE_IMG_X + DISCO_FACE_RAW.xTo,
+  heightFrom: FACE_IMG_TOP_HEIGHT - DISCO_FACE_RAW.yTo,
+  heightTo: FACE_IMG_TOP_HEIGHT - DISCO_FACE_RAW.yFrom,
+};
+const DISCO_FRAMES = 6; // discoface1..6
+const DISCO_BEAT_MS = 500; // 120 bpm (economy.json events.discoWindow.beatMs)
+const DISCO_VOLUME = 0.8;
+const APPLAUSE_VOLUME = 0.8;
+// The roses of the applause: size (px), how many per second, and the fall speed range (px/s).
+const ROSE_SIZE = 26;
+const ROSE_RATE = 30;
+const ROSE_SPEED_MIN = 200;
+const ROSE_SPEED_MAX = 300;
 
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
@@ -344,6 +364,10 @@ class MainScene extends Phaser.Scene {
     this.load.audio("hard_impact", "assets/audio/hard_impact.mp3");
     this.load.audio("egg_impact", "assets/audio/egg_impact.mp3");
     this.load.audio("tomato_impact", "assets/audio/tomato_impact.mp3");
+    for (let i = 1; i <= 6; i++) this.load.image("discoface" + i, "assets/building/discoface" + i + ".png");
+    this.load.image("rose", "assets/building/rose.png");
+    this.load.audio("disco", "assets/audio/disco.mp3");
+    this.load.audio("applause", "assets/audio/applause.mp3");
   }
 
   create() {
@@ -408,6 +432,10 @@ class MainScene extends Phaser.Scene {
     this.bananaHitTriggered = false;
     this.buffEventId = null; // id of the buff (Tomato Juice) that is running the current face event, or null - see syncBuffEvent
     this.activeEvent = null; // name of the running random event, or null - at most ONE runs at a time (see startEvent)
+    this.discoPhase = null; // null, "song" or "applause" while the disco event runs
+    this.roses = []; // the roses falling during the applause
+    this.heldEventStep = null; // a change of an event (its end, a new phase) that waits for the throw being aimed / in the air to be over
+    Buffs.setEventGate(() => this.isEventActive()); // no event buff can be used while an event runs
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
     this.ball.setDisplaySize(16, 16);
@@ -774,7 +802,7 @@ class MainScene extends Phaser.Scene {
     const back = (sound, to, onDone) =>
       sound ? this.tweens.add({ targets: sound, volume: to, duration: MIRACLE_MUSIC_FADE_MS, ease: "Sine.easeInOut", onComplete: onDone }) : null;
     this.duckTween = [
-      back(this.theme, this.eventMusicOn ? 0 : THEME_VOLUME),
+      back(this.theme, this.eventMusicOn || this.discoPhase ? 0 : THEME_VOLUME), // (the disco event keeps it down until it is over)
       back(this.eventMusic, this.eventMusicOn ? EVENT_MUSIC_VOLUME : 0, () => {
         if (!this.eventMusicOn && this.eventMusic) this.eventMusic.stop(); // (the event is over: it starts from the beginning next time)
       }),
@@ -929,14 +957,8 @@ class MainScene extends Phaser.Scene {
     // that exact point lands inside W20 or W21.
     for (const win of WINDOWS) {
       if (x >= win.xFrom && x <= win.xTo && heightClimbed >= win.heightFrom && heightClimbed <= win.heightTo) {
-        const faceHit =
-          this.bananaActive &&
-          !this.bananaHitTriggered &&
-          win === W20 &&
-          x >= BANANA_FACE_BOX.xFrom &&
-          x <= BANANA_FACE_BOX.xTo &&
-          heightClimbed >= BANANA_FACE_BOX.heightFrom &&
-          heightClimbed <= BANANA_FACE_BOX.heightTo;
+        const fb = this.eventFaceBox(); // the face of the running event (banana or disco), or null
+        const faceHit = !!fb && win === W20 && x >= fb.xFrom && x <= fb.xTo && heightClimbed >= fb.heightFrom && heightClimbed <= fb.heightTo;
         this.finishThrow(true, win, x, heightClimbed, faceHit);
         return;
       }
@@ -984,20 +1006,15 @@ class MainScene extends Phaser.Scene {
   }
 
   resolveMiracleThrow(x, h) {
-    const eventOn = this.bananaActive && !this.bananaHitTriggered;
+    const fb = this.eventFaceBox(); // the face of the running event (banana or disco), or null
+    const eventOn = !!fb;
     let hitWin = null;
     let faceHit = false;
     if (!this.fallsBehind) {
       for (const win of WINDOWS) {
         if (x >= win.xFrom && x <= win.xTo && h >= win.heightFrom && h <= win.heightTo) {
           hitWin = win;
-          faceHit =
-            eventOn &&
-            win === W20 &&
-            x >= BANANA_FACE_BOX.xFrom &&
-            x <= BANANA_FACE_BOX.xTo &&
-            h >= BANANA_FACE_BOX.heightFrom &&
-            h <= BANANA_FACE_BOX.heightTo;
+          faceHit = eventOn && win === W20 && x >= fb.xFrom && x <= fb.xTo && h >= fb.heightFrom && h <= fb.heightTo;
           break;
         }
       }
@@ -1007,7 +1024,7 @@ class MainScene extends Phaser.Scene {
       Buffs.consumeCharge(this.aim.miracleId); // the Diamond Cross is used up by this throw (its "+1" card goes at the impact)
       return;
     }
-    const box = eventOn ? BANANA_FACE_BOX : W20;
+    const box = eventOn ? fb : W20;
     this.startMiracle(x, h, {
       x: (box.xFrom + box.xTo) / 2,
       h: (box.heightFrom + box.heightTo) / 2,
@@ -1247,9 +1264,13 @@ class MainScene extends Phaser.Scene {
       // (The streak is only counted and shown - it no longer adds coins.)
 
       if (faceHit) {
-        this.bananaHitTriggered = true;
-        coins *= this.eco.events.faceWindow.faceMultiplier; // hitting the face multiplies this throw's coins (x40)
-        this.triggerBananaHit(mark);
+        if (this.activeEvent === "disco") {
+          coins *= this.discoConfig().faceMultiplier; // a disco face hit: a fixed bonus; the face stays, the event goes on
+        } else {
+          this.bananaHitTriggered = true;
+          coins *= this.eco.events.faceWindow.faceMultiplier; // hitting the banana face multiplies this throw's coins (x2.5) and ends the event
+          this.triggerBananaHit(mark);
+        }
       }
 
       // The coin multiplier of the buffs that were active when the player tapped to aim. Only whole coins are paid; the fraction
@@ -1278,7 +1299,151 @@ class MainScene extends Phaser.Scene {
     });
   }
 
-  // True while any timed event is running. Only the face window exists so far - add every new event
+  // ---- The face of the event that is running NOW (the one a hit gives a bonus for, and the one the purple / yellow dot marks) ----
+  // Banana event: its face, until it is hit. Disco event: the singer's face while the song plays (not during the applause).
+  eventFaceBox() {
+    if (this.bananaActive && !this.bananaHitTriggered) return BANANA_FACE_BOX;
+    if (this.discoPhase === "song") return DISCO_FACE_BOX;
+    return null;
+  }
+
+  eventColor() {
+    return this.discoPhase === "song" ? EVENT_COLOR_DISCO : EVENT_COLOR_FACE;
+  }
+
+  // Marks stuck on W20 fade out quickly when its picture changes (so nothing looks glued to a picture that is about to be swapped).
+  fadeMarksOnW20() {
+    for (const mark of this.marks.slice()) {
+      const heightClimbed = -mark.y;
+      if (mark.x >= W20.xFrom && mark.x <= W20.xTo && heightClimbed >= W20.heightFrom && heightClimbed <= W20.heightTo) {
+        if (mark.fadeTimer) mark.fadeTimer.remove();
+        this.fadeAndRemoveMark(mark, MARK_QUICK_FADE_MS);
+      }
+    }
+  }
+
+  // ---- DISCO event ----
+  // Chance per throw: economy.json events.discoWindow.chancePerThrow (0.001, like the banana face). What happens, in order:
+  //  1. "song": disco.mp3 plays (about 2:44); W20 shows discoface1..6, changing every beat (120 bpm = every 0.5 s, kept in step with the
+  //     track's own position). Hitting the singer's FACE pays events.discoWindow.faceMultiplier times the coins of that throw; a plain W20
+  //     hit pays as usual. The face does NOT go away when it is hit: every hit during the song counts. A purple dot marks it on the aim bars.
+  //  2. "applause": when the track ends W20 goes back to normal, applause.mp3 plays (21 s) and roses fall from the top of the picture
+  //     to below the bottom edge of the default view for as long as it plays (spawned so the last one has left the picture when it ends).
+  //  3. When the applause ends everything is normal again (the theme fades back in).
+  // The music (theme) is ducked for the whole event. Like every event it never changes phase while a throw is being aimed or is in the air
+  // (heldEventStep), and while it runs no other event can start (startEvent) and no event buff can be used (Buffs.eventBlocked).
+  discoConfig() {
+    return { chancePerThrow: 0.001, faceMultiplier: 1.25, beatMs: DISCO_BEAT_MS, ...((this.eco.events && this.eco.events.discoWindow) || {}) };
+  }
+
+  startDiscoEvent() {
+    if (this.isEventActive()) return;
+    this.activeEvent = "disco";
+    this.discoPhase = "song";
+    this.discoFrame = 0;
+    this.fadeMarksOnW20();
+    this.bananaOverlay.setTexture("discoface1");
+    this.bananaOverlay.setVisible(true);
+    this.tweens.add({ targets: this.bananaOverlay, alpha: 1, duration: BANANA_FADE_MS });
+    this.duckMusic();
+    this.discoSound = this.sound.add("disco", { volume: DISCO_VOLUME });
+    this.discoStart = this.time.now;
+    this.discoSound.once("complete", () => this.onDiscoSongEnd());
+    this.discoSound.play();
+  }
+
+  // The frame of the song right now: the track's own position / one beat (falls back to the clock if the position is not available).
+  updateDisco(dt) {
+    if (this.discoPhase === "song" && this.discoSound) {
+      const pos = this.discoSound.isPlaying ? this.discoSound.seek : 0;
+      const ms = typeof pos === "number" && pos > 0 ? pos * 1000 : this.time.now - this.discoStart;
+      const f = Math.floor(ms / this.discoConfig().beatMs) % DISCO_FRAMES;
+      if (f !== this.discoFrame) {
+        this.discoFrame = f;
+        this.bananaOverlay.setTexture("discoface" + (f + 1));
+      }
+    }
+    if (this.discoPhase === "applause") {
+      const elapsed = this.time.now - this.applauseStart;
+      if (elapsed < this.applauseMs - this.roseFallMs()) {
+        this.roseAcc += dt * ROSE_RATE;
+        while (this.roseAcc >= 1) {
+          this.roseAcc -= 1;
+          this.spawnRose();
+        }
+      }
+    }
+    this.updateRoses(dt);
+  }
+
+  onDiscoSongEnd() {
+    if (this.discoPhase !== "song") return;
+    if (!this.canEventEnd()) {
+      this.heldEventStep = () => this.onDiscoSongEnd(); // a throw is being aimed / is in the air: the face stays until it is over
+      return;
+    }
+    this.discoPhase = "applause";
+    this.fadeMarksOnW20();
+    this.tweens.add({
+      targets: this.bananaOverlay,
+      alpha: 0,
+      duration: BANANA_FADE_MS,
+      onComplete: () => {
+        if (this.discoPhase !== "song") this.bananaOverlay.setVisible(false);
+      },
+    });
+    this.applauseSound = this.sound.add("applause", { volume: APPLAUSE_VOLUME });
+    this.applauseStart = this.time.now;
+    this.applauseMs = this.applauseSound.duration > 1 ? this.applauseSound.duration * 1000 : 21000;
+    this.roseAcc = 0;
+    this.applauseSound.once("complete", () => this.endDiscoEvent());
+    this.applauseSound.play();
+  }
+
+  endDiscoEvent() {
+    if (this.discoPhase !== "applause") return;
+    if (!this.canEventEnd()) {
+      this.heldEventStep = () => this.endDiscoEvent();
+      return;
+    }
+    this.roses.forEach((r) => r.img.destroy());
+    this.roses = [];
+    this.discoPhase = null;
+    this.activeEvent = null;
+    this.discoSound = null;
+    this.applauseSound = null;
+    this.unduckMusic();
+  }
+
+  // One rose, a little tilted (each its own angle), at the very top of the picture, falling straight down (a hair of sideways drift).
+  spawnRose() {
+    const size = ROSE_SIZE * Phaser.Math.FloatBetween(0.85, 1.15);
+    const img = this.add.image(Phaser.Math.FloatBetween(-6, GAME_WIDTH + 6), this.worldY(TOP_BOUNDARY_HEIGHT) - size, "rose");
+    img.setDisplaySize(size, size).setDepth(9).setRotation(Phaser.Math.FloatBetween(-0.55, 0.55));
+    this.roses.push({ img, vy: Phaser.Math.FloatBetween(ROSE_SPEED_MIN, ROSE_SPEED_MAX), vx: Phaser.Math.FloatBetween(-10, 10) });
+  }
+
+  updateRoses(dt) {
+    if (!this.roses.length) return;
+    const bottom = INITIAL_SCROLL_Y + GAME_HEIGHT; // the bottom edge of the default camera view: a rose is gone once it is below it
+    this.roses = this.roses.filter((r) => {
+      r.img.y += r.vy * dt;
+      r.img.x += r.vx * dt;
+      if (r.img.y - r.img.displayHeight / 2 > bottom) {
+        r.img.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // Seconds a rose needs from the top of the picture to below the bottom edge of the default view at the slowest speed.
+  roseFallMs() {
+    const dist = INITIAL_SCROLL_Y + GAME_HEIGHT + TOP_BOUNDARY_HEIGHT + 2 * ROSE_SIZE;
+    return (dist / ROSE_SPEED_MIN) * 1000;
+  }
+
+  // True while any timed event is running (the banana face, the disco) - add every new event
   // here, so two events never overlap.
   isEventActive() {
     return this.activeEvent !== null;
@@ -1288,7 +1453,10 @@ class MainScene extends Phaser.Scene {
   // it here and make it set `this.activeEvent = name` when it starts and `null` when it ends - the rule that only
   // one event can run at a time is enforced in startEvent(), so a new event can't overlap the others.
   eventDefs() {
-    return [{ name: "face", chance: this.eco.events.faceWindow.chancePerThrow, start: () => this.startBananaEvent() }];
+    return [
+      { name: "face", chance: this.eco.events.faceWindow.chancePerThrow, start: () => this.startBananaEvent() },
+      { name: "disco", chance: this.discoConfig().chancePerThrow, start: () => this.startDiscoEvent() },
+    ];
   }
 
   // Tomato Juice (buff effect triggerEvent "face"): while it runs the banana face is on. Checked every frame:
@@ -1379,10 +1547,10 @@ class MainScene extends Phaser.Scene {
     // An event never ends while a throw is being aimed or is in the air (whatever ends it: its own timer, or the buff that made it):
     // the end waits until the throw is over (checked every frame in update()).
     if (!this.canEventEnd()) {
-      this.eventEndPending = true;
+      this.heldEventStep = () => this.endBananaEvent();
       return;
     }
-    this.eventEndPending = false;
+    this.heldEventStep = null;
     this.setEventMusic(false);
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
     this.buffEventId = null;
@@ -1405,7 +1573,7 @@ class MainScene extends Phaser.Scene {
   // then after events.faceWindow.hitRevertMs fades both the texture and the mark that triggered it back
   // to nothing together.
   triggerBananaHit(mark) {
-    this.eventEndPending = false; // (the hit ends the event by itself)
+    this.heldEventStep = null; // (the hit ends the event by itself)
     this.setEventMusic(false); // the event is over the moment the face is hit: the music fades out while the face fades away
     if (this.bananaEndTimer) this.bananaEndTimer.remove();
     if (this.buffEventId) {
@@ -1496,15 +1664,15 @@ class MainScene extends Phaser.Scene {
   //  `swing` (optional): the offset already chosen. With it, powerFrom/powerTo are the strengths that hit FROM
   //  THAT OFFSET (null if none does); without it they are just the height band.
   activeEventTarget(swing) {
-    if (!(this.bananaActive && !this.bananaHitTriggered)) return null;
-    const b = BANANA_FACE_BOX;
+    const b = this.eventFaceBox(); // the face of the running event
+    if (!b) return null;
     const band = swing === undefined ? { from: this.powerForApex(b.heightFrom), to: this.powerForApex(b.heightTo) } : this.powerBandFor(swing, b);
     const tMin = Math.sqrt((2 * b.heightFrom) / GRAVITY);
     const tMax = Math.sqrt((2 * b.heightTo) / GRAVITY);
     const dxFrom = b.xFrom - ORIGIN_X;
     const dxTo = b.xTo - ORIGIN_X;
     return {
-      color: EVENT_COLOR_FACE,
+      color: this.eventColor(),
       swingFrom: Math.max(dxFrom / (MAX_SWING_SPEED * tMin), dxFrom / (MAX_SWING_SPEED * tMax)),
       swingTo: Math.min(dxTo / (MAX_SWING_SPEED * tMin), dxTo / (MAX_SWING_SPEED * tMax)),
       powerFrom: band ? band.from : null,
@@ -1661,7 +1829,12 @@ class MainScene extends Phaser.Scene {
     } else if (this.state === STATE.FLIGHT) {
       this.updateFlight(dt);
     }
-    if (this.eventEndPending && this.canEventEnd()) this.endBananaEvent(); // an event whose end was held back by a throw
+    if (this.heldEventStep && this.canEventEnd()) {
+      const step = this.heldEventStep; // a change of an event that was held back by a throw
+      this.heldEventStep = null;
+      step();
+    }
+    this.updateDisco(dt);
     this.updateBounce(dt);
     this.updateFallingBalls(dt);
 

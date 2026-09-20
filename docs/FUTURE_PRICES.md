@@ -71,4 +71,4 @@ Rare items: Kaiser Roll, Triangles, Skyr, Pinecone, Egg = 6% each (was 7.5% with
 
 ## Stacking (2026-09-20)
 
-Buffs of the same kind stack: save chances as independent rolls (10 / 20 / 50 = 64% together, never above 75%), coin multipliers multiply (no cap: 1.1 x 1.2 x 1.35 x 1.5 = 2.67x with the planned ladder), the Triangles slow-downs multiply on the offset slider only (no floor). The prices above were set for one buff at a time; with stacking each extra buff of a kind returns a little less than its own price implies.
+Buffs of the same kind stack: save chances as independent rolls (10 / 20 / 50 = 64% together, never above 90%), coin multipliers multiply (no cap: 1.1 x 1.2 x 1.35 x 1.5 = 2.67x with the planned ladder), the Triangles slow-downs multiply on the offset slider only (no floor). The prices above were set for one buff at a time; with stacking each extra buff of a kind returns a little less than its own price implies.

@@ -20,7 +20,7 @@
 //                          affected. Buffs STACK: they multiply (0.9 x 0.8 = 0.72), no floor
 //   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Buffs STACK as INDEPENDENT ROLLS: each has its own chance,
 //                          so the chance that one of them saves it is 1 - (1-a)(1-b)... (10% + 20% = 28%), never above
-//                          `buffCaps.saveProjectile` (0.75); modifiers() also says which buff has the highest chance (saveProjectileBy),
+//                          `buffCaps.saveProjectile` (0.9); modifiers() also says which buff has the highest chance (saveProjectileBy),
 //                          it is shown on the result message when it saves a projectile
 //   triggerEvent     name  while it runs, that event ("face" = the banana face) is on, for as long as the buff lasts; when the event ends
 //                          (the player hits the face) the buff ends with it, and when the buff ends (timer / cancelled) so does the
@@ -81,7 +81,7 @@ const Buffs = (() => {
     }
     // Only the save chance is limited (economy.json buffCaps.saveProjectile) so a pile of buffs can never make throws free;
     // coin multipliers and the offset slow-down stack without a limit.
-    const cap = eco && eco.buffCaps && typeof eco.buffCaps.saveProjectile === "number" ? eco.buffCaps.saveProjectile : 0.75;
+    const cap = eco && eco.buffCaps && typeof eco.buffCaps.saveProjectile === "number" ? eco.buffCaps.saveProjectile : 0.9;
     m.saveProjectile = Math.min(cap, 1 - notSaved);
     return m;
   }

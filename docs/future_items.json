@@ -243,7 +243,7 @@
       "legendary": 5000
     },
     "face_multiplier": "x2.5 fits a legendary standard projectile; with a lower-tier projectile it pays little (a buff for the best projectile). If it should depend on the projectile: 2.5 x the buff's price / the hit value, kept between x2 and x20.",
-    "save_chance_ladder": "10% common (Water Bottle), 20% rare (Mints), 50% epic (planned); they stack as independent rolls, 64% together, capped at 75%. Legendary = a one-time free throw instead of a percentage.",
-    "stacking": "Save chances: independent rolls, cap 75%. Coin multipliers and offset slow-downs multiply, no cap."
+    "save_chance_ladder": "10% common (Water Bottle), 20% rare (Mints), 50% epic (planned); they stack as independent rolls, 64% together, capped at 90%. Legendary = a one-time free throw instead of a percentage.",
+    "stacking": "Save chances: independent rolls, cap 90%. Coin multipliers and offset slow-downs multiply, no cap."
   }
 }

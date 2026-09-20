@@ -1,5 +1,5 @@
 {
-  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20. The legendary 1.5x coin bonus was added as Daniel's 3 PLN on 2026-09-20. The epic standard projectile was added as the Tomato on 2026-09-20.",
+  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20. The legendary 1.5x coin bonus was added as Daniel's 3 PLN on 2026-09-20. The epic standard projectile was added as the Tomato on 2026-09-20. The epic 50% save was added as the epic Mints (id mints_epic) on 2026-09-20.",
   "projectiles": [
     {
       "_note": "LEGENDARY STANDARD. Average stack 15000, hit value 4800 (the legendary rarity default).",
@@ -66,29 +66,6 @@
     }
   ],
   "buffs": [
-    {
-      "_note": "EPIC save chance 50% (was 30%): save chances stack as independent rolls (10 / 20 / 50 -> 64% together). Price = 60% of half a 3,000 stack.",
-      "id": "epic_save",
-      "name": "TBD",
-      "category": "consumable",
-      "rarity": "epic",
-      "priceRange": {
-        "min": 675,
-        "max": 1125
-      },
-      "ignorePriceOverride": true,
-      "duration": {
-        "seconds": 120
-      },
-      "image": "assets/items/TBD.png",
-      "effects": [
-        {
-          "type": "saveProjectile",
-          "value": 0.5
-        }
-      ],
-      "description": "TBD"
-    },
     {
       "_note": "EPIC coin bonus 1.35x.",
       "id": "epic_coin_bonus",

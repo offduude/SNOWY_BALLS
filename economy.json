@@ -126,6 +126,19 @@
         "detail": "Save chance: 20%."
       },
       {
+        "id": "mints_epic",
+        "name": "Mints",
+        "category": "consumable",
+        "rarity": "epic",
+        "priceRange": { "min": 675, "max": 1125 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 120 },
+        "image": "assets/items/mints.png",
+        "effects": [{ "type": "saveProjectile", "value": 0.5 }],
+        "description": "Might award a FRESH projectile.",
+        "detail": "Save chance: 50%."
+      },
+      {
         "id": "water_bottle",
         "name": "Water Bottle",
         "category": "consumable",

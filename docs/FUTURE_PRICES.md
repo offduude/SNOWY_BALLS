@@ -44,7 +44,7 @@ legendary 12.5 h / 6.6 h.
 | rare | Skyr | green guide lines on both sliders | 3 min (as now) | 96 | 43-72 (58) | in the game (now rare; was epic, 530-719) |
 | rare | Orange Mints | 20% chance not to use up the projectile | 2 min | 80 | 36-60 (48) | in the game (added 2026-09-20) |
 | rare | Kaiser Roll | 1.2x coins | 2 min (as now) | 96 | 43-72 (58) | in the game (was 93-156, now the range above) |
-| epic | *(new)* save | **50%** chance not to use up the projectile (was 30%) | 2 min | 1,500 | 675-1,125 (900) | future |
+| epic | Mints (`mints_epic`) | **50%** chance not to use up the projectile (was 30%) | 2 min | 1,500 | 675-1,125 (900) | in the game (added 2026-09-20) |
 | epic | *(new)* coin bonus | 1.35x coins | 2 min | 1,260 | 570-940 (756) | future |
 | legendary | *(new)* free throw | replaces the 50% save: the next throw does not use up a bought projectile (a one-time charge, no timer; needs a new mechanic) | until thrown | 3,000 (7,500 on a heavy hitter) | 2,250-3,750 (3,000) | future |
 | legendary | Daniel's 3 PLN | 1.5x coins | 2 min | 9,000 | 4,050-6,750 (5,400) | in the game (added 2026-09-20) |

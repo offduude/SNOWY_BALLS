@@ -73,7 +73,7 @@ Rare items: Kaiser Roll, Triangles, Skyr, Pinecone, Egg = 6% each (was 7.5% with
 
 Buffs of the same kind stack: save chances as independent rolls (10 / 20 / 50 = 64% together, never above 90%), coin multipliers multiply (no cap: 1.1 x 1.2 x 1.35 x 1.5 = 2.67x with the planned ladder), the Triangles slow-downs multiply on the offset slider only (no floor). The prices above were set for one buff at a time; with stacking each extra buff of a kind returns a little less than its own price implies.
 
-## Disco buff (legendary, planned) - price estimate (2026-09-20)
+## Disco buff (legendary; built as the Disco Ticket, branch disco-event) - price estimate (2026-09-20)
 
 The disco event (built) pays a fixed **x1.25** on every hit of the singer's face while the 164 s song plays; the face stays, so it can pay many times. The banana face pays x2.5 once (and ends). A buff that summons the disco is worth what those bonus hits are worth to a player with the best projectile.
 

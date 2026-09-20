@@ -1,5 +1,5 @@
 {
-  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20. The legendary 1.5x coin bonus was added as Daniel's 3 PLN on 2026-09-20. The epic standard projectile was added as the Tomato on 2026-09-20. The epic 50% save was added as the epic Mints (id mints_epic) on 2026-09-20.",
+  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20. The legendary 1.5x coin bonus was added as Daniel's 3 PLN on 2026-09-20. The epic standard projectile was added as the Tomato on 2026-09-20. The epic 50% save was added as the epic Mints (id mints_epic) on 2026-09-20. The legendary disco summon buff was built as the Disco Ticket (id disco_ticket) on 2026-09-20 (branch disco-event, not pushed).",
   "projectiles": [
     {
       "_note": "LEGENDARY STANDARD. Average stack 15000, hit value 4800 (the legendary rarity default).",
@@ -113,27 +113,6 @@
       ],
       "description": "TBD",
       "detail": "Next throw is free."
-    },
-    {
-      "_note": "BUILT AS A TEST ITEM on branch disco-event (2026-09-20, not pushed): 'Disco Ball (test)' with a placeholder picture cut from discoface1.png and this price. Rename / real art / decide the price before it ships. LEGENDARY DISCO SUMMON (planned, needs wiring): using it starts the disco event (main.js startDiscoEvent) between throws; refused while any event runs (Buffs.eventBlocked already does that for every buff with a triggerEvent effect). Unlike Tomato Juice it must not end with a timer - the event has its own length (song 164 s + applause 21 s) - so it needs the same 'charge' treatment as the Diamond Cross (charge: true, used up when the event starts) and syncBuffEvent must start an event BY NAME from the effect value. Price estimate: see docs/FUTURE_PRICES.md 'Disco buff'.",
-      "id": "disco_summon",
-      "name": "TBD",
-      "category": "consumable",
-      "rarity": "legendary",
-      "priceRange": {
-        "min": 5100,
-        "max": 8550
-      },
-      "ignorePriceOverride": true,
-      "charge": true,
-      "image": "assets/items/TBD.png",
-      "effects": [
-        {
-          "type": "triggerEvent",
-          "value": "disco"
-        }
-      ],
-      "description": "TBD"
     }
   ],
   "price_ladder_summary": {

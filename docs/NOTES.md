@@ -1099,3 +1099,5 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 - Verified: the card ("+1", legendary, "Summons the disco."), USE starts the disco at once, the top card shows the ticket and 2:44 (163 s left of the 164 s song), the Tomato Juice button dimmed, not cancellable.
 
 - **Two more bottom lines** (2026-09-20, economy.json only): Diamond Cross "Next throw won't miss.", Tomato Juice "Somebody comes to the window.". Both fit next to the max-time line under the USE button (the longer one ends at x 550, the time line starts at 587) and under the 3-line descriptions.
+
+- **Disco Ticket shows its time form** (2026-09-20): in the BUFFS list the line under its USE button reads **"02:44 xINF"** (the song's length as a music player shows it - 164.4 s rounded DOWN to whole seconds, `Buffs.summonMs`, given by the scene through `Buffs.setEventLength`) instead of "+1", and a waiting ticket on the top bar shows 2:44 too; once used the card counts down from it (2:44, 2:43, ...). Other charge buffs (Diamond Cross) still show "+1". `buffs.js?v=26`, `collection.js?v=55`, `main.js?v=130`.

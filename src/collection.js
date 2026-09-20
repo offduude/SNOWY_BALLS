@@ -207,7 +207,10 @@ const Collection = (() => {
     // ... followed by how many the player has: "02:00 x3" ("+1 x3" for a charge buff, "02:00 xINF" in god mode).
     // The time is at the button's left edge and the amount at its right edge (see .buff-row .pick-regen).
     const amount = b.count > 0 ? `<span>${countText(b.count)}</span>` : "";
-    const maxTime = `<div class="pick-regen"><span>${Buffs.isCharge(b.item) ? "+1" : clock(Buffs.durationMs(b.item))}</span>${amount}</div>`;
+    // (a charge buff shows "+1" - except a summon buff, the Disco Ticket: it shows how long its event lasts, "02:44")
+    const len = Buffs.summonMs(b.item);
+    const maxText = len ? clock(len) : Buffs.isCharge(b.item) ? "+1" : clock(Buffs.durationMs(b.item));
+    const maxTime = `<div class="pick-regen"><span>${maxText}</span>${amount}</div>`;
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (
       `<div class="pick-row buff-row" data-id="${esc(b.id)}">` +

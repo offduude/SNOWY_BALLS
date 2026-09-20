@@ -60,9 +60,25 @@ const Buffs = (() => {
     return !!(item && item.charge);
   }
 
-  // What a card shows as its time: mm:ss, or "+1" for a charge buff.
+  // The length of the event a SUMMON buff (a charge buff with a triggerEvent effect: the Disco Ticket) starts, in ms - the scene knows it (the
+  // disco is as long as its song) - or null for any other buff. Such a buff shows that length as its time, like a timed buff.
+  let eventLength = null;
+
+  function summonMs(item) {
+    if (!isCharge(item) || !hasTrigger(item) || !eventLength) return null;
+    const e = item.effects.find((x) => x.type === "triggerEvent");
+    const ms = eventLength(e.value);
+    return ms > 0 ? Math.floor(ms / 1000) * 1000 : null; // (whole seconds, rounded down: the song is 2:44.4 long and reads 2:44, as in a music player)
+  }
+
+  // What a card shows as its time: mm:ss, or "+1" for a charge buff that has no length (Diamond Cross). A summon buff shows its event's length
+  // while it waits and counts it down once the event has started.
   function timeText(item, ms) {
-    return isCharge(item) && ms > CHARGE_MS / 2 ? "+1" : formatTime(ms); // (a summon buff that has started counts its event down)
+    if (isCharge(item) && ms > CHARGE_MS / 2) {
+      const len = summonMs(item);
+      return len ? formatTime(len) : "+1";
+    }
+    return formatTime(ms);
   }
 
   function durationMs(item) {
@@ -271,6 +287,10 @@ const Buffs = (() => {
       });
     },
     active,
+    summonMs,
+    setEventLength: (fn) => {
+      eventLength = fn;
+    },
     summonBuff,
     setBuffEnd,
     eventBlocked,

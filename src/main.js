@@ -436,6 +436,7 @@ class MainScene extends Phaser.Scene {
     this.roses = []; // the roses falling during the applause
     this.discoEvent = null; // { name, startedAt } of the running disco (also saved: Economy.getEvent)
     this.heldEventStep = null; // a change of an event (its end, a new phase) that waits for the throw being aimed / in the air to be over
+    Buffs.setEventLength((name) => (name === "disco" && this.discoSound ? this.discoTimes().songMs : 0)); // (a summon buff shows how long its event lasts)
     Buffs.setEventGate(() => this.eventBlocksStart()); // no event buff can be used while an event runs (the disco's applause can be cut)
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");

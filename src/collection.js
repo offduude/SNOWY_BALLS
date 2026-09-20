@@ -281,6 +281,8 @@ const Collection = (() => {
     markSeen(); // switching straight from one list to another
     openKind = kind;
     scrollEl.dataset.kind = kind; // (the OPTIONS list redraws itself after a change, see Saves.refresh)
+    panelEl.classList.toggle("options-open", kind === "options"); // (the version tag is shown in the OPTIONS list only)
+    document.getElementById("version-tag").textContent = typeof GAME_VERSION_TEXT === "string" ? GAME_VERSION_TEXT : "";
     buttons.buff.classList.toggle("active", kind === "buff");
     buttons.options.classList.toggle("active", kind === "options");
     if (kind === "options") {

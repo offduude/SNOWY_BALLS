@@ -452,6 +452,21 @@
       pointer-events: none;
     }
 
+    /* The game version ("v1.0.178"), small, in the top-right corner of the OPTIONS list only (shown by collection.js). */
+    #version-tag {
+      display: none;
+      position: absolute;
+      top: calc(var(--u) * 1.5);
+      right: calc(var(--u) * 1.6);
+      font-size: calc(var(--u) * 0.85);
+      color: #e6cfa3;
+      pointer-events: none;
+    }
+
+    #list-panel.options-open #version-tag {
+      display: block;
+    }
+
     #list-title {
       flex: none;
       /* the bottom is 8px shorter: #list-scroll starts with 8px of padding, room for the "new" dot that sticks out over the first card's corner */
@@ -1107,6 +1122,7 @@
     <div id="list-backdrop"></div>
     <div id="list-panel">
       <div id="list-title"></div>
+      <div id="version-tag"></div>
       <div id="list-scroll"></div>
     </div>
     <div id="buff-hud"></div>
@@ -1128,6 +1144,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="src/version.js?v=178"></script>
   <script src="src/economy.js?v=24"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1159,7 +1176,7 @@
   <script src="src/buffs.js?v=20"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=52"></script>
+  <script src="src/collection.js?v=53"></script>
   <script src="src/main.js?v=124"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

@@ -43,7 +43,7 @@ it no longer adds coins or speeds the markers up.
 
 | field | meaning |
 |---|---|
-| `throwsPerHour` | how many throws an hour the snowball stock allows (150 = 50 every 20 minutes); used to turn "hours in the shop" into "throws" for the natural event chance (see below). **The chance of a natural event is no longer set per event - it is by RARITY, see "Event rarities"** |
+| `throwsPerHour` | (optional) how many throws an hour to assume for the natural event chance; by default the snowball's REAL refill rate, `3600 / projectiles.snowball.regen.everySeconds` = 120 an hour. **The chance of a natural event is not set per event - it is by RARITY, see "Event rarities"** |
 | `durationMs` | how long the face texture stays (20000 = 20s) |
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`2.5`) |
@@ -229,14 +229,14 @@ player's finger. The buff cards and list always show the live state.
 ## Event rarities (2026-09-20)
 
 - An event has the rarity of its **summon buff** (the shop item whose `triggerEvent` effect names the event): the banana face (Tomato Juice) and the disco (Disco Ticket) are **legendary**. A future event takes the rarity of its buff; one with no buff can name its `rarity` in its own `events` block.
-- **Natural spawning is rolled by rarity, not by event.** After every throw the game makes ONE roll per rarity that has events (in a random order); the first that hits picks one of that rarity's events at random. So adding an event to a rarity never makes that rarity's events more frequent. An event never starts while another runs.
-- **The chance of a rarity** is set so that, on average, it takes as many throws to get one of its events as it takes to see an item of that rarity in the shop: `meanShopHours = 1 / (the rarity's share of the shop's rarity roll x slots x 3600 / availabilitySeconds)`, `chance per throw = 1 / (meanShopHours x throwsPerHour)`. With the shop odds common 60 / rare 30 / epic 9 / legendary 1 (of 100), 6 slots, 30-minute timers and 150 throws an hour:
+- **Natural spawning is rolled by rarity, not by event.** After every throw the game makes ONE independent roll per rarity that has events. If **several rarities hit on the same throw, the better (rarer) one wins**; that rarity then picks one of its events at random. So adding an event to a rarity never makes that rarity's events more frequent. An event never starts while another runs.
+- **The chance of a rarity** is set so that, on average, it takes as many throws to get one of its events as it takes to see an item of that rarity in the shop: `meanShopHours = 1 / (the rarity's share of the shop's rarity roll x slots x 3600 / availabilitySeconds)`, `chance per throw = 1 / (meanShopHours x throwsPerHour)`, with `throwsPerHour` = the snowball's real refill rate (120 an hour: one every 30 s). With the shop odds common 60 / rare 30 / epic 9 / legendary 1 (of 100), 6 slots and 30-minute timers:
 
-| rarity | time to see one in the shop | chance per throw | 1 in | at the snowball's real regen (120 an hour) |
+| rarity | time to see one in the shop | chance per throw | 1 in | effective (after losing to better rarities) |
 |---|---|---|---|---|
-| common | 8.3 min | 4.8% | 21 | 10.4 min |
-| rare | 16.7 min | 2.4% | 42 | 20.8 min |
-| epic | 55.6 min | 0.72% | 139 | 69.4 min |
-| legendary | 8.3 h | 0.08% | 1250 | 10.4 h |
+| common | 8.3 min | 6.0% | 17 | 5.76% (1 in 17) |
+| rare | 16.7 min | 3.0% | 33 | 2.97% (1 in 34) |
+| epic | 55.6 min | 0.90% | 111 | 0.899% (1 in 111) |
+| legendary | 8.3 h | 0.10% | 1000 | 0.100% (1 in 1000) |
 
-  Only legendary has events today (the banana face and the disco, half each: about 1 in 2500 throws each). It follows the shop by itself: change a rarity's shop odds, the slots or the timers and the events follow (`py tools/economy_report.py` prints this table); `events.rarityChances { legendary: 0.0008 }` overrides a rarity by hand. A rarity that has no item in the shop cannot spawn events.
+  Only legendary has events today (the banana face and the disco, half each: about 1 in 2000 throws each). It follows the shop and the snowball by itself: change a rarity's shop odds, the slots, the timers or the snowball's regen and the events follow (`py tools/economy_report.py` prints this table); `events.rarityChances { legendary: 0.0008 }` overrides a rarity by hand. A rarity that has no item in the shop cannot spawn events.

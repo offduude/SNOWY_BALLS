@@ -120,7 +120,7 @@ def event_chances(eco):
         has.add(eco["projectiles"].get(it["id"], {}).get("rarity") if it["category"] == "projectile" else it.get("rarity"))
     rar = [r for r in eco["rarities"] if r.get("chance", 0) > 0 and r["id"] in has]
     total = sum(r["chance"] for r in rar)
-    tph = eco.get("events", {}).get("throwsPerHour", 150)
+    tph = eco.get("events", {}).get("throwsPerHour") or 3600 / eco["projectiles"]["snowball"]["regen"]["everySeconds"]
     out = {}
     for r in rar:
         share = r["chance"] / total
@@ -176,15 +176,21 @@ def main():
     events = {}
     for name in ("face", "disco"):
         events.setdefault(event_rarity(eco, name), []).append(name)
-    tph = eco.get("events", {}).get("throwsPerHour", 150)
-    real_tph = 3600 / eco["projectiles"]["snowball"]["regen"]["everySeconds"]
-    print(f"  (throws an hour: {tph:.0f} in the rules; the snowball's regen really gives {real_tph:.0f} an hour)")
-    print(f"  {'rarity':<10}{'shop share':>11}{'shop wait':>12}{'chance/throw':>14}{'1 in':>7}{'at real regen':>15}  events")
-    for rid, (share, mins, chance, throws) in event_chances(eco).items():
+    tph = eco.get("events", {}).get("throwsPerHour") or 3600 / eco["projectiles"]["snowball"]["regen"]["everySeconds"]
+    print(f"  (throws an hour: {tph:.0f} = the snowball's real refill rate; if several rarities hit on one throw the rarer one wins,")
+    print("   so a rarity's effective chance is its chance x (1 - the chance of every better rarity))")
+    print(f"  {'rarity':<10}{'shop share':>11}{'shop wait':>12}{'chance/throw':>14}{'1 in':>7}{'effective':>11}{'1 in':>7}  events")
+    ch = event_chances(eco)
+    order = [r["id"] for r in eco["rarities"]]
+    ids = sorted(ch, key=order.index)
+    for i, rid in enumerate(ids):
+        share, mins, chance, throws = ch[rid]
+        better = 1.0
+        for hid in ids[i + 1:]:
+            better *= 1 - ch[hid][2]
+        eff = chance * better
         wait = f"{mins / 60:.1f} h" if mins >= 120 else f"{mins:.1f} min"
-        real_mins = throws / real_tph * 60
-        real = f"{real_mins / 60:.1f} h" if real_mins >= 120 else f"{real_mins:.1f} min"
-        print(f"  {rid:<10}{share * 100:>10.0f}%{wait:>12}{chance * 100:>13.3f}%{throws:>7.0f}{real:>15}  {', '.join(events.get(rid, [])) or '-'}")
+        print(f"  {rid:<10}{share * 100:>10.0f}%{wait:>12}{chance * 100:>13.3f}%{throws:>7.0f}{eff * 100:>10.3f}%{1 / eff:>7.0f}  {', '.join(events.get(rid, [])) or '-'}")
 
     problems = check(eco)
     print("\nChecks:", "all good" if not problems else "")

@@ -1566,6 +1566,15 @@ class MainScene extends Phaser.Scene {
     return (item && item.rarity) || "legendary";
   }
 
+  // How many throws an hour the snowball stock allows: its real refill rate (one every regen.everySeconds), unless economy.json overrides it
+  // with events.throwsPerHour.
+  throwsPerHour() {
+    const ev = this.eco.events || {};
+    if (typeof ev.throwsPerHour === "number" && ev.throwsPerHour > 0) return ev.throwsPerHour;
+    const regen = this.eco.projectiles.snowball && this.eco.projectiles.snowball.regen;
+    return regen && regen.everySeconds > 0 ? 3600 / regen.everySeconds : 120;
+  }
+
   // The chance per throw that an event of this RARITY starts by itself, so that on average it takes as many throws as it takes to see an item
   // of that rarity in the shop (see events._rarityNote in economy.json): 1 / (meanShopHours x throwsPerHour), where meanShopHours = 1 / (the
   // rarity's share of the shop's rarity roll x slots x 3600 / availabilitySeconds). 0 if the rarity cannot come up in the shop.
@@ -1579,23 +1588,24 @@ class MainScene extends Phaser.Scene {
     if (!r || !(r.chance > 0) || !has.has(rarityId) || total <= 0) return 0;
     const rollsPerHour = (this.eco.shop.slots * 3600) / (r.availabilitySeconds || 1800);
     const meanShopHours = 1 / ((r.chance / total) * rollsPerHour);
-    return 1 / (meanShopHours * (ev.throwsPerHour || 150));
+    return 1 / (meanShopHours * this.throwsPerHour());
   }
 
-  // One throw's roll for a natural event: ONE roll per RARITY that has events (in a random order, so no rarity is favoured), not one per
-  // event; the first that hits picks one of its rarity's events at random. Returns the event's name or null. (So adding an event to a
-  // rarity does not make that rarity's events more frequent.)
+  // One throw's roll for a natural event: an independent roll for EACH RARITY that has events (not one per event). If several rarities hit on the
+  // same throw the BETTER (rarer) one wins; its rarity then picks one of its events at random. Returns the event's name or null. (So adding
+  // an event to a rarity does not make that rarity's events more frequent; a rarity that loses to a better one on the same throw is only a
+  // little rarer than its chance - by that better one's chance.)
   rollNaturalEvent() {
     const byRarity = {};
     for (const d of this.eventDefs()) (byRarity[d.rarity] = byRarity[d.rarity] || []).push(d.name);
-    const order = Object.keys(byRarity).sort(() => Math.random() - 0.5);
-    for (const rar of order) {
-      if (Math.random() < this.eventRarityChance(rar)) {
-        const names = byRarity[rar];
-        return names[Math.floor(Math.random() * names.length)];
-      }
+    const rank = (id) => (this.eco.rarities || []).findIndex((r) => r.id === id);
+    let best = null;
+    for (const rar of Object.keys(byRarity)) {
+      if (Math.random() < this.eventRarityChance(rar) && (best === null || rank(rar) > rank(best))) best = rar;
     }
-    return null;
+    if (best === null) return null;
+    const names = byRarity[best];
+    return names[Math.floor(Math.random() * names.length)];
   }
 
   // Tomato Juice (buff effect triggerEvent "face"): while it runs the banana face is on. Checked every frame:

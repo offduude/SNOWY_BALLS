@@ -616,14 +616,12 @@
       white-space: nowrap;
     }
 
-    /* "Doesn't stack." under the max time of a buff ("02:00"), always the same distance below it */
-    .pick-nostack {
+    /* "Doesn't stack." in the same row as a buff's detail line ("Save chance: 10%."), in the same style, at the right end of the row */
+    .pick-row.buff-row .pick-nostack {
       position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      margin-top: calc(var(--u) * 2.3);
-      font-size: calc(var(--u) * 0.75);
+      right: calc(var(--u) * 1.2);
+      bottom: calc(var(--u) * 1.2);
+      font-size: calc(var(--u) * 1);
       color: #8a6a44;
       white-space: nowrap;
     }
@@ -1143,7 +1141,7 @@
   <script src="src/buffs.js?v=12"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=42"></script>
+  <script src="src/collection.js?v=43"></script>
   <script src="src/main.js?v=115"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

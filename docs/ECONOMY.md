@@ -172,7 +172,7 @@ A `consumable` item is a timed **buff**. Buying one only puts it in the **invent
 It is **used from the BUFFS tab**: the USE button takes one out of the inventory and starts it for `duration.seconds`, and the button
 turns into the running timer (device clock, so it keeps running while the app is closed and is saved). While a buff is running it
 can't be used again (its button is a timer); when it ends the USE button comes back if there are more, and the card leaves the list
-when none are left. Effects do not stack from the same buff; different buffs multiply. Its `effects` list is what it does:
+when none are left. Effects do not stack from the same buff; for a save chance or a coin multiplier only the best running buff counts (Buffs.modifiers), the slowest sliderSpeed counts, and the BUFFS list says "Doesn't stack." under such a buff's max time. Its `effects` list is what it does:
 
 | type | value means |
 |---|---|
@@ -192,7 +192,7 @@ player's finger. The buff cards and list always show the live state.
 
 | type | value means |
 |---|---|
-| `coinMultiplier` | multiplies coins from hits (multiple sources multiply together) |
+| `coinMultiplier` | multiplies coins from hits (several running buffs: only the highest counts, they do not multiply) |
 | `aimSpeedMultiplier` | multiplies the aim pointers' sweep speed (below 1 = slower = easier) |
 | `streakShield` | number of misses that won't reset the streak |
 | `hitPaddingPx` | window hitboxes grow by this many pixels on every side |
@@ -204,8 +204,8 @@ player's finger. The buff cards and list always show the live state.
 
 - The snowball pays 5 a hit (free, so it is the baseline); `tools/economy_report.py` prints how many
   hits and throws each item costs. There are no tiers right now: every item can appear from the start.
-- Multiplier effects stack, so keep `coinMultiplier` values modest or a few purchases make the
-  prices meaningless. Effects that make the *game itself* easier (`aimSpeedMultiplier`,
+- Coin multipliers do not stack (only the best one counts), so a `coinMultiplier` value only has to be fair on its own.
+  Effects that make the *game itself* easier (`aimSpeedMultiplier`,
   `hitPaddingPx`) compound with that - watch total hit rate, not just coin rate.
 - Permanent items leave the pool once bought; consumables never do. If nothing is eligible when a
   slot restocks it just stays SOLD OUT (no timer) until something is.

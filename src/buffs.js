@@ -11,7 +11,8 @@
 //   guideLines       1     shows the green guarantee lines on both sliders (hidden without this buff)
 //   precision        x     offset (angle) slider: its range shrinks to 1/x, so the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
-//   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout)
+//   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout). Several such
+//                          buffs can run at once (each keeps its timer) but only the HIGHEST counts - they do not multiply
 //   sliderSpeed      x     both sliders move at x times their speed (0.8 = 20% slower, steadier). Several such buffs can run at once
 //                          (each keeps its timer) but only the BEST counts = the slowest (lowest x); they do not multiply
 //   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Several such buffs can run at once (all keep
@@ -64,6 +65,7 @@ const Buffs = (() => {
         if (!(e.type in m)) continue;
         if (e.type === "guideLines") m.guideLines += e.value; // a switch: any active source turns it on
         else if (e.type === "sliderSpeed") m.sliderSpeed = Math.min(m.sliderSpeed, e.value); // only the slowest counts
+        else if (e.type === "coinMultiplier") m.coinMultiplier = Math.max(m.coinMultiplier, e.value); // only the highest counts
         else if (e.type === "saveProjectile") {
           if (e.value > m.saveProjectile) {
             m.saveProjectile = e.value; // only the best one counts

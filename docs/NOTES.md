@@ -967,3 +967,8 @@ Applies the plan in `docs/FUTURE_PRICES.md` (one stack per 2 minutes, 75% hits, 
 - **Water Bottle text** (2026-09-20): description is now "Contains hydration. Hydrates." and it has the bottom line "Save chance: 10%." (like Mints and Snowy Cube; economy.json only).
 
 - **Buff bottom lines** (2026-09-20): Triangles "Slows pointer by 20%." (its 0.8x slider speed), Orange Skyr "Marks the sweet spot." (the green guide lines); every buff now has one (economy.json only).
+
+## "Doesn't stack." on buffs (2026-09-20)
+
+- Every buff with a **save chance** or a **coin multiplier** (Water Bottle, Mints, Snowy Cube, Kaiser Roll) shows **"Doesn't stack."** under its max time (02:00) in the BUFFS list, at the same distance below it on every card and also while the buff is running (`.pick-nostack` in index.html, `noStack` in `buffRowHtml`; it follows the effect types, so new buffs of these kinds get it automatically). Triangles (slowest slider speed wins) and Orange Skyr / Tomato Juice have none.
+- **Behavior change to make the label true:** coin multipliers used to MULTIPLY when several ran together (Kaiser Roll 1.2x + Snowy Cube 1.1x = 1.32x). Now only the **highest** counts (1.2x), like save chances (`Buffs.modifiers`). Verified with Kaiser Roll, Snowy Cube, Mints and Water Bottle running at once: coinMultiplier 1.2, saveProjectile 0.2 by Mints. `buffs.js?v=12`, `collection.js?v=42`. This also means the buff prices in `docs/FUTURE_PRICES.md` (one buff use per stack) hold with several buffs on.

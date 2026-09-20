@@ -46,13 +46,7 @@ const INITIAL_SCROLL_Y = -(GAME_HEIGHT - 20);
 // 184. The roofline (IMG_GROUND_Y - IMG_ROOF_Y = 643) is the maximum. The strength curve below is built on
 // these bounds (vy0 = sqrt(2 * GRAVITY * height)).
 const MIN_STICK_HEIGHT = IMG_GROUND_Y - 486 + 10; // 184
-// Apex of a full-strength throw of the reference projectile (weight 100, the snowball) with no buffs:
-// the middle of the window row above the goal windows (image y 173-216 -> height 660 - 194.5).
-// Buffs/lighter projectiles can still push a throw higher - past the roof edge it falls back behind
-// the building, past the top of the texture it escapes (see updateFlight).
-const MAX_APEX_HEIGHT = IMG_GROUND_Y - (173 + 216) / 2; // 465.5
-// The snowball's weight - the reference all other weights are measured against (economy.json "weight", never
-// shown to the player as a number). See the "weight" section below for what a weight does.
+// The reference weight number of the offset slider's zone (the moderate tier, the snowball's). See the "weight" section below.
 const REFERENCE_WEIGHT = 100;
 // Where the wall ends and the sky starts: background.png rows 0-14 are sky, row 15 is the dark roof
 // edge. Nothing can stick above this line - a ball whose apex is higher falls back down and sinks
@@ -124,40 +118,32 @@ const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's dot on the aim bar
 const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit range, so a marker on the dot always hits)
 
 // ---------------------------------------------------------------------------------------------------------
-// WEIGHT. One number per projectile (economy.json "projectiles.<id>.weight"; snowball = 100 is the reference).
+// WEIGHT is a TIER (very light ... very heavy, economy.json weightTiers), not a number.
 //
-// STRENGTH slider: `power` is where the marker is (0 = start .. 1 = tip). The apex the throw reaches is
-// apexForEffectivePower(power + weightShift(weight)), and the curve passes through the apex bounds
-// (0 -> MIN_STICK_HEIGHT, 1 -> MAX_APEX_HEIGHT) and through W20's MIDDLE at 0.5. The shift moves where the
-// middle of W20 sits on the slider: 0.5 for weight 100, the tip (1.0) for weight 200, the very start (0) for
-// weight 0 - i.e. the perfect W20 throw is at power = weight / 200. Heavier = a higher power is needed.
+// STRENGTH slider: `power` is where the marker is (0 = start .. 1 = tip). A tier is the part of the slider where the throw
+// lands in W20: very light 0-25%, light 25-50%, moderate 37.5-62.5%, heavy 50-75%, very heavy 75-100% (projectile.strengthBand).
+// The apex is a straight line in `power` through those two points - the bottom of W20 at the band's start, the top of W20 at
+// its end - and goes on in the same line on both sides (never below the lowest allowed stick height).
 //
 // OFFSET slider: the sideways drift is swing x MAX_SWING_SPEED x flight time, and a swing of +-W20_SWING_GUARANTEE
 // is the most that is still guaranteed to land inside W20's width. The offset bar spans +-offsetRange swing, so
-// the share of the bar that hits W20 is W20_SWING_GUARANTEE / offsetRange = the "zone": 0 for weight 0 (only the exact
-// middle), 1 for weight 200 (anywhere on the slider), and `offsetZoneAtWeight100` (economy.json aim, default 0.5)
-// for the snowball, straight lines in between.
-const APEX_MID = (W20.heightFrom + W20.heightTo) / 2; // the middle of W20 (365.5)
-const CURVE_C = 2 * (MAX_APEX_HEIGHT - MIN_STICK_HEIGHT) - 4 * (APEX_MID - MIN_STICK_HEIGHT);
-const CURVE_B = MAX_APEX_HEIGHT - MIN_STICK_HEIGHT - CURVE_C;
-const CURVE_SLOPE_TOP = CURVE_B + 2 * CURVE_C; // beyond effective power 1 the curve continues in a straight line
+// the share of the bar that hits W20 is W20_SWING_GUARANTEE / offsetRange = the "zone": lighter = a smaller zone (a wider,
+// less precise swing), heavier = a bigger one. The tier uses the old weight number equal to the middle of its band
+// (x 200: 25 / 75 / 100 / 125 / 175) - the zone is `offsetZoneAtWeight100` (economy.json aim, 0.5) for 100 and a straight
+// line to 0 at weight 0 and to 1 at weight 200.
+const DEFAULT_STRENGTH_BAND = { from: 0.375, to: 0.625 }; // moderate
 
-function weightShift(weight) {
-  return (REFERENCE_WEIGHT - weight) / (2 * REFERENCE_WEIGHT); // (100 - w) / 200
+// Strength position -> apex height for a projectile (a straight line through W20's bottom at the band's start and top at its end).
+function apexForPower(proj, power) {
+  const b = proj.strengthBand || DEFAULT_STRENGTH_BAND;
+  const apex = W20.heightFrom + ((W20.heightTo - W20.heightFrom) * (power - b.from)) / (b.to - b.from);
+  return Math.max(MIN_STICK_HEIGHT, apex);
 }
 
-// Effective power (0..1 = the snowball's slider) -> apex height. Never below the lowest allowed stick height.
-function apexForEffectivePower(pe) {
-  if (pe <= 0) return MIN_STICK_HEIGHT;
-  if (pe <= 1) return MIN_STICK_HEIGHT + CURVE_B * pe + CURVE_C * pe * pe;
-  return MAX_APEX_HEIGHT + CURVE_SLOPE_TOP * (pe - 1);
-}
-
-// The inverse (can return values below 0 for apexes under the minimum; those are unreachable).
-function effectivePowerForApex(apex) {
-  if (apex >= MAX_APEX_HEIGHT) return 1 + (apex - MAX_APEX_HEIGHT) / CURVE_SLOPE_TOP;
-  const d = apex - MIN_STICK_HEIGHT;
-  return (-CURVE_B + Math.sqrt(CURVE_B * CURVE_B + 4 * CURVE_C * d)) / (2 * CURVE_C);
+// The inverse (can fall outside 0..1: then that apex can't be reached with the bar).
+function powerForApexOf(proj, apex) {
+  const b = proj.strengthBand || DEFAULT_STRENGTH_BAND;
+  return b.from + ((apex - W20.heightFrom) / (W20.heightTo - W20.heightFrom)) * (b.to - b.from);
 }
 
 // The share of the offset bar that is a guaranteed W20 hit (sideways) for a projectile of this weight.
@@ -352,6 +338,7 @@ class MainScene extends Phaser.Scene {
     // fail silently later, so say so loudly right away.
     this.eco = this.cache.json.get("economy");
     if (!this.eco) throw new Error("economy.json failed to load or has a JSON syntax error - check it.");
+    this.prepareProjectiles();
     Rarity.init(this.eco);
     // Refilling projectile stocks (the snowball): tell the save their cap and pace before anything reads a count.
     const regen = {};
@@ -752,6 +739,27 @@ class MainScene extends Phaser.Scene {
     ].filter(Boolean);
   }
 
+  // Turns what economy.json says about each projectile into what the game uses, once, right after loading:
+  //  - weight: the tier name -> its strength band, its label (shown on the card) and the equivalent weight number of the offset slider;
+  //  - hitValue: from the projectile's rarity (rarities[].projectileHitValue), unless the projectile has a hitValue of its own.
+  prepareProjectiles() {
+    const tiers = Object.fromEntries((this.eco.weightTiers || []).map((t) => [t.id, t]));
+    const rarities = Object.fromEntries((this.eco.rarities || []).map((r) => [r.id, r]));
+    for (const [id, p] of Object.entries(this.eco.projectiles || {})) {
+      if (p.weightId) continue; // (already prepared: the scene was restarted with the same cached economy.json)
+      const t = tiers[p.weight] || tiers.moderate;
+      if (!t) throw new Error(`economy.json: projectile ${id} has an unknown weight tier '${p.weight}'`);
+      p.weightId = t.id;
+      p.weightLabel = t.label;
+      p.strengthBand = { from: t.from, to: t.to };
+      p.weight = ((t.from + t.to) / 2) * 200; // the equivalent weight number (25 / 75 / 100 / 125 / 175): the offset slider's width
+      if (typeof p.hitValue !== "number") {
+        const r = rarities[p.rarity];
+        p.hitValue = r && typeof r.projectileHitValue === "number" ? r.projectileHitValue : 1;
+      }
+    }
+  }
+
   worldY(heightFromGround) {
     // Phaser y grows downward; our "height climbed" grows upward.
     return -heightFromGround;
@@ -803,10 +811,9 @@ class MainScene extends Phaser.Scene {
 
     const swing = (this.angleValue - 0.5) * 2; // -1..1
     this.ballVX = swing * MAX_SWING_SPEED;
-    // The strength marker's position (0..1) plus the weight shift is the effective power on the snowball's curve
-    // (see "WEIGHT" above); the apex is never below the lowest allowed stick height.
-    const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
-    const apex = apexForEffectivePower(this.powerValue + weightShift(weight));
+    // The strength marker's position (0..1) -> the apex, from the projectile's weight tier (see "WEIGHT" above); never below
+    // the lowest allowed stick height.
+    const apex = apexForPower(this.proj, this.powerValue);
     this.ballVY0 = Math.sqrt(2 * GRAVITY * apex);
     this.ballStartX = ORIGIN_X;
     this.apexTime = this.ballVY0 / GRAVITY; // the snowball sticks to the wall here - see updateFlight
@@ -1031,7 +1038,7 @@ class MainScene extends Phaser.Scene {
 
     if (hit) {
       this.streak += 1;
-      let coins = this.proj.rewards[win.name]; // the base coins for this window come from the projectile in use
+      let coins = this.proj.hitValue; // one hit value, for both goal windows: it comes from the projectile's rarity (see prepareProjectiles)
       // (The streak is only counted and shown - it no longer adds coins.)
 
       if (faceHit) {
@@ -1290,8 +1297,7 @@ class MainScene extends Phaser.Scene {
   // The strength-bar value whose throw peaks at `apex` (a world height) with the equipped projectile - the inverse
   // of launchBall(). May fall outside 0..1 (then that apex can't be reached with the bar).
   powerForApex(apex) {
-    const weight = this.proj.weight === undefined ? REFERENCE_WEIGHT : this.proj.weight;
-    return effectivePowerForApex(apex) - weightShift(weight);
+    return powerForApexOf(this.proj, apex);
   }
 
   // `hitWidthPx` = how wide (on the bar) the range that really hits is. The dot never sticks out of it - it is

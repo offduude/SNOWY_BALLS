@@ -52,11 +52,11 @@ def check(eco):
     if "snowball" not in projectiles:
         problems.append("projectiles: the 'snowball' (the default projectile) is missing")
     for pid, p in projectiles.items():
-        for w in ("W20", "W21"):
-            if w not in p.get("rewards", {}):
-                problems.append(f"projectile {pid}: missing rewards.{w}")
-        if not p.get("weight"):
-            problems.append(f"projectile {pid}: missing 'weight'")
+        tier_ids = [t["id"] for t in eco.get("weightTiers", [])]
+        if p.get("weight") not in tier_ids:
+            problems.append(f"projectile {pid}: weight '{p.get('weight')}' is not one of the weightTiers {tier_ids}")
+        if hit_value(eco, p) is None:
+            problems.append(f"projectile {pid}: no hit value (its rarity '{p.get('rarity')}' has no projectileHitValue)")
     for i in shop["items"]:
         if i.get("category") == "projectile" and i.get("id") not in projectiles:
             problems.append(f"{i['id']}: projectile has no entry in the top-level \"projectiles\" section")
@@ -98,14 +98,22 @@ def slot_odds(eco):
     return odds
 
 
+def hit_value(eco, p):
+    """One hit's base coins: the projectile's own hitValue, else its rarity's projectileHitValue."""
+    if isinstance(p.get("hitValue"), (int, float)):
+        return p["hitValue"]
+    for r in eco.get("rarities", []):
+        if r["id"] == p.get("rarity") and "projectileHitValue" in r:
+            return r["projectileHitValue"]
+    return None
+
+
 def main():
     eco = load()
-    print("Base coins per hit, by projectile (streak bonus not counted):")
+    print("Base coins per hit (both goal windows), by projectile:")
     for pid, p in eco["projectiles"].items():
-        r = p["rewards"]
-        print(f"  {pid:<10} W20 {r['W20']}  W21 {r['W21']}  (average {sum(r.values()) / len(r):.2f})  weight {p.get('weight')}")
-    snow = eco["projectiles"]["snowball"]["rewards"]
-    avg_hit = sum(snow.values()) / len(snow)
+        print(f"  {pid:<12} {hit_value(eco, p)}  ({p.get('rarity')}, weight {p.get('weight')})")
+    avg_hit = hit_value(eco, eco["projectiles"]["snowball"])
     print(f"\nPrices below are in snowball hits (average {avg_hit:.2f} coins per hit).\n")
 
     header = f"{'item':<18}{'cat':<11}{'price':>6}{'hits':>7}" + "".join(

@@ -28,8 +28,8 @@ start with "economy.json failed to load or has a JSON syntax error".
 
 `coins = floor( base x faceMultiplier x buffs.coinMultiplier )`
 
-- `base` = the equipped projectile's `rewards.W20` / `rewards.W21` (see "projectiles": snowball 5 / 3, chestnut 8 / 5)
-- `faceMultiplier` = `events.faceWindow.faceMultiplier` (40) when the banana face is hit during the face event, otherwise 1 - so a snowball face hit pays 5 x 40 = 200, a chestnut one 8 x 40 = 320
+- `base` = the equipped projectile's **hit value** - ONE number for both goal windows (W21 pays the same as W20), from its rarity (`rarities[].projectileHitValue`: snowball/default 5, common 12, rare 60, epic 300, legendary 1500)
+- `faceMultiplier` = `events.faceWindow.faceMultiplier` (40) when the banana face is hit during the face event, otherwise 1 - so a snowball face hit pays 5 x 40 = 200, a common projectile's 12 x 40 = 480
 - then the buffs' multiplier (read when the player tapped to aim), rounded down once at the end
 
 **The streak adds nothing.** It is only a counter (STREAK: n under the top-right buttons, saved across reloads, reset by a miss);
@@ -84,28 +84,29 @@ rarity, default and common included, however many of those there are (the tabs l
 PROJECTILES / BUFFS tabs on the amount's row, left of the amount. The tabs list the rarest first. The light colours have a thin
 dark outline so they read on the cream cards.
 
-## weightLabels (live)
+## weightTiers (live)
 
-Projectile weights are never shown as numbers. `weightLabels` maps a weight to the word on the projectile card (`weight: light`):
-the **last** entry whose `from` is at most the weight is used. Now: 0+ very light, 50+ light, 75+ moderate, 125+ heavy,
-150+ very heavy (snowball 100 = moderate, chestnut 75 = moderate, grenade 130 = heavy). Edit the thresholds or words freely.
+Projectile **weight is a tier, not a number**: very light, light, moderate, heavy, very heavy (`weightTiers`, and each projectile names
+its tier in `projectiles.<id>.weight`). The word is shown on the projectile card. A tier is where on the **strength slider** a throw
+lands in W20 (`from` / `to` are shares of the slider: 0 = its start, 1 = its tip):
 
-## weight (live)
+| tier | strength slider | band |
+|---|---|---|
+| very light | 0% - 25% | 25% wide |
+| light | 25% - 50% | 25% wide |
+| moderate | 37.5% - 62.5% | 25% wide (the snowball) |
+| heavy | 50% - 75% | 25% wide |
+| very heavy | 75% - 100% | 25% wide |
 
-The **snowball is always weight 100** - the reference every other weight is measured against. A projectile's `weight` (0 to 200,
-shown to the player only as a word) sets two things:
+Inside the band the apex is inside W20's height (344-387: the bottom of W20 at the band's start, the top at its end, a straight line
+through them that goes on both sides); below the band the throw peaks under W20, above it over W20. Every band is 25% wide, so the
+strength part is equally easy for every tier - only where it is differs (lighter = less strength, heavier = more).
 
-**Strength slider.** The perfect throw - the apex in the exact middle of W20 - is at strength position `weight / 200`:
-weight 100 = the centre of the slider, weight 200 = the very tip, weight 0 = the very beginning (50 -> 25%, 130 -> 65%, ...).
-Heavier projectiles need more strength. Below/above the perfect position the apex falls/rises along the snowball's curve
-(start of the slider = the lowest allowed height 184, centre = W20's middle 365.5, tip = the middle of the window row above, 465.5;
-beyond the tip, for light projectiles, the curve continues upward in a straight line).
-
-**Offset slider.** The share of the slider that lands inside W20 sideways is `weight / 200` on a straight line: weight 0 = only the exact
-middle (a floor of 1.5% is used so the slider still works), weight 200 = anywhere on the slider, and the snowball (100) is
-`aim.offsetZoneAtWeight100` (0.5 = half). Heavier projectiles are therefore easier to throw in a straight line.
-Precision buffs narrow the spread further. **Note:** with 0.5 the snowball's offset slider only spans +-0.31 swing, which is too short to
-reach W21 (it needs about +-0.37) - only projectiles lighter than ~68 can reach it. Lower `offsetZoneAtWeight100` to widen the snowball's spread.
+**Offset slider.** The share of the slider that lands inside W20 sideways depends on the tier through the old weight number equal to the
+middle of its band x 200 (very light 25, light 75, moderate 100, heavy 125, very heavy 175): a straight line from 0 (weight 0, only the
+exact middle; a floor of 1.5% is used) through `aim.offsetZoneAtWeight100` (0.5) at 100 to 1 (anywhere on the slider) at 200. Lighter =
+a wider, less precise swing. Precision buffs narrow the spread further. **Note:** W21 needs about +-0.37 swing; the offset slider
+spans +-1.22 (very light), +-0.41 (light), +-0.31 (moderate), +-0.24 (heavy), +-0.17 (very heavy) - so only very light and light projectiles can reach W21.
 
 ## projectiles (live)
 
@@ -117,12 +118,12 @@ is in `PROJECTILE_VISUALS` at the top of `src/main.js`.
 |---|---|
 | `regen` `{ max, everySeconds }` | a **refilling stock** (the snowball: `max` 50, `everySeconds` 30): the player starts with `max`; every one thrown comes back at one per `everySeconds` from the first throw, counted by the device clock so it also runs while the app is closed. The card never leaves the PROJECTILES list, not even at x0; with 0 left you can't start a throw (the middle of the screen shows "OUT of SNOWBALLS" with "+1 in 00:xx" under it). Buying can't push it over `max` |
 | `infinite` | `true` = never runs out (nothing uses it right now). Every other projectile is a **consumable**: one is used up the moment the player taps "TAP to aim" (and is NOT given back if the aim is abandoned - opening the shop, equipping something else, closing the app; an abandoned aim also loses the streak); when the last one is gone the snowball is equipped again and the kind leaves the PROJECTILES list |
-| `rewards` | the base coins for a hit on `W20` / `W21` with this projectile (the face bonus is added on top) |
-| `weight` | 0-200, **not shown as a number** (see "weight" above; the snowball is always 100): the strength position of the perfect W20 throw is `weight / 200`, and the share of the offset slider that hits W20 also grows with it |
+| `rarity` | its tier; it decides the hit value (`rarities[].projectileHitValue`: default 5, common 12, rare 60, epic 300, legendary 1500 - the same for W20 and W21 and for every projectile of the rarity). A projectile may set a `hitValue` of its own |
+| `weight` | the weight TIER id: `very_light`, `light`, `moderate`, `heavy`, `very_heavy` (see "weightTiers") |
 | `leavesMark` | `false` = no snow mark; the projectile bounces off the wall instead (and plays its impact sound) |
 | `spins` | the projectile rotates in flight |
 
-A full-strength throw of the snowball (weight 100, no buffs) peaks at the middle of the window row above the goal windows (height 465.5); its centred throw hits the middle of W20. Chestnut right now: rewards 8 / 5, `weight 75`, `angleRange 0.8`, no mark, spins, consumable (placeholder numbers, to be tuned).
+Every projectile of a rarity has the same hit value, stack size (3-7 pieces) and price per piece (20% under the hit value), so a stack costs 50 / 250 / 1250 / 6250 on average (common / rare / epic / legendary) and pays 12 / 60 / 300 / 1500 a hit: a x5 step per tier. What tells projectiles of one rarity apart is their weight tier (where the strength band is, how wide the offset swing is), their look, sound and whether they leave a mark.
 
 ## shop
 
@@ -201,7 +202,7 @@ player's finger. The buff cards and list always show the live state.
 
 ## Balancing notes
 
-- Average base reward is ~4 coins per hit (W20 5 / W21 3); `tools/economy_report.py` prints how many
+- The snowball pays 5 a hit (free, so it is the baseline); `tools/economy_report.py` prints how many
   hits and throws each item costs. There are no tiers right now: every item can appear from the start.
 - Multiplier effects stack, so keep `coinMultiplier` values modest or a few purchases make the
   prices meaningless. Effects that make the *game itself* easier (`aimSpeedMultiplier`,

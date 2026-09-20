@@ -82,8 +82,7 @@ const Shop = (() => {
   }
 
   function averageHitCoins() {
-    const w = Object.values(eco.projectiles.snowball.rewards); // what a normal hit pays
-    return w.reduce((a, b) => a + b, 0) / w.length;
+    return eco.projectiles.snowball.hitValue; // what a normal hit pays
   }
 
   function isCheap(item, cfg) {

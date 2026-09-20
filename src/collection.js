@@ -120,14 +120,6 @@ const Collection = (() => {
     return Economy.getProjectileCount(it.id) > 0;
   }
 
-  // The word for a projectile's weight (never the number): the LAST weightLabels entry whose `from` is <= the weight.
-  function weightWord(weight) {
-    const labels = (eco && eco.weightLabels) || [];
-    let hit = null;
-    for (const l of labels) if (weight >= l.from) hit = l;
-    return hit ? hit.label : "?";
-  }
-
   // The two stats in ONE row along the bottom of the card, starting right after the picture (under the text and the
   // EQUIP button). Two fixed columns - the left is as wide as the longest weight word - so each stat is in the same
   // place on every card whatever the words' lengths.
@@ -136,8 +128,8 @@ const Collection = (() => {
     if (!p) return "";
     return (
       `<div class="pick-stats">` +
-      `<span class="pick-stat">weight: ${esc(weightWord(p.weight))}</span>` +
-      `<span class="pick-stat">hit value: <i class="coin"></i>${p.rewards.W20}</span>` +
+      `<span class="pick-stat">weight: ${esc(p.weightLabel || "?")}</span>` +
+      `<span class="pick-stat">hit value: <i class="coin"></i>${p.hitValue}</span>` +
       `</div>`
     );
   }
@@ -146,10 +138,10 @@ const Collection = (() => {
   // without a rarity goes last). Ties keep the older order: highest W20 base value first, then the catalog order.
   function sortedItems(kind, items) {
     if (kind !== "projectile" || !eco) return items;
-    const p = (it) => eco.projectiles[it.id] || { rewards: { W20: 0 } };
+    const p = (it) => eco.projectiles[it.id] || { hitValue: 0 };
     return items
       .map((it, i) => ({ it, i }))
-      .sort((a, b) => Rarity.rank(p(b.it).rarity) - Rarity.rank(p(a.it).rarity) || p(b.it).rewards.W20 - p(a.it).rewards.W20 || a.i - b.i)
+      .sort((a, b) => Rarity.rank(p(b.it).rarity) - Rarity.rank(p(a.it).rarity) || p(b.it).hitValue - p(a.it).hitValue || a.i - b.i)
       .map((x) => x.it);
   }
 

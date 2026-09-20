@@ -50,6 +50,12 @@ const Collection = (() => {
           image: "assets/snowball/rowan_berry.png",
         },
         {
+          id: "test_very_heavy", // TEST projectile: economy.json projectiles.test_very_heavy is "godOnly", so only a god mode save lists it
+          name: "Test Boulder",
+          description: "Very heavy test projectile. God mode only.",
+          image: "assets/snowball/stone.png",
+        },
+        {
           id: "egg", // same id as its shop item and its economy.json "projectiles" entry
           name: "Egg",
           description: "No chickens inside. Enough for a 'basic' omelette.",
@@ -121,6 +127,7 @@ const Collection = (() => {
     if (it.free) return true;
     if (kind !== "projectile") return false;
     const p = eco && eco.projectiles && eco.projectiles[it.id];
+    if (p && p.godOnly && !Economy.isGod()) return false; // a test projectile: god mode saves only
     if (p && (p.regen || p.infinite)) return true; // a refilling projectile never leaves the list, not even at x0
     return Economy.getProjectileCount(it.id) > 0;
   }

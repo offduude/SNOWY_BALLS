@@ -48,7 +48,8 @@
     "rowan_berry": { "infinite": false, "rarity": "common", "weight": "light", "leavesMark": false, "spins": true },
     "stone": { "infinite": false, "rarity": "common", "hitValue": 40, "weight": "heavy", "leavesMark": false, "spins": true },
     "pinecone": { "infinite": false, "rarity": "rare", "weight": "heavy", "leavesMark": false, "spins": true },
-    "grenade": { "infinite": false, "rarity": "epic", "hitValue": 2400, "weight": "heavy", "leavesMark": true, "spins": false }
+    "grenade": { "infinite": false, "rarity": "epic", "hitValue": 2400, "weight": "heavy", "leavesMark": true, "spins": false },
+    "test_very_heavy": { "infinite": true, "godOnly": true, "rarity": "default", "weight": "very_heavy", "leavesMark": false, "spins": true }
   },
 
 

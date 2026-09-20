@@ -230,6 +230,9 @@ const PROJECTILE_VISUALS = {
     explosion: { flashMs: 340, flashScale: 4.6, shakeMs: 330, shakeX: 0.014, shakeY: 0.008 },
   },
 };
+// A TEST projectile (economy.json projectiles.test_very_heavy, "godOnly": only a god mode save can list and equip it): it looks and sounds
+// like the stone. To try another weight tier, change its `weight` in economy.json.
+PROJECTILE_VISUALS.test_very_heavy = { ...PROJECTILE_VISUALS.stone };
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
 // apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex - and the closer it gets to the apex the
@@ -433,7 +436,10 @@ class MainScene extends Phaser.Scene {
   applyProjectile(id) {
     const known = PROJECTILE_VISUALS[id] && this.eco.projectiles && this.eco.projectiles[id];
     // A projectile is usable if it never runs out, refills (the snowball is always equippable, even at 0), or the player has some.
-    const available = known && (this.eco.projectiles[id].infinite || this.eco.projectiles[id].regen || Economy.getProjectileCount(id) > 0);
+    const available =
+      known &&
+      !(this.eco.projectiles[id].godOnly && !Economy.isGod()) && // (a test projectile equipped in a god save, then a normal save loaded)
+      (this.eco.projectiles[id].infinite || this.eco.projectiles[id].regen || Economy.getProjectileCount(id) > 0);
     if (!known || !available) {
       id = "snowball"; // the default
       if (Economy.getEquipped("projectile") !== id) Economy.setEquipped("projectile", id); // keep the save honest

@@ -52,6 +52,7 @@
     "stone": { "infinite": false, "rarity": "common", "hitValue": 40, "weight": "heavy", "leavesMark": false, "spins": true },
     "pinecone": { "infinite": false, "rarity": "rare", "weight": "heavy", "leavesMark": false, "spins": true },
     "grenade": { "infinite": false, "rarity": "epic", "hitValue": 2400, "weight": "heavy", "leavesMark": true, "spins": false },
+    "tomato": { "infinite": false, "rarity": "epic", "weight": "heavy", "leavesMark": true, "spins": true },
     "test_very_heavy": { "infinite": true, "godOnly": true, "rarity": "default", "weight": "very_heavy", "leavesMark": false, "spins": true }
   },
 
@@ -223,6 +224,17 @@
         "image": "assets/snowball/grenade.png",
         "effect": { "type": "givesProjectile", "value": "grenade" },
         "description": "What a great day to have one!"
+      },
+      {
+        "id": "tomato",
+        "name": "Tomato",
+        "category": "projectile",
+        "amount": { "min": 3, "max": 7 },
+        "unitPrice": { "min": 450, "max": 750 },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/tomato.png",
+        "effect": { "type": "givesProjectile", "value": "tomato" },
+        "description": "Tomato ketchup is a salad."
       },
       {
         "id": "chestnut",

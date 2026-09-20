@@ -25,11 +25,11 @@ Written 2026-09-20, revised the same day. Everything marked "in the game" was ap
 | default (snowball) | free | - / - / **4** | - |
 | common | 50 | 3-7 / 8-12 / **16** | 1-3 / 20-30 / **40** |
 | rare | 400 | 3-7 / 60-100 / **128** | 1-3 / 150-250 / **320** |
-| epic *(standard: not in the game yet)* | 3,000 | 3-7 / 450-750 / **960** | 1-3 / 1,125-1,875 / **2,400** |
+| epic *(standard: Tomato, in the game since 2026-09-20)* | 3,000 | 3-7 / 450-750 / **960** | 1-3 / 1,125-1,875 / **2,400** |
 | legendary *(none in the game yet)* | 15,000 | 3-7 / 2,250-3,750 / **4,800** | 1-3 / 5,600-9,400 / **12,000** |
 
 In the game today: common Chestnut + Rowan Berry (standard) and Stone (heavy hitter); rare Pinecone (standard) and Egg (heavy hitter); epic
-Grenade (heavy hitter). Time to first afford a stack at 75% / 90% hit rate (simulated, always-playing player): rare 0.5 h / 0.2 h, epic 3.7 h / 2.1 h,
+Tomato (standard) and Grenade (heavy hitter). Time to first afford a stack at 75% / 90% hit rate (simulated, always-playing player): rare 0.5 h / 0.2 h, epic 3.7 h / 2.1 h,
 legendary 12.5 h / 6.6 h.
 
 ## Buffs (always 1 per slot, price is per buff)

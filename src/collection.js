@@ -56,6 +56,12 @@ const Collection = (() => {
           image: "assets/snowball/stone.png",
         },
         {
+          id: "tomato", // same id as its shop item and its economy.json "projectiles" entry
+          name: "Tomato",
+          description: "Tomato ketchup is a salad.",
+          image: "assets/snowball/tomato.png",
+        },
+        {
           id: "egg", // same id as its shop item and its economy.json "projectiles" entry
           name: "Egg",
           description: "No chickens inside. Enough for a 'basic' omelette.",

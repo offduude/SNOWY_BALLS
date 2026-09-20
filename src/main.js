@@ -197,6 +197,13 @@ const PROJECTILE_VISUALS = {
     impactVolume: 0.5,
     mark: { texture: "egg_impact", size: 20 }, // the splat it leaves on the wall (was 40)
   },
+  tomato: {
+    ball: "tomato",
+    sprites: { idle: "char_idle_tomato", aiming: "char_aiming_tomato", throwing: "char_throwing" },
+    impactSound: "tomato_impact",
+    impactVolume: 0.5,
+    mark: { texture: "tomato_impact", size: 20 }, // the splat it leaves on the wall (it sticks, it does not bounce off)
+  },
   rowan_berry: {
     ball: "rowan_berry",
     sprites: { idle: "char_idle_rowan_berry", aiming: "char_aiming_rowan_berry", throwing: "char_throwing" },
@@ -303,6 +310,10 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_idle_egg", "assets/character/character1_idle_egg.png");
     this.load.image("char_aiming_egg", "assets/character/character1_aiming_egg.png");
     this.load.image("egg_impact", "assets/snowball/egg_impact.png"); // the splat it leaves on the wall
+    this.load.image("tomato", "assets/snowball/tomato.png");
+    this.load.image("char_idle_tomato", "assets/character/character1_idle_tomato.png");
+    this.load.image("char_aiming_tomato", "assets/character/character1_aiming_tomato.png");
+    this.load.image("tomato_impact", "assets/snowball/tomato_impact.png"); // the splat it leaves on the wall
     this.load.image("rowan_berry", "assets/snowball/rowan_berry_projectile.png?v=2"); // the ball in the air (the card / shop icon is rowan_berry.png)
     this.load.image("char_idle_rowan_berry", "assets/character/character1_idle_rowan_berry.png");
     this.load.image("char_aiming_rowan_berry", "assets/character/character1_aiming_rowan_berry.png");
@@ -332,6 +343,7 @@ class MainScene extends Phaser.Scene {
     this.load.audio("angels", "assets/audio/angels.mp3");
     this.load.audio("hard_impact", "assets/audio/hard_impact.mp3");
     this.load.audio("egg_impact", "assets/audio/egg_impact.mp3");
+    this.load.audio("tomato_impact", "assets/audio/tomato_impact.mp3");
   }
 
   create() {

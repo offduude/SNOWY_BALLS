@@ -63,6 +63,51 @@ const Economy = (() => {
     return out;
   }
 
+  // The save as it is stored, cleaned into the shape the game expects (anything missing gets its default).
+  function clean(p, base) {
+    const shop = p.shop || {};
+    return {
+      epoch: SAVE_EPOCH,
+      coins: p.coins || 0,
+      // Saves from before lifetimeCoins existed: the best honest guess is what they hold now.
+      lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
+      bestStreak: p.bestStreak || 0,
+      streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
+      coinCarry: typeof p.coinCarry === "number" && p.coinCarry >= 0 && p.coinCarry < 1 ? p.coinCarry : 0,
+      aiming: p.aiming === true,
+      projectiles: cleanCounts(p.projectiles),
+      regen: cleanRegen(p.regen),
+      buffItems: cleanCounts(p.buffItems),
+      newBuffs: cleanIds(p.newBuffs),
+      newProjectiles: cleanIds(p.newProjectiles),
+      buffsUnseen: p.buffsUnseen === true,
+      projectilesUnseen: p.projectilesUnseen === true,
+      unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
+      equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
+      buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number") : [],
+      shop: {
+        stock: Array.isArray(shop.stock) ? shop.stock : null,
+        offers: Array.isArray(shop.offers) ? shop.offers : [],
+        owned: Array.isArray(shop.owned) ? shop.owned : [],
+        consumables: shop.consumables && typeof shop.consumables === "object" ? shop.consumables : {},
+        restock: Array.isArray(shop.restock) ? shop.restock : [],
+        expires: Array.isArray(shop.expires) ? shop.expires.map((x) => (typeof x === "number" ? x : null)) : [],
+        unseen: shop.unseen === true,
+      },
+    };
+  }
+
+  // A save that came from somewhere else (an imported code): the cleaned save, or null if it is not a save of the current
+  // reset (see SAVE_EPOCH).
+  function sanitize(p) {
+    if (!p || typeof p !== "object" || !(typeof p.epoch === "number" && p.epoch >= SAVE_EPOCH)) return null;
+    try {
+      return clean(p, fresh());
+    } catch (e) {
+      return null;
+    }
+  }
+
   function load() {
     const base = fresh();
     try {
@@ -73,36 +118,7 @@ const Economy = (() => {
         cleansed = true; // an old save: the grand reset - start again
         return base;
       }
-      const shop = p.shop || {};
-      return {
-        epoch: SAVE_EPOCH,
-        coins: p.coins || 0,
-        // Saves from before lifetimeCoins existed: the best honest guess is what they hold now.
-        lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
-        bestStreak: p.bestStreak || 0,
-        streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
-        coinCarry: typeof p.coinCarry === "number" && p.coinCarry >= 0 && p.coinCarry < 1 ? p.coinCarry : 0,
-        aiming: p.aiming === true,
-        projectiles: cleanCounts(p.projectiles),
-        regen: cleanRegen(p.regen),
-        buffItems: cleanCounts(p.buffItems),
-        newBuffs: cleanIds(p.newBuffs),
-        newProjectiles: cleanIds(p.newProjectiles),
-        buffsUnseen: p.buffsUnseen === true,
-        projectilesUnseen: p.projectilesUnseen === true,
-        unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
-        equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
-        buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number") : [],
-        shop: {
-          stock: Array.isArray(shop.stock) ? shop.stock : null,
-          offers: Array.isArray(shop.offers) ? shop.offers : [],
-          owned: Array.isArray(shop.owned) ? shop.owned : [],
-          consumables: shop.consumables && typeof shop.consumables === "object" ? shop.consumables : {},
-          restock: Array.isArray(shop.restock) ? shop.restock : [],
-          expires: Array.isArray(shop.expires) ? shop.expires.map((x) => (typeof x === "number" ? x : null)) : [],
-          unseen: shop.unseen === true,
-        },
-      };
+      return clean(p, base);
     } catch (e) {
       return base;
     }
@@ -111,7 +127,11 @@ const Economy = (() => {
   let state = load();
   if (cleansed) save(); // write the fresh save over the old one right away, so it can only ever be cleansed once
 
+  // While the save slots are being swapped (see saves.js) nothing may write this page's old state over the new one.
+  let locked = false;
+
   function save() {
+    if (locked) return;
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
     } catch (e) {
@@ -464,6 +484,14 @@ const Economy = (() => {
     takeBuff,
     setRegenConfig,
     wasCleansed: () => cleansed,
+    sanitize,
+    snapshot: () => JSON.stringify(state), // the save as it is right now (for exporting)
+    freshJson: () => JSON.stringify(fresh()), // a brand-new game
+    lockSaves: () => {
+      locked = true;
+    },
+    getEpoch: () => SAVE_EPOCH,
+    storageKey: KEY,
     setBuffMax,
     getBuffMax,
     regenInfo,

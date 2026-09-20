@@ -267,7 +267,17 @@ const Collection = (() => {
   function open(kind) {
     markSeen(); // switching straight from one list to another
     openKind = kind;
+    scrollEl.dataset.kind = kind; // (the OPTIONS list redraws itself after a change, see Saves.refresh)
     buttons.buff.classList.toggle("active", kind === "buff");
+    buttons.options.classList.toggle("active", kind === "options");
+    if (kind === "options") {
+      titleEl.textContent = "OPTIONS";
+      Saves.renderOptions(scrollEl);
+      scrollEl.scrollTop = 0;
+      container.classList.add("list-open");
+      buttons.projectile.classList.remove("active");
+      return;
+    }
     if (kind === "buff") {
       Economy.clearUnseenBuffs(); // the player is looking at the tab now: its red dot goes
       titleEl.textContent = "BUFFS";
@@ -294,8 +304,10 @@ const Collection = (() => {
     markSeen();
     openKind = null;
     container.classList.remove("list-open");
+    scrollEl.dataset.kind = "";
     buttons.projectile.classList.remove("active");
     buttons.buff.classList.remove("active");
+    buttons.options.classList.remove("active");
     buttons.character?.classList.remove("active");
   }
 
@@ -357,7 +369,10 @@ const Collection = (() => {
         projectile: document.getElementById("projectiles-btn"),
         character: document.getElementById("characters-btn"),
         buff: document.getElementById("buffs-btn"),
+        options: document.getElementById("options-btn"),
       };
+      buttons.options.addEventListener("click", () => toggle("options"));
+      scrollEl.addEventListener("click", (e) => Saves.onClick(e)); // the SAVES section of the OPTIONS list
       buttons.buff.addEventListener("click", () => toggle("buff"));
       // Red dot on the PROJECTILES button (same dot as the shop's, but silent).
       dotEl = document.getElementById("projectiles-dot");

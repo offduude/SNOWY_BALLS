@@ -901,6 +901,151 @@
       pointer-events: none;
     }
 
+    /* ---- OPTIONS list: the SAVES section ---- */
+    .opt-head {
+      flex: none;
+      color: #ffffff;
+      font-size: calc(var(--u) * 1.4);
+      padding: calc(var(--u) * 0.2) calc(var(--u) * 0.2) 0;
+    }
+
+    .save-row {
+      flex: none;
+      display: flex;
+      gap: calc(var(--u) * 1);
+      align-items: stretch;
+    }
+
+    /* A save slot: a card with a name and, under it, when it was last loaded. */
+    .save-slot {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: calc(var(--u) * 0.9);
+      min-height: calc(var(--u) * 8.4);
+      padding: calc(var(--u) * 1.2) calc(var(--u) * 1.4);
+      box-sizing: border-box;
+      text-align: left;
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+      color: #3b2412;
+      font-family: "Press Start 2P", monospace;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .save-slot .save-name { font-size: calc(var(--u) * 1.6); line-height: 1.3; }
+    .save-slot .save-date { font-size: calc(var(--u) * 1); color: #8a6a44; }
+    .save-slot.active { border-color: #3b8a3b; box-shadow: inset 0 0 0 2px #3b8a3b; cursor: default; }
+
+    .save-tag {
+      position: absolute;
+      top: calc(var(--u) * 0.9);
+      right: calc(var(--u) * 1.2);
+      font-size: calc(var(--u) * 1);
+      color: #2f7a2f;
+    }
+
+    /* An empty slot: dimmed, dashed, just "+ CREATE". */
+    .save-slot.empty {
+      align-items: center;
+      background: rgba(244, 234, 208, 0.18);
+      border: 2px dashed #d9c9a3;
+      color: #f4ead0;
+      font-size: calc(var(--u) * 1.6);
+    }
+
+    /* The two small buttons to the right of a slot: download (export) and trash (delete), one above the other. */
+    .save-btns {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--u) * 0.8);
+      width: calc(var(--u) * 6);
+    }
+
+    .save-icon {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .save-icon:active { background: #74491f; }
+    .save-icon svg { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); }
+
+    /* ---- popups (export / import / create / delete / load) ---- */
+    #modal-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.62);
+      font-family: "Press Start 2P", monospace;
+    }
+
+    .modal-panel {
+      width: calc(var(--u) * 58);
+      max-width: 92%;
+      box-sizing: border-box;
+      padding: calc(var(--u) * 2);
+      background: #f4ead0;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+      color: #3b2412;
+    }
+
+    .modal-title { font-size: calc(var(--u) * 1.8); margin-bottom: calc(var(--u) * 1.2); }
+    .modal-text { font-size: calc(var(--u) * 1.1); line-height: 1.7; color: #6b4a2a; margin-bottom: calc(var(--u) * 1.2); }
+
+    .modal-code,
+    .modal-input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      background: #fff8e6;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+      color: #3b2412;
+      resize: none;
+    }
+
+    .modal-code { height: calc(var(--u) * 13); padding: calc(var(--u) * 0.8); font: calc(var(--u) * 1) monospace; word-break: break-all; }
+    .modal-input { padding: calc(var(--u) * 1); font: calc(var(--u) * 1.4) "Press Start 2P", monospace; }
+    .modal-status { min-height: calc(var(--u) * 2.6); margin-top: calc(var(--u) * 0.8); font-size: calc(var(--u) * 1); line-height: 1.6; }
+    .modal-status.ok { color: #2f7a2f; }
+    .modal-status.bad { color: #a3352b; }
+    .modal-buttons { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); justify-content: flex-end; margin-top: calc(var(--u) * 1.4); }
+
+    .modal-btn {
+      padding: calc(var(--u) * 1) calc(var(--u) * 1.6);
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: calc(var(--u) * 1.2);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .modal-btn:active { background: #74491f; }
+    .modal-btn.danger { background: #a3352b; }
+    .modal-btn.ghost { background: #b9a88f; border-color: #8a7a62; color: #f4ead0; }
+    .modal-btn.off { opacity: 0.4; cursor: default; }
+
     #coin-counter .coin {
       flex: none;
       width: 9px;
@@ -931,6 +1076,7 @@
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
       <span id="projectiles-dot" class="notif-dot"></span>
+      <button id="options-btn" class="side-btn" type="button">OPTIONS</button>
     </div>
     <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
     <button id="shop-btn" type="button">SHOP</button>
@@ -941,7 +1087,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/economy.js?v=19"></script>
+  <script src="src/economy.js?v=20"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -967,7 +1113,8 @@
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=11"></script>
   <script src="src/shop.js?v=22"></script>
-  <script src="src/collection.js?v=37"></script>
+  <script src="src/saves.js?v=1"></script>
+  <script src="src/collection.js?v=38"></script>
   <script src="src/main.js?v=114"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

@@ -38,7 +38,8 @@ const Economy = (() => {
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
       unlockedCharacters: ["andek"], // the ids of the characters the player has (the default one always)
       unlockedSceneries: ["frosty"], // ... and of the sceneries
-      equipped: { character: "andek", scenery: "frosty", projectile: "snowball" }, // what the player currently uses
+      unlockedWeathers: ["snow"], // ... and of the weathers
+      equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" }, // what the player currently uses
       buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
       shop: {
         offers: [], // per slot: null, or { amount, unitPrice } rolled for a stack item on sale there
@@ -107,6 +108,7 @@ const Economy = (() => {
       // (the default character used to be called "default": it is Andek now)
       unlockedCharacters: [...new Set([...base.unlockedCharacters, ...(Array.isArray(p.unlockedCharacters) ? p.unlockedCharacters : []).map((id) => (id === "default" ? "andek" : id))])],
       unlockedSceneries: [...new Set([...base.unlockedSceneries, ...(Array.isArray(p.unlockedSceneries) ? p.unlockedSceneries : [])])],
+      unlockedWeathers: [...new Set([...base.unlockedWeathers, ...(Array.isArray(p.unlockedWeathers) ? p.unlockedWeathers : [])])],
       equipped: (() => {
         const eq = { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) };
         if (eq.character === "default") eq.character = "andek";
@@ -467,7 +469,12 @@ const Economy = (() => {
     return state.bestStreak;
   }
 
-  // kind: "character" | "projectile"
+  // The list of the ids the player has of a skin kind.
+  function unlockedList(kind) {
+    return kind === "character" ? state.unlockedCharacters : kind === "weather" ? state.unlockedWeathers : state.unlockedSceneries;
+  }
+
+  // kind: "character" | "scenery" | "weather" | "projectile"
   function getEquipped(kind) {
     return state.equipped[kind];
   }
@@ -560,10 +567,10 @@ const Economy = (() => {
     onProjectilesChange,
     getEquipped,
     setEquipped,
-    // Characters and sceneries the player has (kind: "character" or "scenery"); the default ones are always there.
-    isUnlocked: (kind, id) => (kind === "character" ? state.unlockedCharacters : state.unlockedSceneries).includes(id),
+    // Characters, sceneries and weathers the player has (kind: "character", "scenery" or "weather"); the default ones are always there.
+    isUnlocked: (kind, id) => unlockedList(kind).includes(id),
     unlock: (kind, id) => {
-      const list = kind === "character" ? state.unlockedCharacters : state.unlockedSceneries;
+      const list = unlockedList(kind);
       if (!list.includes(id)) {
         list.push(id);
         save();

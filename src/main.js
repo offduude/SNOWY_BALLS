@@ -407,6 +407,7 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("onion", "assets/snowball/onion.png");
+    this.load.image("weather_snow", "assets/weather/snowflake.png"); // the default weather's particle (another weather's is loaded when it is first used)
     this.load.image("drone", "assets/snowball/drone.png");
     this.load.image("potato", "assets/snowball/potato.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
@@ -505,6 +506,8 @@ class MainScene extends Phaser.Scene {
     // at y = -IMG_GROUND_Y puts row IMG_GROUND_Y exactly at y = 0.
     this.bgImage = this.add.image(0, -IMG_GROUND_Y, "background").setOrigin(0, 0);
     this.applyScenery(Economy.getEquipped("scenery")); // the equipped scenery's wall picture (Frosty = background.png)
+    this.weather = null; // the equipped weather that is falling: see applyWeather
+    this.applyWeather(Economy.getEquipped("weather"));
 
     this.drawCharacter();
 
@@ -1232,6 +1235,91 @@ class MainScene extends Phaser.Scene {
 
   onSceneryEquipped(id) {
     this.applyScenery(id);
+  }
+
+  // ---- WEATHER (economy.json weathers, the third skins category) ----
+  // Particles fall from the sky just like the roses of the applause (they start above the top of the world, fall straight down and are gone below the bottom of
+  // the default view), over the whole game picture, for as long as the weather is equipped. A weather names its density and its fall speed (economy.json
+  // weatherDensities / weatherSpeeds): the density is how many particles are in the picture (432 x 243) at once, so the spawn rate is worked out from it and the
+  // fall speed - a slow weather is not thinner than a fast one. When a weather starts the sky is already full (the particles are spread over the whole fall).
+  applyWeather(id) {
+    this.clearWeather();
+    const list = (this.eco && this.eco.weathers) || [];
+    const def = list.find((x) => x.id === id) || list[0];
+    if (!def) return;
+    const speed = ((this.eco.weatherSpeeds || {})[def.fallSpeed]) || { from: 50, to: 75 };
+    const onScreen = ((this.eco.weatherDensities || {})[def.density]) ?? 15;
+    const w = { id: def.id, def, key: "weather_" + def.id, onScreen, from: speed.from, to: speed.to, acc: 0, particles: [], age: 0 };
+    w.rate = (onScreen * (speed.from + speed.to)) / 2 / GAME_HEIGHT; // particles a second: the ones in the picture x how fast they leave it / its height
+    this.weather = w;
+    const start = () => {
+      if (this.weather === w && !w.filled && this.textures.exists(w.key)) this.fillWeather();
+    };
+    if (this.textures.exists(w.key)) start();
+    else {
+      this.load.image(w.key, def.particle);
+      this.load.once("complete", start);
+      this.load.start();
+    }
+  }
+
+  onWeatherEquipped(id) {
+    this.applyWeather(id);
+  }
+
+  clearWeather() {
+    if (this.weather) this.weather.particles.forEach((p) => p.img.destroy());
+    this.weather = null;
+  }
+
+  // The sky is full from the first frame: as many particles as there are in a steady fall, spread over the whole way from the top of the world to the bottom of the default view.
+  fillWeather() {
+    const w = this.weather;
+    w.filled = true;
+    const top = this.worldY(TOP_BOUNDARY_HEIGHT);
+    const bottom = INITIAL_SCROLL_Y + GAME_HEIGHT;
+    const n = Math.round((w.onScreen * (bottom - top)) / GAME_HEIGHT);
+    for (let i = 0; i < n; i++) this.spawnWeatherParticle(Phaser.Math.FloatBetween(top, bottom));
+  }
+
+  // One particle: at world y `y` (default: just above the top of the world), anywhere across the picture sideways.
+  spawnWeatherParticle(y) {
+    const w = this.weather;
+    const size = (w.def.particleSize || 10) * Phaser.Math.FloatBetween(0.8, 1.2);
+    const x = Phaser.Math.FloatBetween(INITIAL_SCROLL_X - 6, INITIAL_SCROLL_X + GAME_WIDTH + 6);
+    const img = this.add.image(x, y === undefined ? this.worldY(TOP_BOUNDARY_HEIGHT) - size : y, w.key);
+    img.setDisplaySize(size, size).setDepth(9); // (the same depth as the roses: over the building, under the live ball)
+    w.particles.push({
+      img,
+      x0: x,
+      age: 0,
+      vy: Phaser.Math.FloatBetween(w.from, w.to),
+      vx: Phaser.Math.FloatBetween(-4, 4), // a hair of sideways drift
+      swayPx: (w.def.sway || 0) * Phaser.Math.FloatBetween(0.5, 1.2), // and a gentle swing from side to side
+      swayHz: Phaser.Math.FloatBetween(0.4, 0.9),
+      phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
+    });
+  }
+
+  updateWeather(dt) {
+    const w = this.weather;
+    if (!w || !w.filled) return;
+    w.acc += dt * w.rate;
+    while (w.acc >= 1) {
+      w.acc -= 1;
+      this.spawnWeatherParticle();
+    }
+    const bottom = INITIAL_SCROLL_Y + GAME_HEIGHT; // the bottom edge of the default camera view: a particle is gone once it is below it
+    w.particles = w.particles.filter((p) => {
+      p.age += dt;
+      p.img.y += p.vy * dt;
+      p.img.x = p.x0 + p.vx * p.age + Math.sin(p.age * p.swayHz * Math.PI * 2 + p.phase) * p.swayPx;
+      if (p.img.y - p.img.displayHeight / 2 > bottom) {
+        p.img.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   // The projectile in the character's hand (idle: upside down, aiming: upright), placed by CHARACTERS[..].hands and the projectile's `hold`; hidden when the hands are empty
@@ -2429,6 +2517,7 @@ class MainScene extends Phaser.Scene {
       step();
     }
     this.updateSong(dt);
+    this.updateWeather(dt);
     this.updateBounce(dt);
     this.updateFallingBalls(dt);
 

@@ -89,15 +89,17 @@ const Collection = (() => {
     },
   };
 
-  // SKINS (the SKINS button): a list with two buttons, CHARACTERS and SCENERIES, each opening a menu of cards (economy.json characters / sceneries).
+  // SKINS (the SKINS button): a list with three buttons, CHARACTERS, SCENERIES and WEATHER, each opening a menu of cards (economy.json characters / sceneries / weathers).
   // Their cards are like the buff cards (name, description, rarity in the corner, the EQUIP button, the detail line at the bottom) without an amount:
   // they are never consumed and never unequipped - only by equipping another one (the equipped one's button just says EQUIPPED). Listed by
   // rarity, the rarest on top, the default one at the bottom.
-  const SKIN_KINDS = ["skins", "character", "scenery"];
-  const SKIN_TITLES = { skins: "SKINS", character: "CHARACTERS", scenery: "SCENERIES" };
+  const SKIN_MENUS = ["character", "scenery", "weather"]; // the menus of cards (each kind's own list in economy.json: characters / sceneries / weathers)
+  const SKIN_KINDS = ["skins", ...SKIN_MENUS];
+  const SKIN_TITLES = { skins: "SKINS", character: "CHARACTERS", scenery: "SCENERIES", weather: "WEATHER" };
+  const SKIN_LISTS = { character: "characters", scenery: "sceneries", weather: "weathers" };
 
   function skinItems(kind) {
-    return (eco && eco[kind === "character" ? "characters" : "sceneries"]) || [];
+    return (eco && eco[SKIN_LISTS[kind]]) || [];
   }
 
   let container, panelEl, titleEl, scrollEl, buttons, dotEl;
@@ -147,7 +149,7 @@ const Collection = (() => {
   }
 
   function isListed(kind, it) {
-    if (kind === "character" || kind === "scenery") return it.rarity === "default" || Economy.isUnlocked(kind, it.id); // the default ones are always there
+    if (SKIN_MENUS.includes(kind)) return it.rarity === "default" || Economy.isUnlocked(kind, it.id); // the default ones are always there
     if (kind !== "projectile") return false;
     const p = eco && eco.projectiles && eco.projectiles[it.id];
     if (p && p.godOnly && !Economy.isGod()) return false; // a test projectile: god mode saves only
@@ -172,7 +174,7 @@ const Collection = (() => {
   // Projectiles are listed by RARITY, the rarest first (economy.json projectiles.<id>.rarity, see rarity.js; an item
   // without a rarity goes last). Ties keep the older order: highest W20 base value first, then the catalog order.
   function sortedItems(kind, items) {
-    if ((kind === "character" || kind === "scenery") && eco) {
+    if (SKIN_MENUS.includes(kind) && eco) {
       // by rarity, the rarest first (legendary on top, default at the bottom); equal rarities keep the file's order
       return items.map((it, i) => ({ it, i })).sort((a, b) => Rarity.rank(b.it.rarity) - Rarity.rank(a.it.rarity) || a.i - b.i).map((x) => x.it);
     }
@@ -228,7 +230,7 @@ const Collection = (() => {
     );
   }
 
-  // The SKINS list itself: the two buttons, each with the name of what is equipped now.
+  // The SKINS list itself: the three buttons, each with the name of what is equipped now.
   function skinsMenuHtml() {
     const now = (kind) => {
       const it = skinItems(kind).find((x) => x.id === Economy.getEquipped(kind));
@@ -236,7 +238,8 @@ const Collection = (() => {
     };
     return (
       `<button class="skins-choice" type="button" data-skins="character"><span class="skins-choice-name">CHARACTERS</span><span class="skins-choice-now">${now("character")}</span></button>` +
-      `<button class="skins-choice" type="button" data-skins="scenery"><span class="skins-choice-name">SCENERIES</span><span class="skins-choice-now">${now("scenery")}</span></button>`
+      `<button class="skins-choice" type="button" data-skins="scenery"><span class="skins-choice-name">SCENERIES</span><span class="skins-choice-now">${now("scenery")}</span></button>` +
+      `<button class="skins-choice" type="button" data-skins="weather"><span class="skins-choice-name">WEATHER</span><span class="skins-choice-now">${now("weather")}</span></button>`
     );
   }
 
@@ -365,7 +368,7 @@ const Collection = (() => {
     buttons.buff.classList.toggle("active", kind === "buff");
     buttons.options.classList.toggle("active", kind === "options");
     buttons.skins.classList.toggle("active", SKIN_KINDS.includes(kind));
-    panelEl.classList.toggle("nested", kind === "character" || kind === "scenery"); // (the BACK button of the two skin menus)
+    panelEl.classList.toggle("nested", SKIN_MENUS.includes(kind)); // (the BACK button of the skin menus)
     if (kind === "skins") {
       titleEl.textContent = SKIN_TITLES.skins;
       scrollEl.innerHTML = skinsMenuHtml();
@@ -374,7 +377,7 @@ const Collection = (() => {
       buttons.projectile.classList.remove("active");
       return;
     }
-    if (kind === "character" || kind === "scenery") {
+    if (SKIN_MENUS.includes(kind)) {
       titleEl.textContent = SKIN_TITLES[kind];
       scrollEl.innerHTML =
         sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
@@ -450,7 +453,7 @@ const Collection = (() => {
     const choice = e.target.closest(".skins-choice");
     if (choice) {
       click();
-      open(choice.dataset.skins); // CHARACTERS or SCENERIES
+      open(choice.dataset.skins); // CHARACTERS, SCENERIES or WEATHER
       return;
     }
     const use = e.target.closest(".pick-use");
@@ -463,13 +466,13 @@ const Collection = (() => {
     const btn = e.target.closest(".pick-equip");
     if (!btn || btn.classList.contains("on")) return;
     Economy.setEquipped(openKind, btn.dataset.id);
-    if (openKind === "character" || openKind === "scenery") {
-      // A character / scenery is equipped in place: the list stays open (its buttons show the change), the game switches at once.
+    if (SKIN_MENUS.includes(openKind)) {
+      // A character / scenery / weather is equipped in place: the list stays open (its buttons show the change), the game switches at once.
       click();
       refreshButtons();
       const game = window.snowyBallsGame;
       const scene = game && game.scene.getScene("main");
-      if (scene) (openKind === "character" ? scene.onCharacterEquipped : scene.onSceneryEquipped).call(scene, btn.dataset.id);
+      if (scene) scene[{ character: "onCharacterEquipped", scenery: "onSceneryEquipped", weather: "onWeatherEquipped" }[openKind]](btn.dataset.id);
       return;
     }
     if (openKind === "projectile") {
@@ -538,7 +541,7 @@ const Collection = (() => {
       Buffs.onChange(tickBuffList);
       Buffs.onTick(tickBuffList); // the list's timers ride on the buffs' own clock, so they change at the same moment as the cards on screen
       buttons.projectile.addEventListener("click", () => toggle("projectile"));
-      // SKINS: opens its list (two buttons); pressing it while any skin list is open closes it. BACK (in the CHARACTERS / SCENERIES menus) returns to it.
+      // SKINS: opens its list (three buttons); pressing it while any skin list is open closes it. BACK (in the CHARACTERS / SCENERIES / WEATHER menus) returns to it.
       buttons.skins.addEventListener("click", () => {
         click();
         if (SKIN_KINDS.includes(openKind)) close();

@@ -27,7 +27,7 @@
     }
   },
 
-  "_skinsNote": "SKINS (the SKINS button, between PROJECTILES and OPTIONS): characters and sceneries are equipped, never consumed, never unequipped (only by equipping another one), and listed by rarity, the rarest first. characters: the thrower; `character` names its entry in CHARACTERS (main.js: the empty-handed pictures and hand numbers), `image` is the face on its card, `detail` will describe the bonus it gives (empty for the default one). sceneries: the picture behind the game; `background` is the wall texture - it must be EXACTLY the size of assets/building/background.png (704x1000) with the windows in the same places, so a scenery is only a visual change; `image` is its card picture. rarity: one of the rarities below (default = free, always owned); others must be unlocked (Economy.unlock).",
+  "_skinsNote": "SKINS (the SKINS button, between PROJECTILES and OPTIONS): characters, sceneries and weather (see _weatherNote) are equipped, never consumed, never unequipped (only by equipping another one), and listed by rarity, the rarest first. characters: the thrower; `character` names its entry in CHARACTERS (main.js: the empty-handed pictures and hand numbers), `image` is the face on its card, `detail` will describe the bonus it gives (empty for the default one). sceneries: the picture behind the game; `background` is the wall texture - it must be EXACTLY the size of assets/building/background.png (704x1000) with the windows in the same places, so a scenery is only a visual change; `image` is its card picture. rarity: one of the rarities below (default = free, always owned); others must be unlocked (Economy.unlock).",
   "characters": [
     {
       "id": "andek",
@@ -46,6 +46,29 @@
       "description": "I forgot to bring my jacket!",
       "image": "assets/scenery/frosty.png",
       "background": "assets/building/background.png",
+      "rarity": "default",
+      "detail": ""
+    }
+  ],
+
+  "_weatherNote": "WEATHER (the third skins category, the WEATHER button in the SKINS list): particles that fall from the sky over the whole game picture - the same way the roses fall in the disco / guitar applause (they start at the top of the world, fall straight down and leave below the bottom of the default view) - for as long as the weather is equipped. It is equipped, never consumed, never unequipped (only by equipping another one), listed by rarity like the other skins. weathers: id, name, description, image (the card picture), particle (the falling picture, any size: it is drawn particleSize px wide, each one a little bigger or smaller), particleSize, sway (px the particle swings from side to side while it falls; 0 = straight down), rarity (default = free, always owned; others must be unlocked, Economy.unlock('weather', id)), detail (the bottom line of the card - NOT the density or the speed: the card does not tell them). density and fallSpeed are NAMES of the two scales below. weatherDensities: how many particles are in the game picture (432 x 243) at any moment; the spawn rate follows from it and the fall speed (density x average speed / 243 a second), so a slow weather does not look thinner than a fast one. The roses of the applause are 30 at once (spawned at 30 a second, falling 200-300 px/s) - that is 'heavy' density and 'moderate' fall speed. weatherSpeeds: px a second, each particle rolls its own between from and to.",
+  "weatherDensities": { "light": 7, "moderate": 15, "heavy": 30 },
+  "weatherSpeeds": {
+    "slow": { "from": 50, "to": 75 },
+    "moderate": { "from": 200, "to": 300 },
+    "fast": { "from": 400, "to": 550 }
+  },
+  "weathers": [
+    {
+      "id": "snow",
+      "name": "Snow",
+      "description": "Look! It's snowing!",
+      "image": "assets/weather/snowflake_item.png",
+      "particle": "assets/weather/snowflake.png",
+      "particleSize": 10,
+      "sway": 6,
+      "density": "moderate",
+      "fallSpeed": "slow",
       "rarity": "default",
       "detail": ""
     }

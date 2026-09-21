@@ -69,7 +69,7 @@
       "particleSize": 10,
       "sway": 0,
       "drift": 0,
-      "density": "moderate",
+      "density": "heavy",
       "fallSpeed": "very_slow",
       "rarity": "default",
       "detail": ""

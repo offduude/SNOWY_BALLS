@@ -39,6 +39,7 @@ const Economy = (() => {
       unlockedCharacters: ["andek"], // the ids of the characters the player has (the default one always)
       unlockedSceneries: ["frosty"], // ... and of the sceneries
       unlockedWeathers: ["snow"], // ... and of the weathers
+      shopClock: { base: 0, shop: 0, rate: 1 }, // the SHOP's clock (see shopNow): shop time = shop + rate x (device time - base); the default is the device clock itself
       equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" }, // what the player currently uses (weather can also be "none": unequipped)
       buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
       shop: {
@@ -109,6 +110,10 @@ const Economy = (() => {
       unlockedCharacters: [...new Set([...base.unlockedCharacters, ...(Array.isArray(p.unlockedCharacters) ? p.unlockedCharacters : []).map((id) => (id === "default" ? "andek" : id))])],
       unlockedSceneries: [...new Set([...base.unlockedSceneries, ...(Array.isArray(p.unlockedSceneries) ? p.unlockedSceneries : [])])],
       unlockedWeathers: [...new Set([...base.unlockedWeathers, ...(Array.isArray(p.unlockedWeathers) ? p.unlockedWeathers : [])])],
+      shopClock: (() => {
+        const c = p.shopClock;
+        return c && [c.base, c.shop, c.rate].every(Number.isFinite) && c.rate > 0 ? { base: c.base, shop: c.shop, rate: c.rate } : base.shopClock;
+      })(),
       equipped: (() => {
         const eq = { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) };
         if (eq.character === "default") eq.character = "andek";
@@ -479,9 +484,41 @@ const Economy = (() => {
     return state.equipped[kind];
   }
 
+  let equippedHook = null; // called after something is equipped (the shop uses it to follow the equipped skins' shopSpeed)
   function setEquipped(kind, id) {
     state.equipped[kind] = id;
     save();
+    if (equippedHook) equippedHook(kind, id);
+  }
+
+  // ---- THE SHOP'S CLOCK ----
+  // The shop's timers (how long an item stays on sale, the SOLD OUT timer) are timestamps on THIS clock, not on the device clock: it runs at `rate` x the
+  // device clock (1, or 1.2 with Frosty Night equipped - a skin's `shopSpeed` effect). It is the device clock itself until the rate changes (base 0, shop 0,
+  // rate 1), so saves from before it work unchanged. When the rate changes the clock is re-based at that moment (nothing jumps); it goes on at the saved rate while
+  // the app is closed - the skin stays equipped - so the timers keep running faster offline too. Shop time to real time: divide by the rate.
+  function shopNow() {
+    const c = state.shopClock;
+    return c.shop + c.rate * (Date.now() - c.base);
+  }
+
+  function shopRate() {
+    return state.shopClock.rate;
+  }
+
+  function setShopRate(rate) {
+    if (!(rate > 0) || Math.abs(state.shopClock.rate - rate) < 1e-9) return;
+    state.shopClock = { shop: shopNow(), base: Date.now(), rate };
+    save();
+  }
+
+  // The `effects` of the skins that are equipped now (economy.json characters / sceneries / weathers), given the economy data.
+  function skinEffects(ecoJson) {
+    const out = [];
+    for (const [kind, list] of [["character", "characters"], ["scenery", "sceneries"], ["weather", "weathers"]]) {
+      const it = ((ecoJson && ecoJson[list]) || []).find((x) => x.id === state.equipped[kind]);
+      if (it && Array.isArray(it.effects)) out.push(...it.effects);
+    }
+    return out;
   }
 
   // The buff list is edited in place by the Buffs module, which then calls saveBuffs().
@@ -567,6 +604,13 @@ const Economy = (() => {
     onProjectilesChange,
     getEquipped,
     setEquipped,
+    setEquippedHook: (fn) => {
+      equippedHook = fn;
+    },
+    shopNow,
+    shopRate,
+    setShopRate,
+    skinEffects,
     // Characters, sceneries and weathers the player has (kind: "character", "scenery" or "weather"); the default ones are always there.
     isUnlocked: (kind, id) => unlockedList(kind).includes(id),
     unlock: (kind, id) => {

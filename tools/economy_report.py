@@ -11,7 +11,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(HERE, "..", "economy.json")
 
-CATEGORIES = {"consumable", "projectile"}
+CATEGORIES = {"consumable", "projectile", "character", "scenery", "weather"}
+SKIN_LISTS = {"character": "characters", "scenery": "sceneries", "weather": "weathers"}  # a skin item's id is the skin's id in this list of economy.json
 ACCURACY = [0.15, 0.30, 0.50]  # share of throws that hit a goal window
 
 
@@ -38,8 +39,10 @@ def check(eco):
             r = it.get(rng)
             if r is not None and (not isinstance(r, dict) or "min" not in r or "max" not in r or r["min"] > r["max"] or r["min"] < 1):
                 problems.append(f"item {it.get('id', '?')}: '{rng}' must be {{min, max}} with 1 <= min <= max")
-        if "effect" not in it and "effects" not in it:
+        if it.get("category") not in SKIN_LISTS and "effect" not in it and "effects" not in it:  # (a skin has its effects in its own entry)
             problems.append(f"item {it.get('id', '?')}: needs 'effect' or 'effects'")
+        if it.get("category") in SKIN_LISTS and it.get("id") not in [s.get("id") for s in eco.get(SKIN_LISTS[it["category"]], [])]:
+            problems.append(f"item {it.get('id')}: no skin with this id in {SKIN_LISTS[it['category']]}")
         if it.get("id") in seen:
             problems.append(f"duplicate id '{it['id']}'")
         seen.add(it.get("id"))
@@ -75,8 +78,17 @@ def check(eco):
         if pr.get("rarity") is not None and pr.get("rarity") not in ids:  # none at all is allowed (common in the shop, last in the tabs)
             problems.append(f"projectile {pid}: rarity '{pr.get('rarity')}' is not in rarities")
     for it in shop["items"]:
-        if it.get("category") == "consumable" and it.get("rarity") is not None and it.get("rarity") not in ids:
+        if it.get("category") != "projectile" and it.get("rarity") is not None and it.get("rarity") not in ids:
             problems.append(f"item {it.get('id')}: rarity '{it.get('rarity')}' is not in rarities")
+    # A skin's shop rarity must be its own rarity, and every effect it carries is one the game reads.
+    for kind, key in SKIN_LISTS.items():
+        for sk in eco.get(key, []):
+            for e in sk.get("effects", []):
+                if e.get("type") not in ("shopSpeed", "offsetCenter", "coinMultiplier"):
+                    problems.append(f"{key} {sk.get('id')}: unknown effect '{e.get('type')}'")
+            sold = [i for i in shop["items"] if i.get("category") == kind and i.get("id") == sk.get("id")]
+            if sold and sold[0].get("rarity") != sk.get("rarity"):
+                problems.append(f"{key} {sk.get('id')}: its rarity ({sk.get('rarity')}) differs from its shop item's ({sold[0].get('rarity')})")
     return problems
 
 

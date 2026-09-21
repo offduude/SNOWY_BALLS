@@ -20,6 +20,8 @@
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout). Buffs STACK:
 //                          they multiply each other (1.1 x 1.2 = 1.32), no cap
+//   offsetCenter     c     the OFFSET slider's hit zone is centered at c of the bar (0.5 = the middle, the normal; the Blizzard weather: 0.25); the
+//                          green lines, the centre line and the event dot follow it. Not a buff: only a skin's effect (see below)
 //   offsetSpeed      x     the OFFSET slider's marker moves at x times its speed (0.8 = 20% slower, steadier); the strength slider is not
 //                          affected. Buffs STACK: they multiply (0.9 x 0.8 = 0.72), no floor
 //   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Buffs STACK as INDEPENDENT ROLLS: each has its own chance,
@@ -29,6 +31,8 @@
 //   triggerEvent     name  while it runs, that event ("face" = the banana face) is on, for as long as the buff lasts; when the event ends
 //                          (the player hits the face) the buff ends with it, and when the buff ends (timer / cancelled) so does the
 //                          event. The game (main.js syncBuffEvent) starts and stops the event; this file only reports the buff.
+// The `effects` of the EQUIPPED skins (economy.json characters / sceneries / weathers, Economy.skinEffects) are read in modifiers() like an always-on buff
+// (coinMultiplier: the Blizzard's 1.05, offsetCenter). A skin's shopSpeed is not read here: it is the shop's clock (economy.js shopNow, shop.js).
 // This file also draws the buff cards at the top of the screen (next to the live display); tapping a card cancels its buff - except an EVENT buff
 // (one with a triggerEvent effect: Tomato Juice, the Disco Ball): once used, its event cannot be cancelled (canCancel).
 const Buffs = (() => {
@@ -112,14 +116,17 @@ const Buffs = (() => {
   function modifiers() {
     let notSaved = 1; // the chance that no running buff saves the projectile
     let bestSave = 0;
-    const m = { guideLines: 0, centerLine: 0, eventDot: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1, miracle: 0, miracleBy: null };
-    for (const b of active()) {
-      for (const e of b.item.effects || []) {
+    const m = { guideLines: 0, centerLine: 0, eventDot: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1, offsetCenter: 0.5, miracle: 0, miracleBy: null };
+    // the running buffs, then the equipped skins (an always-on source with no id)
+    const sources = [...active().map((b) => ({ id: b.id, effects: b.item.effects || [] })), { id: null, effects: Economy.skinEffects(eco) }];
+    for (const b of sources) {
+      for (const e of b.effects) {
         if (!(e.type in m)) continue;
         if (e.type === "miracle") {
           m.miracle += e.value;
           m.miracleBy = b.id;
-        } else if (e.type === "guideLines" || e.type === "centerLine" || e.type === "eventDot") m[e.type] += e.value; // a switch: any active source turns it on
+        } else if (e.type === "offsetCenter") m.offsetCenter = e.value; // (only a skin has it)
+        else if (e.type === "guideLines" || e.type === "centerLine" || e.type === "eventDot") m[e.type] += e.value; // a switch: any active source turns it on
         else if (e.type === "saveProjectile") {
           notSaved *= 1 - e.value; // independent rolls: the projectile is used up only if EVERY buff's roll fails
           if (e.value > bestSave) {

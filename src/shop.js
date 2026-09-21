@@ -143,9 +143,12 @@ const Shop = (() => {
   }
 
   // ---------- sold-out timers ----------
-  // Buying an item empties its slot ("SOLD OUT") and starts a timer. The timer is a wall-clock
-  // timestamp (Date.now() = the device's clock) saved with the stock, so it keeps running while the
-  // app is closed: when the player comes back, every slot whose time has passed is restocked.
+  // Buying an item empties its slot ("SOLD OUT") and starts a timer. The timer is a timestamp on the SHOP'S CLOCK (Economy.shopNow(): the device's
+  // clock, run at 1.2x with Frosty Night equipped - see economy.js) saved with the stock, so it keeps running while the
+  // app is closed: when the player comes back, every slot whose time has passed is restocked. Every time below is in shop time (ms of it);
+  // what the player is shown is real time: shop time / Economy.shopRate().
+  const shopNow = () => Economy.shopNow();
+  const realMs = (shopMs) => shopMs / Economy.shopRate();
 
   function restockMs() {
     return (eco.shop.restockSeconds > 0 ? eco.shop.restockSeconds : 3600) * 1000;
@@ -162,7 +165,7 @@ const Shop = (() => {
 
   // 1799000 ms -> "29:59", 3 h 59 min -> "3:59:00" (the same look as the max time in the BUFFS tab, hours when there are any)
   function availText(ms) {
-    const total = Math.max(0, Math.ceil(ms / 1000));
+    const total = Math.max(0, Math.ceil(ms / 1000 - 0.001)); // (the small allowance: 1500000.0000000002 ms must read 25:00, not 25:01)
     const h = Math.floor(total / 3600);
     const mm = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
     const ss = String(total % 60).padStart(2, "0");
@@ -193,7 +196,7 @@ const Shop = (() => {
   function ensureStock() {
     const st = Economy.getShopState();
     const slots = eco.shop.slots;
-    const now = Date.now();
+    const now = shopNow();
     let restocked = 0; // slots that just came back from a SOLD OUT timer or rerolled because their item ran out
     let stock = Array.isArray(st.stock) ? st.stock.slice(0, slots) : [];
     while (stock.length < slots) stock.push(null);
@@ -285,13 +288,13 @@ const Shop = (() => {
     st.stock[slot] = null;
     st.offers[slot] = null;
     if (st.expires) st.expires[slot] = null; // sold: no availability timer, the sold-out timer runs instead
-    st.restock[slot] = { at: Date.now() + restockMs(), prev: item.id };
+    st.restock[slot] = { at: shopNow() + restockMs(), prev: item.id };
     Economy.saveShop();
     return { ok: true, item };
   }
 
   function formatTime(ms) {
-    const total = Math.max(0, Math.ceil(ms / 1000));
+    const total = Math.max(0, Math.ceil(ms / 1000 - 0.001));
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
@@ -309,14 +312,14 @@ const Shop = (() => {
   // The availability timer in the top-left of the picture rectangle: how long until this item is replaced.
   function availHtml(slot) {
     const at = (Economy.getShopState().expires || [])[slot];
-    return typeof at === "number" ? `<span class="shop-avail" data-at="${at}">${availText(at - Date.now())}</span>` : "";
+    return typeof at === "number" ? `<span class="shop-avail" data-at="${at}">${availText(realMs(at - shopNow()))}</span>` : "";
   }
 
   function cardHtml(id, slot) {
     const item = id && itemById(id);
     if (!item) {
       const t = (Economy.getShopState().restock || [])[slot];
-      const timer = t && typeof t.at === "number" ? `<span class="shop-timer" data-at="${t.at}">${formatTime(t.at - Date.now())}</span>` : "";
+      const timer = t && typeof t.at === "number" ? `<span class="shop-timer" data-at="${t.at}">${formatTime(realMs(t.at - shopNow()))}</span>` : "";
       // A slot with a timer is SOLD OUT; a slot with nothing to sell at all is (TBD) - there are no items for it yet.
       return `<div class="shop-card empty"><span class="shop-name">${timer ? "SOLD OUT" : "(TBD)"}</span>${timer}</div>`;
     }
@@ -376,7 +379,7 @@ const Shop = (() => {
     if (!eco) return;
     const st = Economy.getShopState();
     const open = isShopOpen();
-    const now = Date.now();
+    const now = shopNow();
     const limit = restockMs() + 1000;
     // due = a timer ran out, or the device clock was set back so a deadline is absurdly far away
     const due =
@@ -389,10 +392,10 @@ const Shop = (() => {
     }
     if (open) {
       root.querySelectorAll(".shop-timer").forEach((el) => {
-        el.textContent = formatTime(Number(el.dataset.at) - now);
+        el.textContent = formatTime(realMs(Number(el.dataset.at) - now));
       });
       root.querySelectorAll(".shop-avail").forEach((el) => {
-        el.textContent = availText(Number(el.dataset.at) - now);
+        el.textContent = availText(realMs(Number(el.dataset.at) - now));
       });
     }
   }
@@ -420,6 +423,11 @@ const Shop = (() => {
     init(economyJson) {
       eco = economyJson;
       if (eco.shop && eco.shop.buffMax) Economy.setBuffMax(eco.shop.buffMax);
+      // The shop's clock runs at the product of the equipped skins' `shopSpeed` effects (Frosty Night 1.2): set now (a save may have been loaded with one
+      // equipped) and again every time something is equipped.
+      const syncRate = () => Economy.setShopRate(Economy.skinEffects(eco).filter((e) => e.type === "shopSpeed").reduce((a, e) => a * e.value, 1));
+      Economy.setEquippedHook(syncRate);
+      syncRate();
       root = document.getElementById("shop-items");
       root.addEventListener("click", onClick);
       dotEl = document.getElementById("shop-dot");

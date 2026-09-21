@@ -341,6 +341,7 @@ const CHARACTERS = {
 };
 const DEFAULT_CHARACTER = "character1";
 const DEFAULT_BACKGROUND = "assets/building/background.png"; // the wall picture that is loaded at the start (the key "background"); the default scenery Frosty uses it
+const WEATHER_MARGIN = 6; // px the sky the weather falls in reaches beyond each side of the picture
 const WEATHER_DEPTH = 9; // the weather's particles are drawn over the character (depth 2) - the same depth as the roses: over the building, over the marks (5), under the live ball (10)
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
@@ -617,6 +618,7 @@ class MainScene extends Phaser.Scene {
       markerHz: cfg.markerHz, // the STRENGTH marker's fixed speed
       angleMarkerHz: cfg.markerHz * b.offsetSpeed, // the OFFSET marker's: the same, x the slow-down buffs (Triangles 0.8 x 0.9 ...)
       angleRange: offsetRangeForZone(zone),
+      offsetCenter: b.offsetCenter, // where on the bar the hit zone is centered (0.5 = the middle; the Blizzard weather: 0.25)
       powerRange: 1 / b.strengthControl,
       coinMultiplier: b.coinMultiplier,
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Orange Skyr) gives them
@@ -1243,6 +1245,9 @@ class MainScene extends Phaser.Scene {
   // the default view), over the whole game picture, for as long as the weather is equipped. A weather names its density and its fall speed (economy.json
   // weatherDensities / weatherSpeeds): the density is how many particles are in the picture (432 x 243) at once, so the spawn rate is worked out from it and the
   // fall speed - a slow weather is not thinner than a fast one. When a weather starts the sky is already full (the particles are spread over the whole fall).
+  // A weather may fall at an ANGLE (degrees from straight down, positive = towards the right: the Blizzard's 65 blows from the left to the right at speed): the
+  // speed is then along the path, and the particles also come in over the left edge (or the right one for a negative angle) - the same number per area as
+  // everywhere else - and are gone when they leave over the other side.
   applyWeather(id) {
     this.clearWeather();
     if (id === "none") return; // no weather equipped: the sky is empty
@@ -1251,8 +1256,16 @@ class MainScene extends Phaser.Scene {
     if (!def) return;
     const speed = ((this.eco.weatherSpeeds || {})[def.fallSpeed]) || { from: 50, to: 75 };
     const onScreen = ((this.eco.weatherDensities || {})[def.density]) ?? 15;
-    const w = { id: def.id, def, key: "weather_" + def.id, onScreen, from: speed.from, to: speed.to, acc: 0, particles: [], age: 0 };
-    w.rate = (onScreen * (speed.from + speed.to)) / 2 / GAME_HEIGHT; // particles a second: the ones in the picture x how fast they leave it / its height
+    const angle = ((def.angle || 0) * Math.PI) / 180;
+    const w = { id: def.id, def, key: "weather_" + def.id, onScreen, from: speed.from, to: speed.to, sin: Math.sin(angle), cos: Math.cos(angle), accTop: 0, accSide: 0, particles: [], age: 0 };
+    const mean = (speed.from + speed.to) / 2;
+    w.left = INITIAL_SCROLL_X - WEATHER_MARGIN; // the sides of the sky the particles live in (a little wider than the picture)
+    w.right = INITIAL_SCROLL_X + GAME_WIDTH + WEATHER_MARGIN;
+    w.top = this.worldY(TOP_BOUNDARY_HEIGHT);
+    w.bottom = INITIAL_SCROLL_Y + GAME_HEIGHT; // the bottom edge of the default camera view: a particle is gone once it is below it
+    const perArea = onScreen / ((w.right - w.left) * GAME_HEIGHT); // particles per px of sky
+    w.rateTop = (onScreen * mean * w.cos) / GAME_HEIGHT; // a second, over the top: the ones in the picture x how fast they leave it downwards / its height
+    w.rateSide = perArea * (w.bottom - w.top) * mean * Math.abs(w.sin); // a second, over the left / right edge (0 for a straight fall)
     this.weather = w;
     const start = () => {
       if (this.weather === w && !w.filled && this.textures.exists(w.key)) this.fillWeather();
@@ -1274,29 +1287,29 @@ class MainScene extends Phaser.Scene {
     this.weather = null;
   }
 
-  // The sky is full from the first frame: as many particles as there are in a steady fall, spread over the whole way from the top of the world to the bottom of the default view.
+  // The sky is full from the first frame: as many particles as there are in a steady fall, spread over the whole sky.
   fillWeather() {
     const w = this.weather;
     w.filled = true;
-    const top = this.worldY(TOP_BOUNDARY_HEIGHT);
-    const bottom = INITIAL_SCROLL_Y + GAME_HEIGHT;
-    const n = Math.round((w.onScreen * (bottom - top)) / GAME_HEIGHT);
-    for (let i = 0; i < n; i++) this.spawnWeatherParticle(Phaser.Math.FloatBetween(top, bottom));
+    const n = Math.round((w.onScreen * (w.bottom - w.top)) / GAME_HEIGHT);
+    for (let i = 0; i < n; i++) this.spawnWeatherParticle(Phaser.Math.FloatBetween(w.left, w.right), Phaser.Math.FloatBetween(w.top, w.bottom));
   }
 
-  // One particle: at world y `y` (default: just above the top of the world), anywhere across the picture sideways.
-  spawnWeatherParticle(y) {
+  // One particle at world (x, y). Called without them it comes in over the top of the sky (anywhere across).
+  spawnWeatherParticle(x, y) {
     const w = this.weather;
     const size = (w.def.particleSize || 10) * Phaser.Math.FloatBetween(0.8, 1.2);
-    const x = Phaser.Math.FloatBetween(INITIAL_SCROLL_X - 6, INITIAL_SCROLL_X + GAME_WIDTH + 6);
-    const img = this.add.image(x, y === undefined ? this.worldY(TOP_BOUNDARY_HEIGHT) - size : y, w.key);
+    if (x === undefined) x = Phaser.Math.FloatBetween(w.left, w.right);
+    const img = this.add.image(x, y === undefined ? w.top - size : y, w.key);
     img.setDisplaySize(size, size).setDepth(WEATHER_DEPTH);
+    const s = Phaser.Math.FloatBetween(w.from, w.to);
+    const drift = w.def.drift || 0;
     w.particles.push({
       img,
       x0: x,
       age: 0,
-      vy: Phaser.Math.FloatBetween(w.from, w.to),
-      vx: (w.def.drift || 0) * Phaser.Math.FloatBetween(-1, 1), // sideways drift (economy.json `drift`, none by default: straight down)
+      vy: s * w.cos,
+      vx: s * w.sin + drift * Phaser.Math.FloatBetween(-1, 1), // the slant, and a sideways drift (economy.json `drift`, none by default)
       swayPx: (w.def.sway || 0) * Phaser.Math.FloatBetween(0.5, 1.2), // a gentle swing from side to side (`sway`, none by default)
       swayHz: Phaser.Math.FloatBetween(0.4, 0.9),
       phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
@@ -1306,17 +1319,23 @@ class MainScene extends Phaser.Scene {
   updateWeather(dt) {
     const w = this.weather;
     if (!w || !w.filled) return;
-    w.acc += dt * w.rate;
-    while (w.acc >= 1) {
-      w.acc -= 1;
+    w.accTop += dt * w.rateTop;
+    while (w.accTop >= 1) {
+      w.accTop -= 1;
       this.spawnWeatherParticle();
     }
-    const bottom = INITIAL_SCROLL_Y + GAME_HEIGHT; // the bottom edge of the default camera view: a particle is gone once it is below it
+    if (w.rateSide > 0) {
+      w.accSide += dt * w.rateSide;
+      while (w.accSide >= 1) {
+        w.accSide -= 1;
+        this.spawnWeatherParticle(w.sin > 0 ? w.left : w.right, Phaser.Math.FloatBetween(w.top, w.bottom)); // over the edge the wind blows in from
+      }
+    }
     w.particles = w.particles.filter((p) => {
       p.age += dt;
       p.img.y += p.vy * dt;
       p.img.x = p.x0 + p.vx * p.age + Math.sin(p.age * p.swayHz * Math.PI * 2 + p.phase) * p.swayPx;
-      if (p.img.y - p.img.displayHeight / 2 > bottom) {
+      if (p.img.y - p.img.displayHeight / 2 > w.bottom || p.img.x < w.left - 40 || p.img.x > w.right + 40) {
         p.img.destroy();
         return false;
       }
@@ -2415,11 +2434,12 @@ class MainScene extends Phaser.Scene {
     if (isAngle) {
       // The bar always spans the equipped projectile's whole angle range, so the marker runs edge to edge.
       const range = this.aim.angleRange;
-      markerPos = 0.5 + (this.angleValue - 0.5) / range;
+      const center = this.aim.offsetCenter; // where on the bar swing 0 - the middle of the hit zone - is (0.5 normally)
+      markerPos = center + (this.angleValue - 0.5) / range;
 
       const lineAt = (swing, color, alpha, width, extra) => {
         for (const sign of [-1, 1]) {
-          const x = Math.round(barX + (0.5 + (sign * swing) / 2 / range) * barW);
+          const x = Math.round(barX + (center + (sign * swing) / 2 / range) * barW);
           g.lineStyle(width, color, alpha);
           g.lineBetween(x, barY - extra, x, barY + barH + extra);
         }
@@ -2434,8 +2454,9 @@ class MainScene extends Phaser.Scene {
       const target = this.aim.eventDot ? this.activeEventTarget() : null; // (no dot without the buff)
       if (target) {
         const swing = (target.swingFrom + target.swingTo) / 2;
-        if (Math.abs(swing) < range) {
-          const x = barX + (0.5 + swing / 2 / range) * barW;
+        const dotPos = center + swing / 2 / range;
+        if (dotPos > 0 && dotPos < 1) {
+          const x = barX + dotPos * barW;
           this.drawEventDot(g, x, barY + barH / 2, target.color, ((target.swingTo - target.swingFrom) / 2 / range) * barW);
         }
       }
@@ -2504,7 +2525,7 @@ class MainScene extends Phaser.Scene {
       // itself never moves faster on screen.
       const a = this.aim;
       const pos = pingPong(elapsed * a.angleMarkerHz);
-      this.angleValue = 0.5 + (pos - 0.5) * a.angleRange;
+      this.angleValue = 0.5 + (pos - a.offsetCenter) * a.angleRange; // (swing 0 - straight up - is where the zone is centered)
     } else if (this.state === STATE.AIM_POWER) {
       const elapsed = (time - this.aimStartTime) / 1000;
       // Same for strength: fixed marker speed along the bar, the bar covers `powerRange` of the power span (centered).

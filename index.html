@@ -76,41 +76,10 @@
       z-index: 2;
     }
 
-    /* Mute toggle, top-right of the game. Plain <img>-as-button since it's just an icon, no
-       label needed. */
-    #volume-btn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      z-index: 5; /* above the shop board (3) so mute stays usable in the shop */
-      will-change: transform; /* stable own layer - stops the icon shifting a pixel when the shop layer appears */
-      transform: translateZ(0);
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #volume-btn img {
-      width: 100%;
-      height: 100%;
-      image-rendering: pixelated;
-      display: block;
-      filter: none;
-      opacity: 1;
-      transition: filter 0.15s ease, opacity 0.15s ease;
-    }
-
-    #volume-btn.muted img {
-      filter: grayscale(100%);
-      opacity: 0.45;
-    }
+    /* (The mute button that was here is gone: the volume is a slider in OPTIONS now. Its picture, assets/ui/volume_icon.png, is kept in the files.) */
 
     /* Shop screen: shop_board.png stretched over the whole game display (canvas + message),
-       faded in/out. Sits under the volume button (z 5) and the SHOP/BACK button (z 4). */
+       faded in/out. Sits under the SHOP/BACK button (z 4). */
     #shop-board {
       position: absolute;
       inset: 0;
@@ -792,8 +761,8 @@
     #buffs-btn {
       position: absolute;
       top: 10px;
-      right: 46px;
-      width: 60px;
+      right: 10px;
+      width: 96px; /* as wide as the projectile counter under it (the mute button that shared this row is gone) */
       height: 28px;
       z-index: 5;
       transition: opacity 0.25s ease;
@@ -919,9 +888,9 @@
       top: -8px;
     }
 
-    /* Same dot on the top-left corner of the BUFFS button (button: 46px from the right edge, 60px wide, 10px from the top). */
+    /* Same dot on the top-left corner of the BUFFS button (button: 10px from the right edge, 96px wide, 10px from the top). */
     #buffs-dot {
-      right: 98px; /* 46 + 60 - half the dot */
+      right: 98px; /* 10 + 96 - half the dot */
       top: 2px; /* 10 - half the dot */
     }
 
@@ -1019,6 +988,69 @@
       opacity: 0;
       transition: opacity 2.4s ease;
       pointer-events: none;
+    }
+
+    /* ---- OPTIONS list: the VOLUME section: a slider (0-100%, the master volume) and its value ---- */
+    .vol-row {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: calc(var(--u) * 1.4);
+    }
+
+    .vol-value {
+      flex: none;
+      width: calc(var(--u) * 5.2);
+      text-align: right;
+      color: #ffffff;
+      font-size: calc(var(--u) * 1.2);
+    }
+
+    .vol-slider {
+      --p: 50%; /* how far it is filled (set by the script) */
+      flex: 1;
+      min-width: 0;
+      height: calc(var(--u) * 2.6);
+      margin: 0;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+      touch-action: none; /* dragging the handle must not scroll the list */
+      cursor: pointer;
+    }
+
+    .vol-slider::-webkit-slider-runnable-track {
+      height: calc(var(--u) * 1.2);
+      background: linear-gradient(to right, #8b5a2b var(--p), #dcc9a0 var(--p));
+      border: 2px solid #4a2f14;
+      border-radius: 3px;
+    }
+
+    .vol-slider::-moz-range-track {
+      height: calc(var(--u) * 1.2);
+      background: linear-gradient(to right, #8b5a2b var(--p), #dcc9a0 var(--p));
+      border: 2px solid #4a2f14;
+      border-radius: 3px;
+    }
+
+    .vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: calc(var(--u) * 2);
+      height: calc(var(--u) * 2.6);
+      margin-top: calc(var(--u) * -0.9 - 2px);
+      background: #f4ead0;
+      border: 2px solid #4a2f14;
+      border-radius: 3px;
+    }
+
+    .vol-slider::-moz-range-thumb {
+      box-sizing: border-box;
+      width: calc(var(--u) * 2);
+      height: calc(var(--u) * 2.6);
+      background: #f4ead0;
+      border: 2px solid #4a2f14;
+      border-radius: 3px;
     }
 
     /* ---- OPTIONS list: the SAVES section ---- */
@@ -1217,13 +1249,10 @@
     <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
     <button id="shop-btn" type="button">SHOP</button>
     <span id="shop-dot" class="notif-dot"></span>
-    <button id="volume-btn" type="button" aria-label="Mute">
-      <img src="assets/ui/volume_icon.png" alt="" />
-    </button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=202"></script>
+  <script src="src/version.js?v=203"></script>
   <script src="src/economy.js?v=28"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1254,16 +1283,17 @@
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=28"></script>
   <script src="src/shop.js?v=23"></script>
-  <script src="src/saves.js?v=5"></script>
+  <script src="src/volume.js?v=1"></script>
+  <script src="src/saves.js?v=6"></script>
   <script src="src/collection.js?v=61"></script>
-  <script src="src/main.js?v=144"></script>
+  <script src="src/main.js?v=145"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "buff-hud", "ammo-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());
@@ -1284,18 +1314,8 @@
       document.getElementById("coin-count").textContent = formatCoins(coins);
     });
 
-    // Toggles Phaser's global sound mute - waits for the game to exist since this can fire
-    // before Phaser finishes booting on a slow load.
-    document.getElementById("volume-btn").addEventListener("click", () => {
-      const game = window.snowyBallsGame;
-      if (!game) return;
-      const nowMuted = !game.sound.mute;
-      game.sound.mute = nowMuted;
-      document.getElementById("volume-btn").classList.toggle("muted", nowMuted);
-    });
-
-    // SHOP <-> BACK: same button, label swaps. Click sound goes through Phaser so the mute
-    // button and master volume apply to it too.
+    // SHOP <-> BACK: same button, label swaps. Click sound goes through Phaser so the master
+    // volume (the slider in OPTIONS) applies to it too.
     document.getElementById("shop-btn").addEventListener("click", () => {
       playUiClick();
       const container = document.getElementById("game-container");

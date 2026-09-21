@@ -419,7 +419,31 @@ const Saves = (() => {
   function renderOptions(el) {
     listEl = el;
     // Every section of the list is a rectangle of its own (SAVES now, others may follow).
-    el.innerHTML = `<div class="opt-section"><div class="opt-head">SAVES</div>${getSlots().map(slotHtml).join("")}</div>`;
+    el.innerHTML =
+      `<div class="opt-section"><div class="opt-head">SAVES</div>${getSlots().map(slotHtml).join("")}</div>` +
+      `<div class="opt-section"><div class="opt-head">VOLUME</div><div class="vol-row"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Volume" /><span class="vol-value"></span></div></div>`;
+    wireVolume(el);
+  }
+
+  // The VOLUME slider: dragging it sets the master volume live (Volume.set remembers it on the device); letting go plays a click so the level
+  // can be heard. It shows the volume that is saved.
+  function wireVolume(el) {
+    const slider = el.querySelector(".vol-slider");
+    const label = el.querySelector(".vol-value");
+    if (!slider) return;
+    const show = () => {
+      slider.style.setProperty("--p", slider.value + "%");
+      label.textContent = slider.value + "%";
+    };
+    slider.value = Math.round(Volume.get() * 100);
+    show();
+    slider.addEventListener("input", () => {
+      Volume.set(slider.value / 100);
+      show();
+    });
+    slider.addEventListener("change", () => {
+      if (typeof playUiClick === "function") playUiClick();
+    });
   }
 
   function refresh() {

@@ -1,5 +1,5 @@
 {
-  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20. The legendary 1.5x coin bonus was added as Daniel's 3 PLN on 2026-09-20. The epic standard projectile was added as the Tomato on 2026-09-20. The epic 50% save was added as the epic Mints (id mints_epic) on 2026-09-20. The legendary disco summon buff was built as the Disco Ticket (id disco_ticket) on 2026-09-20 (branch disco-event, not pushed). The legendary heavy hitter was added as the Drone (id drone) on 2026-09-21 (branch drone, not pushed).",
+  "_readme": "Planned items that are NOT in the game yet, with the prices worked out on 2026-09-20 (see docs/FUTURE_PRICES.md for the reasoning). The game does not read this file. To add one, copy its entries into economy.json (a projectile needs a `shop.items` entry AND a `projectiles.<id>` entry, a buff only a `shop.items` entry), add its picture, and check 'py tools/economy_report.py'. Names, images and descriptions are placeholders. Basis: 75% hit rate, one use of a buff = one stack of its own tier, buff price = 60% of the return, +-25% ranges, hit value = 1.6 x the average price per piece. (The common 1.1x coin bonus was added to the game as Snowy Cube on 2026-09-20, so it is no longer listed here.) The rare 20% save was added as Mints on 2026-09-20. The legendary Sure Shot (a guaranteed hit) was built as the Diamond Cross on 2026-09-20. The legendary 1.5x coin bonus was added as Daniel's 3 PLN on 2026-09-20. The epic standard projectile was added as the Tomato on 2026-09-20. The epic 50% save was added as the epic Mints (id mints_epic) on 2026-09-20. The legendary disco summon buff was built as the Disco Ticket (id disco_ticket) on 2026-09-20 (branch disco-event, not pushed). The legendary heavy hitter was added as the Drone (id drone) on 2026-09-21 (branch drone, not pushed). The epic Triangles (30% slower) were added as the Chilli Triangles (id triangles_chilli) on 2026-09-21.",
   "projectiles": [
     {
       "_note": "LEGENDARY STANDARD. Average stack 15000, hit value 4800 (the legendary rarity default).",
@@ -81,6 +81,30 @@
       ],
       "description": "TBD",
       "detail": "Next throw is free."
+    },
+    {
+      "_note": "LEGENDARY TRIANGLES: the offset slider at 0.5x speed (50% slower); the ladder is common 0.9, rare 0.8, epic 0.7 (Chilli Triangles), legendary 0.5. Price: +25 points of hit rate = 0.25 x 1.6 x 15,000 = 6,000 return, 60% = 3,600, +-25%.",
+      "id": "triangles_legendary",
+      "name": "TBD",
+      "category": "consumable",
+      "rarity": "legendary",
+      "priceRange": {
+        "min": 2700,
+        "max": 4500
+      },
+      "ignorePriceOverride": true,
+      "duration": {
+        "seconds": 180
+      },
+      "image": "assets/items/TBD.png",
+      "effects": [
+        {
+          "type": "offsetSpeed",
+          "value": 0.5
+        }
+      ],
+      "description": "Tasty shapes to make your hand steadier.",
+      "detail": "Slows offset by 50%."
     }
   ],
   "price_ladder_summary": {

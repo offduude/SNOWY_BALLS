@@ -229,6 +229,19 @@
         "detail": "Slows offset by 20%."
       },
       {
+        "id": "triangles_chilli",
+        "name": "Chilli Triangles",
+        "category": "consumable",
+        "rarity": "epic",
+        "priceRange": { "min": 324, "max": 540 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 180 },
+        "image": "assets/items/triangles_chilli.png",
+        "effects": [{ "type": "offsetSpeed", "value": 0.7 }],
+        "description": "Tasty shapes to make your hand steadier.",
+        "detail": "Slows offset by 30%."
+      },
+      {
         "id": "triangles_common",
         "name": "Salt Triangles",
         "category": "consumable",

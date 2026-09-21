@@ -425,8 +425,8 @@ const Saves = (() => {
     wireVolume(el);
   }
 
-  // The VOLUME slider: dragging it sets the master volume live (Volume.set remembers it on the device); letting go plays a click so the level
-  // can be heard. It shows the volume that is saved.
+  // The VOLUME slider: dragging it sets the master volume live (Volume.set remembers it on the device). It makes no sound of its own (no click when it
+  // is let go). It shows the volume that is saved.
   function wireVolume(el) {
     const slider = el.querySelector(".vol-slider");
     const label = el.querySelector(".vol-value");
@@ -440,9 +440,6 @@ const Saves = (() => {
     slider.addEventListener("input", () => {
       Volume.set(slider.value / 100);
       show();
-    });
-    slider.addEventListener("change", () => {
-      if (typeof playUiClick === "function") playUiClick();
     });
   }
 

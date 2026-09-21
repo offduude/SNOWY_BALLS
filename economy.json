@@ -104,10 +104,10 @@
       "sway": 0,
       "drift": 0,
       "angle": 0,
-      "density": "heavy",
+      "density": "very_heavy",
       "fallSpeed": "fast",
       "sound": "assets/audio/rain.mp3",
-      "soundVolume": 0.5,
+      "soundVolume": 0.25,
       "affectsEvents": false,
       "rarity": "common",
       "detail": ""

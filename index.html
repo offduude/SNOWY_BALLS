@@ -263,6 +263,11 @@
 
     #game-container.shop-open #shop-hint { opacity: 1; }
 
+    /* On a phone (a touch screen, or a narrow window) the hint is smaller, so it stays clear of the BACK button and out of the way of the cards. */
+    @media (pointer: coarse), (max-width: 700px) {
+      #shop-hint { font-size: 9px; }
+    }
+
     /* The inspect popup (shop.js): a dimmed backdrop over the shop with the item's card in the middle; a click outside the card closes it. */
     #shop-inspect {
       position: absolute;
@@ -1337,7 +1342,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=229"></script>
+  <script src="src/version.js?v=230"></script>
   <script src="src/economy.js?v=33"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,

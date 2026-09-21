@@ -193,7 +193,7 @@ const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the 
 
 // What each equippable projectile LOOKS and SOUNDS like (texture / sound keys from preload; `mark` = the texture and
 // on-screen size of the mark it leaves on the wall, `launchSound` = the sound when it is thrown (`launchLoop`: it repeats until the projectile lands
-// and the impact sound cuts it), `ballScale` = how big the projectile in the air is compared with the others - all optional, the
+// and the impact sound cuts it), `ballScale` = how big the projectile in the air is compared with the others, `heldScale` = the same for the hand - all optional, the
 // defaults are the snowball's mark, the throw whoosh and 1). Its
 // gameplay numbers (aim range/speed, coin multiplier, mark or bounce, spin) live in economy.json
 // under "projectiles", keyed by the same id. Character sprites that aren't listed fall back to the
@@ -272,7 +272,8 @@ const PROJECTILE_VISUALS = {
   drone: {
     ball: "drone", // (the same picture as its card: it is drawn 2x bigger in the air, see ballScale)
     sprites: { idle: "char_idle", aiming: "char_aiming", throwing: "char_throwing" }, // (no pictures of its own: it is drawn in the hand, see CHARACTERS)
-    ballScale: 2, // the projectile in the air is twice the size of the others - and in the hand too (the card / shop / counter picture is not affected)
+    ballScale: 2, // the projectile in the air is twice the size of the others (the card / shop / counter picture is not affected)
+    heldScale: 3, // ... and in the hand it is three times the normal hand size (its drawing is a wide, thin one: at 2x it still looked no bigger than the others)
     launchSound: "drone_fly", // the whole flight: it loops until the projectile lands, and the impact sound cuts it
     launchLoop: true,
     launchVolume: 0.6,
@@ -729,6 +730,8 @@ class MainScene extends Phaser.Scene {
     const key = this.projectileId + ":" + n;
     if (key === this.ammoHudShown) return;
     this.ammoHudShown = key;
+    const box = document.getElementById("ammo-box");
+    if (box) this.tintAmmoBox(box, (this.eco.projectiles[this.projectileId] || {}).rarity);
     const icon = document.getElementById("ammo-icon");
     const text = document.getElementById("ammo-text");
     if (!icon || !text) return;
@@ -736,6 +739,24 @@ class MainScene extends Phaser.Scene {
     if (icon.getAttribute("src") !== src) icon.setAttribute("src", src);
     text.textContent = "x" + n;
     text.style.fontSize = Math.min(8, Math.floor(60 / (n.length + 1))) + "px"; // 60px = the box minus its border, padding and the picture
+  }
+
+  // The counter's background reflects the equipped projectile's rarity (economy.json rarities colour; the legendary rainbow is animated: .rainbow
+  // in index.html, like the buff cards).
+  tintAmmoBox(box, rarityId) {
+    const r = Rarity.info(rarityId);
+    box.classList.remove("tinted", "rainbow");
+    box.style.removeProperty("--tint");
+    if (!r) return;
+    if (r.color === "rainbow") {
+      box.classList.add("rainbow");
+      return;
+    }
+    const m = /^#([0-9a-f]{6})$/i.exec(r.color || "");
+    if (!m) return;
+    const n = parseInt(m[1], 16);
+    box.style.setProperty("--tint", `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.6)`);
+    box.classList.add("tinted");
   }
 
   updateStreakHud() {
@@ -1195,8 +1216,8 @@ class MainScene extends Phaser.Scene {
     b.setPosition(c.x - c.displayWidth / 2 + hand.x, c.y - c.displayHeight + hand.y);
     // A picture with only a few pixels in a big canvas (the rowan berry: a 4 px dot in 32 px) would shrink to a fraction of a pixel at hand size and
     // the renderer would drop it: the sprite is made big enough that what is drawn in it is at least HELD_MIN_CONTENT_PX wide.
-    // A projectile that is drawn bigger in the air (`ballScale`, the drone's 2) is held bigger in the same proportion.
-    const handSize = hand.size * (this.projVisuals.ballScale || 1);
+    // A projectile can be held bigger than the others (`heldScale`, the drone's 3: it must be clearly bigger in the hand).
+    const handSize = hand.size * (this.projVisuals.heldScale || 1);
     const size = Math.max(handSize, (b.frame.width * HELD_MIN_CONTENT_PX) / this.textureContentPx(b.texture.key));
     // A projectile whose drawn part is smaller than the normal one (the rowan berry, 2 px) would vanish behind the fist if it were centred like a
     // full-size one: it rests on the fingertips (its bottom edge at hand.rest) instead.

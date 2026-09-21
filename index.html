@@ -814,6 +814,26 @@
 
     #ammo-box { top: 44px; } /* 10px margin + 28px buttons + 6px gap */
 
+    /* The counter's background reflects the equipped projectile's rarity (main.js tintAmmoBox): its colour over the brown (--tint), or for a LEGENDARY one
+       the travelling rainbow with a glow that pulses (the same waves as the buff cards). */
+    #ammo-box.tinted {
+      background-image: linear-gradient(var(--tint), var(--tint));
+    }
+
+    #ammo-box.rainbow {
+      background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.65), rgba(255, 168, 77, 0.65), rgba(255, 240, 77, 0.65), rgba(91, 255, 110, 0.65),
+        rgba(77, 210, 255, 0.65), rgba(106, 107, 255, 0.65), rgba(193, 77, 255, 0.65), rgba(255, 77, 77, 0.65));
+      background-size: 200% 100%;
+      animation: rarity-wave 2.4s linear infinite, ammo-shine 1.7s ease-in-out infinite;
+    }
+
+    @keyframes ammo-shine {
+      0%, 100% { box-shadow: 0 0 1px rgba(255, 255, 255, 0.15); }
+      50% { box-shadow: 0 0 8px rgba(255, 255, 255, 0.85); }
+    }
+
+    #ammo-text { text-shadow: 1px 1px 0 #3b2412; } /* readable on the lighter rarity colours */
+
     /* The equipped projectile's picture and how many are left ("[picture] x12"), where the STREAK counter was. */
     #ammo-box img {
       width: 14px;
@@ -1252,7 +1272,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=208"></script>
+  <script src="src/version.js?v=209"></script>
   <script src="src/economy.js?v=28"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1286,7 +1306,7 @@
   <script src="src/volume.js?v=1"></script>
   <script src="src/saves.js?v=7"></script>
   <script src="src/collection.js?v=64"></script>
-  <script src="src/main.js?v=150"></script>
+  <script src="src/main.js?v=151"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

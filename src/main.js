@@ -272,8 +272,7 @@ const PROJECTILE_VISUALS = {
   drone: {
     ball: "drone", // (the same picture as its card: it is drawn 2x bigger in the air, see ballScale)
     sprites: { idle: "char_idle", aiming: "char_aiming", throwing: "char_throwing" }, // (no pictures of its own: it is drawn in the hand, see CHARACTERS)
-    hold: { character1: { idle: { size: 9 }, aiming: { size: 10 } } }, // calibrated: its picture is a wide 26 x 13 px drawing in a 32 px canvas, so at the normal 5-6 px it added only 2-3 pixels (too few)
-    ballScale: 2, // the projectile in the air is twice the size of the others (the card / shop / counter picture is not affected)
+    ballScale: 2, // the projectile in the air is twice the size of the others - and in the hand too (the card / shop / counter picture is not affected)
     launchSound: "drone_fly", // the whole flight: it loops until the projectile lands, and the impact sound cuts it
     launchLoop: true,
     launchVolume: 0.6,
@@ -1196,11 +1195,13 @@ class MainScene extends Phaser.Scene {
     b.setPosition(c.x - c.displayWidth / 2 + hand.x, c.y - c.displayHeight + hand.y);
     // A picture with only a few pixels in a big canvas (the rowan berry: a 4 px dot in 32 px) would shrink to a fraction of a pixel at hand size and
     // the renderer would drop it: the sprite is made big enough that what is drawn in it is at least HELD_MIN_CONTENT_PX wide.
-    const size = Math.max(hand.size, (b.frame.width * HELD_MIN_CONTENT_PX) / this.textureContentPx(b.texture.key));
+    // A projectile that is drawn bigger in the air (`ballScale`, the drone's 2) is held bigger in the same proportion.
+    const handSize = hand.size * (this.projVisuals.ballScale || 1);
+    const size = Math.max(handSize, (b.frame.width * HELD_MIN_CONTENT_PX) / this.textureContentPx(b.texture.key));
     // A projectile whose drawn part is smaller than the normal one (the rowan berry, 2 px) would vanish behind the fist if it were centred like a
     // full-size one: it rests on the fingertips (its bottom edge at hand.rest) instead.
     const content = (this.textureContentPx(b.texture.key) * size) / b.frame.width;
-    if (hand.rest !== undefined && content < hand.size) b.y = c.y - c.displayHeight + hand.rest - content / 2;
+    if (hand.rest !== undefined && content < handSize) b.y = c.y - c.displayHeight + hand.rest - content / 2;
     b.setDisplaySize(size, size).setRotation(hand.rotation).setDepth(hand.behind ? c.depth - 0.5 : c.depth + 0.5).setVisible(true);
   }
 

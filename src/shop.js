@@ -3,10 +3,12 @@
 // Timers are device-clock timestamps saved with the stock (Economy.getShopState()), so they keep
 // running while the app is closed and leaving/re-entering can not reroll anything.
 //
-// Two item types: "consumable" (a timed buff, the same one can be on sale in several slots) and
+// Item types: "consumable" (a timed buff, the same one can be on sale in several slots),
 // "projectile" (a STACK of consumable projectiles: the amount and the price of one are rolled at random
-// each time it is put on sale, the slot's price is amount x unit price). Any item can be on sale in several
-// slots at once - each slot has its own offer.
+// each time it is put on sale, the slot's price is amount x unit price) and the three SKIN types "character",
+// "scenery" and "weather" (bought once: the item's id is the skin's id in economy.json characters / sceneries /
+// weathers and buying unlocks it - it is then equipped from the SKINS menu; the card's label says which kind it is).
+// Any item can be on sale in several slots at once - each slot has its own offer.
 // When a slot restocks while the shop is closed, the SHOP button gets a dot and a sound plays.
 //
 // Effects (coinMultiplier, aimSpeedMultiplier, ...) are NOT applied yet - buying currently just
@@ -23,7 +25,10 @@ const Shop = (() => {
   let root = null;
   let dotEl = null;
 
-  const CATEGORY_LABEL = { consumable: "BUFF", projectile: "PROJECTILE" };
+  // The label in the top-left corner of a card, by the item's category.
+  const CATEGORY_LABEL = { consumable: "BUFF", projectile: "PROJECTILE", character: "CHARACTER", scenery: "SCENERY", weather: "WEATHER" };
+  const SKIN_CATEGORIES = ["character", "scenery", "weather"];
+  const ownedSkin = (item) => SKIN_CATEGORIES.includes(item.category) && Economy.isUnlocked(item.category, item.id);
 
   // ---------- rules ----------
 
@@ -78,8 +83,9 @@ const Shop = (() => {
   // Items that may go into a slot: all of them - nothing is unique any more (the same item, projectiles included,
   // can be on sale in any number of slots; every slot rolls its own amount and price).
   // (An item with "godOnly" - a test buff - is never sold: a god mode save just has it, see Economy.fillGod.)
+  // (A skin the player already has is not sold again.)
   function eligible() {
-    return eco.shop.items.filter((it) => !it.godOnly);
+    return eco.shop.items.filter((it) => !it.godOnly && !ownedSkin(it));
   }
 
   function averageHitCoins() {
@@ -252,9 +258,9 @@ const Shop = (() => {
     return restocked;
   }
 
-  // A buff can't be held in more than Economy.getBuffMax() (99) copies.
+  // A buff can't be held in more than Economy.getBuffMax() (99) copies; a skin only once (a card still on sale after it was bought in another slot cannot be bought).
   function isMaxed(item) {
-    return item.category === "consumable" && Economy.getBuffCount(item.id) >= Economy.getBuffMax();
+    return (item.category === "consumable" && Economy.getBuffCount(item.id) >= Economy.getBuffMax()) || ownedSkin(item);
   }
 
   function buy(slot) {
@@ -270,6 +276,8 @@ const Shop = (() => {
       // The whole stack goes into the inventory. If this is a kind the player had none of, the PROJECTILES
       // list expands and its red dot comes on (Economy raises it; more of a kind they already have doesn't).
       Economy.addProjectiles(item.id, offer ? offer.amount : 1);
+    } else if (SKIN_CATEGORIES.includes(item.category)) {
+      Economy.unlock(item.category, item.id); // a character / scenery / weather is unlocked: it shows up in its SKINS menu, equipped from there
     } else {
       Economy.addBuffs(item.id, 1); // a buff goes into the inventory; it is USED from the BUFFS tab (see buffs.js)
     }

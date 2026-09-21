@@ -168,7 +168,7 @@ setting it back can not make a timer longer than one full `restockSeconds`.
 |---|---|
 | `id` | unique, never change it once players own it (saves refer to it) |
 | `name`, `description` | shown in the shop |
-| `category` | `consumable` (a timed buff: used up over `duration`) or `projectile` (a stack of consumable projectiles). Either can be on sale in several slots at once |
+| `category` | `consumable` (a timed buff: used up over `duration`), `projectile` (a stack of consumable projectiles), or one of the skin kinds `character`, `scenery`, `weather` (bought once; the item's `id` must be the skin's id in `characters` / `sceneries` / `weathers`, buying unlocks it for the SKINS menu). The card's top-left label follows the category: BUFF, PROJECTILE, CHARACTER, SCENERY, WEATHER. Any can be on sale in several slots at once (a skin already owned is not sold again) |
 | `price` | coins |
 | `detail` | optional (buffs): a bottom line on the item's card in the BUFFS tab, e.g. `"Coin bonus: 1.2x."` |
 | `priceRange` | optional, instead of `price`: `{ "min": 43, "max": 72 }` - the price is rolled in that range each time the item is put on sale (saved with the stock, so no reroll by leaving) |

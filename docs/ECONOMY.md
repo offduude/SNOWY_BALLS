@@ -105,20 +105,20 @@ through them that goes on both sides); below the band the throw peaks under W20,
 strength part is equally easy for every tier - only where it is differs (lighter = less strength, heavier = more).
 
 **Offset slider.** The hit zone is the share of the WHOLE bar that lands inside W20 sideways. It is a band centered on the middle of the bar
-that reaches out to both sides, and every tier has its own size (`weightTiers[].offsetZone`; each tier is half of the next):
+that reaches out to both sides, and every tier has its own size (`weightTiers[].offsetZone`; since 2026-09-21 it is no longer a straight ladder: very light and very heavy share 6.25%, light and heavy share 12.5%):
 
 | tier | offset hit zone (of the whole bar) | the bar spans (swing) |
 |---|---|---|
 | very light | 6.25% | +-2.44 |
 | light | 12.5% | +-1.22 |
 | moderate | 25% (the snowball) | +-0.61 |
-| heavy | 50% | +-0.31 |
-| very heavy | 100% (the whole bar hits) | +-0.15 |
+| heavy | 12.5% (was 50%) | +-1.22 |
+| very heavy | 6.25% (was 100%, the whole bar) | +-2.44 |
 
 The bar is scaled so the zone fills exactly that share (a smaller zone = a longer, less precise swing); the green guide lines of Orange Skyr
 mark the zone's edges. A buff with the effect `precision` (value x) makes the zone x times bigger: `zone = offsetZone x product of the buffs`,
 e.g. x1.2 turns 25% into 30% (never more than 100%). The Triangles buff (slower marker) helps every tier, most where the zone is small.
-**Note:** W21 needs about +-0.37 swing, so very light, light and moderate projectiles can reach it and heavy and very heavy ones cannot.
+**Note:** W21 needs about +-0.37 swing. Every tier can reach it now: the narrowest bars are the widest swings, and the heavy and very heavy ones (bars of +-1.22 / +-2.44) can too - before 2026-09-21 they could not.
 
 ## projectiles (live)
 

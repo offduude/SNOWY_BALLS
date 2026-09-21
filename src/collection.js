@@ -231,17 +231,21 @@ const Collection = (() => {
     );
   }
 
-  // The SKINS list itself: the three buttons, each with the name of what is equipped now.
+  // The SKINS list itself: one card per category, looking like a skin card - the picture and the name of what is equipped now, the category as the title -
+  // with a CHANGE button in place of EQUIP that opens the category's menu. The three cards share the whole height of the list (see the CSS for
+  // #list-scroll[data-kind="skins"]), so it never scrolls.
   function skinsMenuHtml() {
-    const now = (kind) => {
+    return SKIN_MENUS.map((kind) => {
       const it = skinItems(kind).find((x) => x.id === Economy.getEquipped(kind));
-      return it ? esc(it.name) : Economy.getEquipped(kind) === "none" ? "None" : "";
-    };
-    return (
-      `<button class="skins-choice" type="button" data-skins="character"><span class="skins-choice-name">CHARACTERS</span><span class="skins-choice-now">${now("character")}</span></button>` +
-      `<button class="skins-choice" type="button" data-skins="scenery"><span class="skins-choice-name">SCENERIES</span><span class="skins-choice-now">${now("scenery")}</span></button>` +
-      `<button class="skins-choice" type="button" data-skins="weather"><span class="skins-choice-name">WEATHER</span><span class="skins-choice-now">${now("weather")}</span></button>`
-    );
+      const now = it ? it.name : Economy.getEquipped(kind) === "none" ? "None" : "";
+      return (
+        `<div class="pick-row buff-row skins-category" data-skins="${kind}">` +
+        (it ? `<img class="pick-pic" src="${esc(it.image || "")}" alt="" draggable="false" />` : `<span class="pick-pic"></span>`) +
+        `<div class="pick-text"><div class="pick-name">${esc(SKIN_TITLES[kind])}</div><div class="pick-desc">${esc(now)}</div></div>` +
+        `<div class="pick-action"><button class="pick-equip skins-change" type="button" data-skins="${kind}">CHANGE</button></div>` +
+        `</div>`
+      );
+    }).join("");
   }
 
   // ---- BUFFS list: the buffs the player has (bought, waiting) or is running. Same cards as the projectiles list without
@@ -451,7 +455,7 @@ const Collection = (() => {
   }
 
   function onEquip(e) {
-    const choice = e.target.closest(".skins-choice");
+    const choice = e.target.closest(".skins-change");
     if (choice) {
       click();
       open(choice.dataset.skins); // CHARACTERS, SCENERIES or WEATHER

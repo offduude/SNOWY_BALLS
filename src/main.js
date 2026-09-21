@@ -218,6 +218,8 @@ const ROSE_SIZE = 26;
 const ROSE_RATE = 30;
 const ROSE_SPEED_MIN = 200;
 const ROSE_SPEED_MAX = 300;
+const ROSE_MEAN_SPEED = (ROSE_SPEED_MIN + ROSE_SPEED_MAX) / 2;
+const ROSE_ON_SCREEN = (ROSE_RATE * GAME_HEIGHT) / ROSE_MEAN_SPEED; // how many roses are in the picture at once (about 29): what the rate and the speed above give
 
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
@@ -1928,6 +1930,7 @@ class MainScene extends Phaser.Scene {
     } else {
       this.songPhase = "applause";
       this.roseAcc = 0;
+      this.roseAccSide = 0;
       this.playSongTrack(this.applauseSound, elapsedMs - songMs, APPLAUSE_VOLUME);
     }
   }
@@ -1956,10 +1959,21 @@ class MainScene extends Phaser.Scene {
       } else if (this.songPhase === "applause") {
         const ap = el - songMs;
         if (ap < applauseMs - this.roseFallMs()) {
-          this.roseAcc += dt * ROSE_RATE;
+          // The number of roses in the picture stays the same whatever they fall like (see roseMotion): over the top, and - for a slanted fall - over the side the wind blows in from.
+          const m = this.roseMotion();
+          const mean = (m.from + m.to) / 2;
+          const sky = this.roseSky();
+          this.roseAcc += (dt * ROSE_ON_SCREEN * mean * m.cos) / GAME_HEIGHT;
           while (this.roseAcc >= 1) {
             this.roseAcc -= 1;
-            this.spawnRose();
+            this.spawnRose(m);
+          }
+          if (m.sin !== 0) {
+            this.roseAccSide += (dt * ROSE_ON_SCREEN * (sky.bottom - sky.top) * mean * Math.abs(m.sin)) / ((sky.right - sky.left) * GAME_HEIGHT);
+            while (this.roseAccSide >= 1) {
+              this.roseAccSide -= 1;
+              this.spawnRose(m, m.sin > 0 ? sky.left : sky.right, Phaser.Math.FloatBetween(sky.top, sky.bottom));
+            }
           }
         }
         this.syncSongAudio(this.applauseSound, ap, applauseMs);
@@ -1998,6 +2012,7 @@ class MainScene extends Phaser.Scene {
       },
     });
     this.roseAcc = 0;
+    this.roseAccSide = 0;
     this.songAudioCheck = 0;
     this.playSongTrack(this.applauseSound, Date.now() - this.songEvent.startedAt - songMs, APPLAUSE_VOLUME);
   }
@@ -2058,13 +2073,30 @@ class MainScene extends Phaser.Scene {
     Economy.setEvent(null);
   }
 
-  // One rose, a little tilted (each its own angle), at the very top of the picture, falling straight down (a hair of sideways drift).
-  spawnRose() {
+  // How the roses of the applause fall: straight down at their own speed (ROSE_SPEED_MIN-MAX) - unless the equipped weather falls at least as fast as that
+  // (the mean of its speed range is not below the roses' mean): then they fall the way the weather does, its speed range and its angle, so a Blizzard's
+  // applause is blown across the picture like the snow. A slower weather (Snow) leaves the roses as they are; so does no weather. Speeds are along the path.
+  roseMotion() {
+    const w = this.weather;
+    if (w && (w.from + w.to) / 2 >= ROSE_MEAN_SPEED) return { from: w.from, to: w.to, sin: w.sin, cos: w.cos };
+    return { from: ROSE_SPEED_MIN, to: ROSE_SPEED_MAX, sin: 0, cos: 1 };
+  }
+
+  // The sky the roses fall in: the same as the weather's (a little wider than the picture, from the top of the world to the bottom of the default view).
+  roseSky() {
+    return { left: INITIAL_SCROLL_X - 6, right: INITIAL_SCROLL_X + GAME_WIDTH + 6, top: this.worldY(TOP_BOUNDARY_HEIGHT), bottom: INITIAL_SCROLL_Y + GAME_HEIGHT };
+  }
+
+  // One rose, a little tilted (each its own angle), falling the way roseMotion says: by default at the very top of the picture (anywhere across) - or at (x, y).
+  spawnRose(m, x, y) {
+    m = m || this.roseMotion();
+    const sky = this.roseSky();
     const size = ROSE_SIZE * Phaser.Math.FloatBetween(0.85, 1.15);
     // (across the whole default view: it starts at world x INITIAL_SCROLL_X, not at 0)
-    const img = this.add.image(Phaser.Math.FloatBetween(INITIAL_SCROLL_X - 6, INITIAL_SCROLL_X + GAME_WIDTH + 6), this.worldY(TOP_BOUNDARY_HEIGHT) - size, "rose");
+    const img = this.add.image(x === undefined ? Phaser.Math.FloatBetween(sky.left, sky.right) : x, y === undefined ? sky.top - size : y, "rose");
     img.setDisplaySize(size, size).setDepth(9).setRotation(Phaser.Math.FloatBetween(-0.55, 0.55));
-    this.roses.push({ img, vy: Phaser.Math.FloatBetween(ROSE_SPEED_MIN, ROSE_SPEED_MAX), vx: Phaser.Math.FloatBetween(-10, 10) });
+    const s = Phaser.Math.FloatBetween(m.from, m.to);
+    this.roses.push({ img, vy: s * m.cos, vx: s * m.sin + Phaser.Math.FloatBetween(-10, 10) }); // (a hair of sideways drift)
   }
 
   updateRoses(dt) {
@@ -2073,7 +2105,7 @@ class MainScene extends Phaser.Scene {
     this.roses = this.roses.filter((r) => {
       r.img.y += r.vy * dt;
       r.img.x += r.vx * dt;
-      if (r.img.y - r.img.displayHeight / 2 > bottom) {
+      if (r.img.y - r.img.displayHeight / 2 > bottom || r.img.x < INITIAL_SCROLL_X - 80 || r.img.x > INITIAL_SCROLL_X + GAME_WIDTH + 80) {
         r.img.destroy();
         return false;
       }
@@ -2084,7 +2116,8 @@ class MainScene extends Phaser.Scene {
   // Seconds a rose needs from the top of the picture to below the bottom edge of the default view at the slowest speed.
   roseFallMs() {
     const dist = INITIAL_SCROLL_Y + GAME_HEIGHT + TOP_BOUNDARY_HEIGHT + 2 * ROSE_SIZE;
-    return (dist / ROSE_SPEED_MIN) * 1000;
+    const m = this.roseMotion();
+    return (dist / (m.from * m.cos)) * 1000; // (its downward speed: the slowest rose's)
   }
 
   // True while any timed event is running (the banana face, the disco) - add every new event

@@ -467,33 +467,11 @@
     }
 
     /* The SKINS list: two big buttons, one for each menu, with what is equipped now under the name. */
-    .skins-choice {
-      flex: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: calc(var(--u) * 0.9);
-      padding: calc(var(--u) * 2.2) calc(var(--u) * 1.2);
-      background: #f4ead0;
-      border: 2px solid #7a5230;
-      border-radius: 3px;
-      color: #3b2412;
-      font-family: inherit;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .skins-choice:active {
-      background: #e8d9b4;
-    }
-
-    .skins-choice-name {
-      font-size: calc(var(--u) * 1.6);
-    }
-
-    .skins-choice-now {
-      font-size: calc(var(--u) * 1);
-      color: #8a6a44;
+    /* The SKINS list: three category cards that share the whole height of the list between them (no scrolling); their CHANGE button is as wide as
+       EQUIPPED so it looks like the skin cards' button. */
+    #list-scroll[data-kind="skins"] .pick-row.skins-category {
+      flex: 1 1 0; /* equal shares of the list's height ... */
+      min-height: 0; /* ... even when that is less than a skin card's usual height (the picture and the button are centered in it) */
     }
 
     /* Scrolled with the finger - no scrollbar/slider. */
@@ -1273,7 +1251,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=225"></script>
+  <script src="src/version.js?v=226"></script>
   <script src="src/economy.js?v=31"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1306,8 +1284,8 @@
   <script src="src/shop.js?v=26"></script>
   <script src="src/volume.js?v=1"></script>
   <script src="src/saves.js?v=7"></script>
-  <script src="src/collection.js?v=66"></script>
-  <script src="src/main.js?v=159"></script>
+  <script src="src/collection.js?v=67"></script>
+  <script src="src/main.js?v=160"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

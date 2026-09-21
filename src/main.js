@@ -1998,7 +1998,7 @@ class MainScene extends Phaser.Scene {
   // The rarity of an event: the rarity of its SUMMON BUFF (the shop item whose triggerEvent effect names the event); failing that the
   // event's own "rarity" in economy.json (events.<block>.rarity), failing that legendary.
   eventRarity(name) {
-    const item = (this.eco.shop.items || []).find((it) => (it.effects || []).some((e) => e.type === "triggerEvent" && e.value === name));
+    const item = (this.eco.shop.items || []).find((it) => !it.godOnly && (it.effects || []).some((e) => e.type === "triggerEvent" && e.value === name)); // (a test buff does not count)
     const block = (this.eco.events || {})[name === "face" ? "faceWindow" : (SONG_EVENTS[name] || {}).block] || {};
     return (item && item.rarity) || block.rarity || "legendary";
   }
@@ -2019,7 +2019,7 @@ class MainScene extends Phaser.Scene {
     const ev = this.eco.events || {};
     if (ev.rarityChances && typeof ev.rarityChances[rarityId] === "number") return ev.rarityChances[rarityId];
     const rarities = this.eco.rarities || [];
-    const has = new Set((this.eco.shop.items || []).map((it) => (it.category === "projectile" ? (this.eco.projectiles[it.id] || {}).rarity : it.rarity)));
+    const has = new Set((this.eco.shop.items || []).filter((it) => !it.godOnly).map((it) => (it.category === "projectile" ? (this.eco.projectiles[it.id] || {}).rarity : it.rarity)));
     const total = rarities.filter((r) => r.chance > 0 && has.has(r.id)).reduce((a, r) => a + r.chance, 0);
     const r = rarities.find((x) => x.id === rarityId);
     if (!r || !(r.chance > 0) || !has.has(rarityId) || total <= 0) return 0;

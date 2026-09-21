@@ -77,8 +77,9 @@ const Shop = (() => {
 
   // Items that may go into a slot: all of them - nothing is unique any more (the same item, projectiles included,
   // can be on sale in any number of slots; every slot rolls its own amount and price).
+  // (An item with "godOnly" - a test buff - is never sold: a god mode save just has it, see Economy.fillGod.)
   function eligible() {
-    return eco.shop.items.slice();
+    return eco.shop.items.filter((it) => !it.godOnly);
   }
 
   function averageHitCoins() {

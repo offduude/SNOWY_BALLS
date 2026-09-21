@@ -158,7 +158,7 @@ const Buffs = (() => {
   function owned() {
     const running = new Map(active().map((b) => [b.id, b]));
     return eco.shop.items
-      .filter((it) => it.category === "consumable")
+      .filter((it) => it.category === "consumable" && !(it.godOnly && !Economy.isGod())) // (a test buff: god mode saves only)
       .map((it, i) => {
         const r = running.get(it.id);
         return { id: it.id, item: it, i, count: Economy.getBuffCount(it.id), active: !!r, msLeft: r ? r.msLeft : 0, blocked: !r && eventBlocked(it) };

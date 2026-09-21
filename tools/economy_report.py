@@ -144,6 +144,7 @@ def hit_value(eco, p):
 
 def main():
     eco = load()
+    eco["shop"]["items"] = [i for i in eco["shop"]["items"] if not i.get("godOnly")]  # a test buff is never sold
     print("Base coins per hit (both goal windows), by projectile:")
     for pid, p in eco["projectiles"].items():
         print(f"  {pid:<12} {hit_value(eco, p)}  ({p.get('rarity')}, weight {p.get('weight')})")

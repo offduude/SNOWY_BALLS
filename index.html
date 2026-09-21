@@ -866,6 +866,15 @@
       color: #3b2412;
     }
 
+    /* "More coming soon!" under the last card of the CHARACTERS / SCENERIES menus */
+    .list-soon {
+      flex: none;
+      padding: calc(var(--u) * 0.6) 0 calc(var(--u) * 0.4);
+      text-align: center;
+      font-size: calc(var(--u) * 1.1);
+      color: #f4ead0;
+    }
+
     .list-empty {
       margin: auto;
       padding: calc(var(--u) * 2);
@@ -1206,7 +1215,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=199"></script>
+  <script src="src/version.js?v=200"></script>
   <script src="src/economy.js?v=27"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1238,7 +1247,7 @@
   <script src="src/buffs.js?v=27"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=58"></script>
+  <script src="src/collection.js?v=59"></script>
   <script src="src/main.js?v=143"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

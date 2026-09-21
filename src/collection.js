@@ -342,9 +342,10 @@ const Collection = (() => {
     }
     if (kind === "character" || kind === "scenery") {
       titleEl.textContent = SKIN_TITLES[kind];
-      scrollEl.innerHTML = sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
-        .map(skinRowHtml)
-        .join("");
+      scrollEl.innerHTML =
+        sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
+          .map(skinRowHtml)
+          .join("") + `<div class="list-soon">More coming soon!</div>`; // (under the last card: the default one)
       fitNames();
       scrollEl.scrollTop = 0;
       refreshButtons();

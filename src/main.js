@@ -267,9 +267,10 @@ PROJECTILE_VISUALS.test_very_heavy = { ...PROJECTILE_VISUALS.stone };
 // (the fingers are over it), false = over the character. Turn the experiment off with USE_HELD_PROJECTILES = false (every projectile then
 // uses its own pictures again, see PROJECTILE_VISUALS.sprites).
 const USE_HELD_PROJECTILES = true;
+const HELD_MIN_CONTENT_PX = 2; // the drawn part of a projectile in the hand is never narrower than this (the same 2 px the rowan berry is when thrown)
 const CHARACTER_HANDS = {
   idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
-  aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true },
+  aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 }, // rest: the row of the fingertips - a projectile smaller than `size` sits ON them (fully visible) instead of behind the fist
 };
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
@@ -884,6 +885,29 @@ class MainScene extends Phaser.Scene {
     this.updateHeldBall(held ? pose : "none");
   }
 
+  // How many pixels the drawn part of a picture is wide / high (the larger of the two; its opaque bounding box), measured once per picture.
+  textureContentPx(key) {
+    this.contentPx = this.contentPx || {};
+    if (this.contentPx[key] !== undefined) return this.contentPx[key];
+    let px = 32;
+    try {
+      const img = this.textures.get(key).getSourceImage();
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 0) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      if (x1 >= 0) px = Math.max(1, x1 - x0 + 1, y1 - y0 + 1);
+    } catch (e) {
+      /* keep the default */
+    }
+    this.contentPx[key] = px;
+    return px;
+  }
+
   // The projectile in the character's hand (idle: upside down, aiming: upright), placed by CHARACTER_HANDS; hidden when the hands are empty
   // or while the projectile is being thrown.
   updateHeldBall(pose) {
@@ -896,7 +920,14 @@ class MainScene extends Phaser.Scene {
     if (b.texture.key !== this.projVisuals.ball) b.setTexture(this.projVisuals.ball);
     const c = this.character;
     b.setPosition(c.x - c.displayWidth / 2 + hand.x, c.y - c.displayHeight + hand.y);
-    b.setDisplaySize(hand.size, hand.size).setRotation(hand.rotation).setDepth(hand.behind ? c.depth - 0.5 : c.depth + 0.5).setVisible(true);
+    // A picture with only a few pixels in a big canvas (the rowan berry: a 4 px dot in 32 px) would shrink to a fraction of a pixel at hand size and
+    // the renderer would drop it: the sprite is made big enough that what is drawn in it is at least HELD_MIN_CONTENT_PX wide.
+    const size = Math.max(hand.size, (b.frame.width * HELD_MIN_CONTENT_PX) / this.textureContentPx(b.texture.key));
+    // A projectile whose drawn part is smaller than the normal one (the rowan berry, 2 px) would vanish behind the fist if it were centred like a
+    // full-size one: it rests on the fingertips (its bottom edge at hand.rest) instead.
+    const content = (this.textureContentPx(b.texture.key) * size) / b.frame.width;
+    if (hand.rest !== undefined && content < hand.size) b.y = c.y - c.displayHeight + hand.rest - content / 2;
+    b.setDisplaySize(size, size).setRotation(hand.rotation).setDepth(hand.behind ? c.depth - 0.5 : c.depth + 0.5).setVisible(true);
   }
 
   handleFreezeInput() {

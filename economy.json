@@ -8,7 +8,7 @@
   },
 
   "events": {
-    "_rarityNote": "EVENT RARITIES: an event has the rarity of its SUMMON BUFF (the shop item whose triggerEvent effect names the event: Tomato Juice -> face: EPIC, Disco Ticket -> disco: LEGENDARY); an event with no such buff can name its rarity in its own block (\"rarity\"). NATURAL SPAWNING: after every throw the game rolls ONE independent chance for each RARITY that has events (not for each event); if several rarities hit on the same throw the BETTER (rarer) one wins; the winning rarity picks one of its events at random - so adding an event never makes its rarity more frequent. The chance of a rarity is worked out so that, on average, it takes as many throws to get one of its events as it takes to see an item of that rarity in the shop: meanShopHours = 1 / (share of the rarity in the shop's rarity roll x slots x 3600 / availabilitySeconds), chance per throw = 1 / (meanShopHours x throwsPerHour). throwsPerHour is the snowball's real refill rate, 3600 / projectiles.snowball.regen.everySeconds = 120 an hour (so it follows the regen; set events.throwsPerHour to override it). With today's shop odds (common 60, rare 30, epic 9, legendary 1 of 100): common about 1 in 17 throws, rare 1 in 33, epic 1 in 111 (the banana face), legendary 1 in 1000 (the disco). A rarity that has no item in the shop cannot spawn. To set a rarity's chance by hand add events.rarityChances { legendary: 0.0008 }.",
+    "_rarityNote": "EVENT RARITIES: an event has the rarity of its SUMMON BUFF (the shop item whose triggerEvent effect names the event: Tomato Juice -> face: EPIC, Disco Ticket -> disco: LEGENDARY); an event with no such buff can name its rarity in its own block (\"rarity\"). NATURAL SPAWNING: after every throw the game rolls ONE independent chance for each RARITY that has events (not for each event); if several rarities hit on the same throw the BETTER (rarer) one wins; the winning rarity picks one of its events at random - so adding an event never makes its rarity more frequent. The chance of a rarity is worked out so that, on average, it takes as many throws to get one of its events as it takes to see an item of that rarity in the shop: meanShopHours = 1 / (share of the rarity in the shop's rarity roll x slots x 3600 / availabilitySeconds), chance per throw = 1 / (meanShopHours x throwsPerHour). throwsPerHour is the snowball's real refill rate, 3600 / projectiles.snowball.regen.everySeconds = 120 an hour (so it follows the regen; set events.throwsPerHour to override it). With today's shop odds (common 60, rare 30, epic 9, legendary 1 of 100): common about 1 in 17 throws, rare 1 in 33, epic 1 in 111 (the banana face or the guitar, a coin toss between them), legendary 1 in 1000 (the disco). A rarity that has no item in the shop cannot spawn. To set a rarity's chance by hand add events.rarityChances { legendary: 0.0008 }.",
     "faceWindow": {
       "durationMs": 20000,
       "hitRevertMs": 1000,
@@ -18,6 +18,12 @@
     "discoWindow": {
       "faceMultiplier": 1.25,
       "beatMs": 500
+    },
+    "_guitarNote": "GUITAR event (the same idea as the disco, see main.js SONG_EVENTS): EPIC (it has no summon buff, so its own rarity below names it; it shares the epic events' natural chance with the banana face - see _rarityNote). While guitar.mp3 plays W20 cycles guitar1 -> guitar2 -> guitar3 (a new one every beatMs); a hit on the guitarist's FACE pays faceMultiplier x the coins of that throw (fixed, the face stays, so every hit of the song counts); a plain W20 hit pays as usual. Afterwards applause.mp3 plays while roses fall, then everything is normal.",
+    "guitarWindow": {
+      "rarity": "epic",
+      "faceMultiplier": 1.25,
+      "beatMs": 470
     }
   },
 

@@ -115,6 +115,7 @@ const AIM_COLOR_ANGLE_CSS = "#6fb1ff";
 const AIM_COLOR_POWER_CSS = "#ff6f6f";
 const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's dot on the aim bars
 const EVENT_COLOR_DISCO = 0xb04dff; // the disco event's face: a purple dot on the aim bars
+const EVENT_COLOR_GUITAR = 0xff8a3d; // the guitar event's face: an orange dot on the aim bars
 const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit range, so a marker on the dot always hits)
 
 // ---------------------------------------------------------------------------------------------------------
@@ -178,9 +179,39 @@ const DISCO_FACE_BOX = {
   heightFrom: FACE_IMG_TOP_HEIGHT - DISCO_FACE_RAW.yTo,
   heightTo: FACE_IMG_TOP_HEIGHT - DISCO_FACE_RAW.yFrom,
 };
-const DISCO_FRAMES = 6; // discoface1..6
-const DISCO_BEAT_MS = 500; // 120 bpm (economy.json events.discoWindow.beatMs)
-const DISCO_VOLUME = 0.8;
+// GUITAR event: guitar1-3 are 58x50 too and are drawn over W20 in the same place. The guitarist (right pane) has the same head as the singer, 5 px
+// further left (texture px x 25-40, y 13-28), and that is the face a hit gives the bonus for.
+const GUITAR_FACE_RAW = { xFrom: 25, xTo: 40, yFrom: 13, yTo: 28 };
+const GUITAR_FACE_BOX = {
+  xFrom: FACE_IMG_X + GUITAR_FACE_RAW.xFrom,
+  xTo: FACE_IMG_X + GUITAR_FACE_RAW.xTo,
+  heightFrom: FACE_IMG_TOP_HEIGHT - GUITAR_FACE_RAW.yTo,
+  heightTo: FACE_IMG_TOP_HEIGHT - GUITAR_FACE_RAW.yFrom,
+};
+// THE SONG EVENTS (the disco, the guitar): a song plays, W20 cycles through `frames` (a new one every `beatMs`), a hit on the face (`faceBox`) pays
+// `faceMultiplier` x, and when the song is over the applause and the roses come. `block` = its numbers in economy.json events.<block> (over
+// `defaults`; the block also names the event's rarity when it has no summon buff). To add another song event: an entry here, its pictures / song in
+// preload, and eventDefs().
+const SONG_EVENTS = {
+  disco: {
+    sound: "disco",
+    volume: 0.8,
+    frames: ["discoface1", "discoface2", "discoface3", "discoface4", "discoface5", "discoface6"],
+    block: "discoWindow",
+    faceBox: DISCO_FACE_BOX,
+    color: EVENT_COLOR_DISCO,
+    defaults: { faceMultiplier: 1.25, beatMs: 500 }, // 120 bpm
+  },
+  guitar: {
+    sound: "guitar",
+    volume: 0.8,
+    frames: ["guitar1", "guitar2", "guitar3"],
+    block: "guitarWindow",
+    faceBox: GUITAR_FACE_BOX,
+    color: EVENT_COLOR_GUITAR,
+    defaults: { faceMultiplier: 1.25, beatMs: 470 }, // about 128 bpm (measured from the song)
+  },
+};
 const APPLAUSE_VOLUME = 0.8;
 // The roses of the applause: size (px), how many per second, and the fall speed range (px/s).
 const ROSE_SIZE = 26;
@@ -421,8 +452,10 @@ class MainScene extends Phaser.Scene {
     this.load.audio("egg_impact", "assets/audio/egg_impact.mp3");
     this.load.audio("tomato_impact", "assets/audio/tomato_impact.mp3");
     for (let i = 1; i <= 6; i++) this.load.image("discoface" + i, "assets/building/discoface" + i + ".png");
+    for (let i = 1; i <= 3; i++) this.load.image("guitar" + i, "assets/building/guitar" + i + ".png");
     this.load.image("rose", "assets/building/rose.png");
     this.load.audio("disco", "assets/audio/disco.mp3");
+    this.load.audio("guitar", "assets/audio/guitar.mp3");
     this.load.audio("applause", "assets/audio/applause.mp3");
   }
 
@@ -489,11 +522,11 @@ class MainScene extends Phaser.Scene {
     this.bananaHitTriggered = false;
     this.buffEventId = null; // id of the buff (Tomato Juice) that is running the current face event, or null - see syncBuffEvent
     this.activeEvent = null; // name of the running random event, or null - at most ONE runs at a time (see startEvent)
-    this.discoPhase = null; // null, "song" or "applause" while the disco event runs
+    this.songPhase = null; // null, "song" or "applause" while the disco event runs
     this.roses = []; // the roses falling during the applause
-    this.discoEvent = null; // { name, startedAt } of the running disco (also saved: Economy.getEvent)
+    this.songEvent = null; // { name, startedAt } of the running disco (also saved: Economy.getEvent)
     this.heldEventStep = null; // a change of an event (its end, a new phase) that waits for the throw being aimed / in the air to be over
-    Buffs.setEventLength((name) => (name === "disco" && this.discoSound ? this.discoTimes().songMs : 0)); // (a summon buff shows how long its event lasts)
+    Buffs.setEventLength((name) => (SONG_EVENTS[name] && this.songSounds ? this.songTimes(name).songMs : 0)); // (a summon buff shows how long its event lasts)
     Buffs.setEventGate(() => this.eventBlocksStart()); // no event buff can be used while an event runs (the disco's applause can be cut)
 
     this.ball = this.add.image(ORIGIN_X, this.worldY(ORIGIN_Y), "snowball");
@@ -526,9 +559,10 @@ class MainScene extends Phaser.Scene {
     // Loops forever so the theme doesn't just play once and go silent - it's a few minutes
     // long, not actually infinite on its own.
     this.startThemeMusic();
-    this.discoSound = this.sound.add("disco", { volume: DISCO_VOLUME });
+    this.songSounds = {}; // the song of each song event, by event name
+    for (const [name, def] of Object.entries(SONG_EVENTS)) this.songSounds[name] = this.sound.add(def.sound, { volume: def.volume });
     this.applauseSound = this.sound.add("applause", { volume: APPLAUSE_VOLUME });
-    this.resumeSavedEvent(); // a disco that was running when the game was closed goes on where the clock says it is
+    this.resumeSavedEvent(); // a song event (disco, guitar) that was running when the game was closed goes on where the clock says it is
     if (/^(localhost|127\.)/.test(location.hostname)) {
       window.calibrateHeld = () => this.calibrateHeldProjectiles(); // dev tools, see docs/CALIBRATION.md
       window.calibrateSheet = () => this.showCalibrationSheet();
@@ -924,7 +958,7 @@ class MainScene extends Phaser.Scene {
     const back = (sound, to, onDone) =>
       sound ? this.tweens.add({ targets: sound, volume: to, duration: MIRACLE_MUSIC_FADE_MS, ease: "Sine.easeInOut", onComplete: onDone }) : null;
     this.duckTween = [
-      back(this.theme, this.eventMusicOn || this.discoPhase ? 0 : THEME_VOLUME), // (the disco event keeps it down until it is over)
+      back(this.theme, this.eventMusicOn || this.songPhase ? 0 : THEME_VOLUME), // (the disco event keeps it down until it is over)
       back(this.eventMusic, this.eventMusicOn ? EVENT_MUSIC_VOLUME : 0, () => {
         if (!this.eventMusicOn && this.eventMusic) this.eventMusic.stop(); // (the event is over: it starts from the beginning next time)
       }),
@@ -1662,8 +1696,8 @@ class MainScene extends Phaser.Scene {
       // (The streak is only counted and shown - it no longer adds coins.)
 
       if (faceHit) {
-        if (this.activeEvent === "disco") {
-          coins *= this.discoConfig().faceMultiplier; // a disco face hit: a fixed bonus; the face stays, the event goes on
+        if (SONG_EVENTS[this.activeEvent]) {
+          coins *= this.songConfig().faceMultiplier; // a song event's face hit (disco, guitar): a fixed bonus; the face stays, the event goes on
         } else {
           this.bananaHitTriggered = true;
           coins *= this.eco.events.faceWindow.faceMultiplier; // hitting the banana face multiplies this throw's coins (events.faceWindow.faceMultiplier, x2) and ends the event
@@ -1701,12 +1735,12 @@ class MainScene extends Phaser.Scene {
   // Banana event: its face, until it is hit. Disco event: the singer's face while the song plays (not during the applause).
   eventFaceBox() {
     if (this.bananaActive && !this.bananaHitTriggered) return BANANA_FACE_BOX;
-    if (this.discoPhase === "song") return DISCO_FACE_BOX;
+    if (this.songPhase === "song") return this.songDef().faceBox;
     return null;
   }
 
   eventColor() {
-    return this.discoPhase === "song" ? EVENT_COLOR_DISCO : EVENT_COLOR_FACE;
+    return this.songPhase === "song" ? this.songDef().color : EVENT_COLOR_FACE;
   }
 
   // Marks stuck on W20 fade out quickly when its picture changes (so nothing looks glued to a picture that is about to be swapped).
@@ -1731,76 +1765,86 @@ class MainScene extends Phaser.Scene {
   // THE CLOCK: like the shop timers the event runs on the device clock. It is saved with the game as { name, startedAt } (Economy.getEvent), and
   // where it is (which phase, which face, where the audio is) is always worked out from Date.now() - startedAt - never from the audio or the
   // game's own timers. So it goes on while the tab is hidden or the app is closed: coming back finds it where it would be (in the song, in the
-  // applause - the audio is started at the right place - or over). The audio is only followed to the clock (syncDiscoAudio).
+  // applause - the audio is started at the right place - or over). The audio is only followed to the clock (syncSongAudio).
   // The music (theme) is ducked for the whole event. Like every event it never changes phase while a throw is being aimed or is in the air
   // (heldEventStep). While the song plays no other event can start and no event buff can be used (Buffs.eventBlocked); during the APPLAUSE
   // another event may start: the applause fades out, no new rose is spawned (those in the air come down) - see cutApplause.
-  discoConfig() {
-    return { faceMultiplier: 1.25, beatMs: DISCO_BEAT_MS, ...((this.eco.events && this.eco.events.discoWindow) || {}) };
+  // (The guitar event works the same way with its own song and pictures: every function below takes what is specific to the running event from its
+  // SONG_EVENTS entry - songDef() - and its numbers from songConfig(). The names say "song" for both.)
+  songDef() {
+    return SONG_EVENTS[this.songEvent ? this.songEvent.name : this.activeEvent] || null;
   }
 
-  // How long the two tracks are (ms).
-  discoTimes() {
-    return { songMs: this.discoSound.duration * 1000, applauseMs: this.applauseSound.duration * 1000 };
+  // The numbers of a song event (default: the running one): economy.json events.<block> over the defaults.
+  songConfig(name) {
+    const def = SONG_EVENTS[name || (this.songEvent && this.songEvent.name)];
+    return { ...def.defaults, ...((this.eco.events && this.eco.events[def.block]) || {}) };
+  }
+
+  // How long the song and the applause are (ms); the song of `name` (default: the running event's).
+  songTimes(name) {
+    return { songMs: this.songSounds[name || this.songEvent.name].duration * 1000, applauseMs: this.applauseSound.duration * 1000 };
   }
 
   // True while nothing may start an event: an event runs - except the disco's applause, which another event may cut short.
   eventBlocksStart() {
-    return this.activeEvent !== null && this.discoPhase !== "applause";
+    return this.activeEvent !== null && this.songPhase !== "applause";
   }
 
-  startDiscoEvent() {
+  startSongEvent(name) {
     if (this.eventBlocksStart()) return;
     this.cutApplause();
-    this.beginDisco({ name: "disco", startedAt: Date.now() }, 0, true);
+    this.beginSong({ name, startedAt: Date.now() }, 0, true);
   }
 
-  // Starts (or, after a reload, resumes) the disco at `elapsedMs` into it.
-  beginDisco(rec, elapsedMs, fresh) {
-    const { songMs } = this.discoTimes();
+  // Starts (or, after a reload, resumes) a song event (rec.name: "disco" or "guitar") at `elapsedMs` into it.
+  beginSong(rec, elapsedMs, fresh) {
+    const def = SONG_EVENTS[rec.name];
+    const { songMs } = this.songTimes(rec.name);
     Economy.setEvent(rec);
-    this.discoEvent = rec;
-    this.activeEvent = "disco";
-    this.discoFrame = -1;
-    this.discoAudioCheck = 0;
+    this.songEvent = rec;
+    this.activeEvent = rec.name;
+    this.songFrame = -1;
+    this.songAudioCheck = 0;
     this.heldEventStep = null;
     this.fadeMarksOnW20();
     this.duckMusic();
     if (elapsedMs < songMs) {
-      this.discoPhase = "song";
-      this.bananaOverlay.setTexture("discoface" + (Math.floor(elapsedMs / this.discoConfig().beatMs) % DISCO_FRAMES + 1));
+      this.songPhase = "song";
+      this.bananaOverlay.setTexture(def.frames[Math.floor(elapsedMs / this.songConfig().beatMs) % def.frames.length]);
       this.bananaOverlay.setVisible(true);
       if (fresh) this.tweens.add({ targets: this.bananaOverlay, alpha: 1, duration: BANANA_FADE_MS });
       else this.bananaOverlay.setAlpha(1);
-      this.playDiscoTrack(this.discoSound, elapsedMs, DISCO_VOLUME);
+      this.playSongTrack(this.songSounds[rec.name], elapsedMs, def.volume);
     } else {
-      this.discoPhase = "applause";
+      this.songPhase = "applause";
       this.roseAcc = 0;
-      this.playDiscoTrack(this.applauseSound, elapsedMs - songMs, APPLAUSE_VOLUME);
+      this.playSongTrack(this.applauseSound, elapsedMs - songMs, APPLAUSE_VOLUME);
     }
   }
 
-  playDiscoTrack(sound, offsetMs, volume) {
+  playSongTrack(sound, offsetMs, volume) {
     if (sound.isPlaying) sound.stop();
     if (offsetMs >= sound.duration * 1000 - 100) return; // (the clock is already past its end: nothing left to play)
     sound.play({ seek: Math.max(0, offsetMs) / 1000, volume });
   }
 
   // The disco's per-frame work: everything follows the clock (see above).
-  updateDisco(dt) {
-    const rec = this.discoEvent;
-    if (this.discoPhase && rec) {
-      const { songMs, applauseMs } = this.discoTimes();
+  updateSong(dt) {
+    const rec = this.songEvent;
+    if (this.songPhase && rec) {
+      const { songMs, applauseMs } = this.songTimes();
       const el = Math.max(0, Date.now() - rec.startedAt); // (a device clock set back: it just waits)
-      if (this.discoPhase === "song") {
-        const f = Math.floor(el / this.discoConfig().beatMs) % DISCO_FRAMES;
-        if (f !== this.discoFrame) {
-          this.discoFrame = f;
-          this.bananaOverlay.setTexture("discoface" + (f + 1));
+      if (this.songPhase === "song") {
+        const def = this.songDef();
+        const f = Math.floor(el / this.songConfig().beatMs) % def.frames.length;
+        if (f !== this.songFrame) {
+          this.songFrame = f;
+          this.bananaOverlay.setTexture(def.frames[f]);
         }
-        this.syncDiscoAudio(this.discoSound, el, songMs);
-        if (el >= songMs && !this.heldEventStep) this.onDiscoSongEnd();
-      } else if (this.discoPhase === "applause") {
+        this.syncSongAudio(this.songSounds[rec.name], el, songMs);
+        if (el >= songMs && !this.heldEventStep) this.onSongEnd();
+      } else if (this.songPhase === "applause") {
         const ap = el - songMs;
         if (ap < applauseMs - this.roseFallMs()) {
           this.roseAcc += dt * ROSE_RATE;
@@ -1809,8 +1853,8 @@ class MainScene extends Phaser.Scene {
             this.spawnRose();
           }
         }
-        this.syncDiscoAudio(this.applauseSound, ap, applauseMs);
-        if (ap >= applauseMs && !this.heldEventStep) this.endDiscoEvent();
+        this.syncSongAudio(this.applauseSound, ap, applauseMs);
+        if (ap >= applauseMs && !this.heldEventStep) this.endSongEvent();
       }
     }
     this.updateRoses(dt);
@@ -1818,64 +1862,65 @@ class MainScene extends Phaser.Scene {
 
   // The audio follows the clock, once a second: not playing when it should be (it was blocked until the first tap, the app was closed) ->
   // started at the right place; playing but off by more than half a second (the tab was hidden, the phone slept) -> put back.
-  syncDiscoAudio(sound, offMs, lenMs) {
-    if (this.time.now < this.discoAudioCheck || this.sound.locked || offMs >= lenMs - 700) return;
-    this.discoAudioCheck = this.time.now + 1000;
-    if (!sound.isPlaying) sound.play({ seek: offMs / 1000, volume: sound === this.discoSound ? DISCO_VOLUME : APPLAUSE_VOLUME });
+  syncSongAudio(sound, offMs, lenMs) {
+    if (this.time.now < this.songAudioCheck || this.sound.locked || offMs >= lenMs - 700) return;
+    this.songAudioCheck = this.time.now + 1000;
+    if (!sound.isPlaying) sound.play({ seek: offMs / 1000, volume: sound === this.applauseSound ? APPLAUSE_VOLUME : this.songDef().volume });
     else if (Math.abs(sound.seek * 1000 - offMs) > 500) sound.seek = offMs / 1000;
   }
 
-  onDiscoSongEnd() {
-    if (this.discoPhase !== "song") return;
+  onSongEnd() {
+    if (this.songPhase !== "song") return;
     if (!this.canEventEnd()) {
-      this.heldEventStep = () => this.onDiscoSongEnd(); // a throw is being aimed / is in the air: the face stays until it is over
+      this.heldEventStep = () => this.onSongEnd(); // a throw is being aimed / is in the air: the face stays until it is over
       return;
     }
-    const { songMs } = this.discoTimes();
-    this.discoPhase = "applause";
+    const { songMs } = this.songTimes();
+    this.songPhase = "applause";
     this.fadeMarksOnW20();
-    if (this.discoSound.isPlaying) this.discoSound.stop();
+    const song = this.songSounds[this.songEvent.name];
+    if (song.isPlaying) song.stop();
     this.tweens.add({
       targets: this.bananaOverlay,
       alpha: 0,
       duration: BANANA_FADE_MS,
       onComplete: () => {
-        if (this.discoPhase !== "song") this.bananaOverlay.setVisible(false);
+        if (this.songPhase !== "song") this.bananaOverlay.setVisible(false);
       },
     });
     this.roseAcc = 0;
-    this.discoAudioCheck = 0;
-    this.playDiscoTrack(this.applauseSound, Date.now() - this.discoEvent.startedAt - songMs, APPLAUSE_VOLUME);
+    this.songAudioCheck = 0;
+    this.playSongTrack(this.applauseSound, Date.now() - this.songEvent.startedAt - songMs, APPLAUSE_VOLUME);
   }
 
-  endDiscoEvent() {
-    if (this.discoPhase !== "applause") return;
+  endSongEvent() {
+    if (this.songPhase !== "applause") return;
     if (!this.canEventEnd()) {
-      this.heldEventStep = () => this.endDiscoEvent();
+      this.heldEventStep = () => this.endSongEvent();
       return;
     }
-    this.finishDisco();
+    this.finishSong();
     this.unduckMusic();
   }
 
   // Everything of the disco is over (or was cut): the state goes back to normal. (The roses already in the air keep falling - updateRoses.)
-  finishDisco() {
-    this.discoPhase = null;
-    this.discoEvent = null;
+  finishSong() {
+    this.songPhase = null;
+    this.songEvent = null;
     this.activeEvent = null;
     Economy.setEvent(null);
-    if (this.discoSound.isPlaying) this.discoSound.stop();
+    for (const snd of Object.values(this.songSounds)) if (snd.isPlaying) snd.stop();
     if (this.applauseSound.isPlaying) this.applauseSound.stop();
   }
 
   // Another event is starting during the applause: the applause fades out (0.8 s), no more roses are spawned (the phase is over), the ones in
   // the air come down as they were, and the disco is over. The music stays down - the new event takes it from here.
   cutApplause() {
-    if (this.discoPhase !== "applause") return;
+    if (this.songPhase !== "applause") return;
     const snd = this.applauseSound;
     this.heldEventStep = null;
-    this.discoPhase = null;
-    this.discoEvent = null;
+    this.songPhase = null;
+    this.songEvent = null;
     this.activeEvent = null;
     Economy.setEvent(null);
     this.tweens.add({
@@ -1883,7 +1928,7 @@ class MainScene extends Phaser.Scene {
       volume: 0,
       duration: 800,
       onComplete: () => {
-        if (this.discoPhase !== "applause") snd.stop(); // (unless a new applause has started meanwhile)
+        if (this.songPhase !== "applause") snd.stop(); // (unless a new applause has started meanwhile)
       },
     });
   }
@@ -1892,11 +1937,11 @@ class MainScene extends Phaser.Scene {
   resumeSavedEvent() {
     const ev = Economy.getEvent();
     if (!ev) return;
-    if (ev.name === "disco") {
-      const { songMs, applauseMs } = this.discoTimes();
+    if (SONG_EVENTS[ev.name]) {
+      const { songMs, applauseMs } = this.songTimes(ev.name);
       const el = Date.now() - ev.startedAt;
       if (el >= 0 && el < songMs + applauseMs) {
-        this.beginDisco({ name: "disco", startedAt: ev.startedAt }, el, false);
+        this.beginSong({ name: ev.name, startedAt: ev.startedAt }, el, false);
         if (this.theme) this.theme.setVolume(0); // silent from the first moment
         return;
       }
@@ -1945,7 +1990,8 @@ class MainScene extends Phaser.Scene {
   eventDefs() {
     return [
       { name: "face", start: () => this.startBananaEvent() },
-      { name: "disco", start: () => this.startDiscoEvent() },
+      { name: "disco", start: () => this.startSongEvent("disco") },
+      { name: "guitar", start: () => this.startSongEvent("guitar") },
     ].map((d) => ({ ...d, rarity: this.eventRarity(d.name) }));
   }
 
@@ -1953,7 +1999,8 @@ class MainScene extends Phaser.Scene {
   // event's own "rarity" in economy.json (events.<block>.rarity), failing that legendary.
   eventRarity(name) {
     const item = (this.eco.shop.items || []).find((it) => (it.effects || []).some((e) => e.type === "triggerEvent" && e.value === name));
-    return (item && item.rarity) || "legendary";
+    const block = (this.eco.events || {})[name === "face" ? "faceWindow" : (SONG_EVENTS[name] || {}).block] || {};
+    return (item && item.rarity) || block.rarity || "legendary";
   }
 
   // How many throws an hour the snowball stock allows: its real refill rate (one every regen.everySeconds), unless economy.json overrides it
@@ -2033,7 +2080,7 @@ class MainScene extends Phaser.Scene {
     if (!this.startEvent(s.event)) return; // (it could not start: the charge waits)
     const rec = Economy.getEvent();
     // The buff's card stays for the whole song and counts it down (a real timer now); it is gone when the song is over, the applause is free.
-    if (s.event === "disco" && rec) Buffs.setBuffEnd(s.id, rec.startedAt + this.discoTimes().songMs);
+    if (SONG_EVENTS[s.event] && rec) Buffs.setBuffEnd(s.id, rec.startedAt + this.songTimes().songMs);
     else Buffs.consumeCharge(s.id);
   }
 
@@ -2381,7 +2428,7 @@ class MainScene extends Phaser.Scene {
       this.heldEventStep = null;
       step();
     }
-    this.updateDisco(dt);
+    this.updateSong(dt);
     this.updateBounce(dt);
     this.updateFallingBalls(dt);
 

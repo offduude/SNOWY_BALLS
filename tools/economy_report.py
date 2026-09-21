@@ -104,12 +104,14 @@ def slot_odds(eco):
 
 
 def event_rarity(eco, name):
-    """The rarity of an event = the rarity of its summon buff (the shop item whose triggerEvent effect names it)."""
+    """The rarity of an event = the rarity of its summon buff (the shop item whose triggerEvent effect names it); failing that the event's own
+    "rarity" in economy.json events.<block> (the guitar); failing that legendary."""
     for it in eco["shop"]["items"]:
         for e in it.get("effects", []):
             if e.get("type") == "triggerEvent" and e.get("value") == name:
                 return it.get("rarity")
-    return "legendary"
+    block = {"face": "faceWindow", "disco": "discoWindow", "guitar": "guitarWindow"}.get(name)
+    return eco.get("events", {}).get(block, {}).get("rarity", "legendary")
 
 
 def event_chances(eco):
@@ -174,7 +176,7 @@ def main():
 
     print("\nNatural events by rarity (an event has the rarity of its summon buff; one roll per RARITY after every throw):")
     events = {}
-    for name in ("face", "disco"):
+    for name in ("face", "disco", "guitar"):
         events.setdefault(event_rarity(eco, name), []).append(name)
     tph = eco.get("events", {}).get("throwsPerHour") or 3600 / eco["projectiles"]["snowball"]["regen"]["everySeconds"]
     print(f"  (throws an hour: {tph:.0f} = the snowball's real refill rate; if several rarities hit on one throw the rarer one wins,")

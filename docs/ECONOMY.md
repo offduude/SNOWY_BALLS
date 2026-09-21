@@ -48,7 +48,7 @@ it no longer adds coins or speeds the markers up.
 | `hitRevertMs` | how long the "hit" texture shows before fading back |
 | `faceMultiplier` | hitting the face multiplies the coins of that throw by this (`2`; the banana face is an EPIC event) |
 
-**Disco event** (`events.discoWindow`, see NOTES.md "Disco event"): `faceMultiplier` `1.25` (paid on EVERY hit of the singer's face while disco.mp3 plays - the face stays - so it is far below the banana face's x2.5), `beatMs` `500` (120 bpm: W20 shows a new one of discoface1-6 every beat). A plain W20 hit pays as usual. After the song: applause.mp3 and falling roses, then normal. Only one event runs at a time; no event buff (`triggerEvent`) can be used while one runs.
+**Disco event** (`events.discoWindow`, see NOTES.md "Disco event"): `faceMultiplier` `1.25` (paid on EVERY hit of the singer's face while disco.mp3 plays - the face stays - so it is far below the banana face's x2.5), `beatMs` `500` (120 bpm: W20 shows a new one of discoface1-6 every beat). A plain W20 hit pays as usual. After the song: applause.mp3 and falling roses, then normal. **Guitar event** (`events.guitarWindow`, **epic**, no summon buff so its own `rarity` names it): the same idea with guitar.mp3 (38.6 s), W20 cycling guitar1-3 every `beatMs` `470` (about 128 bpm, measured from the song), `faceMultiplier` `1.25` on the guitarist's face (an orange dot on the aim bars), then the applause. Only one event runs at a time; no event buff (`triggerEvent`) can be used while one runs.
 
 ## aim (live)
 
@@ -189,7 +189,7 @@ when none are left. Effects do not stack from the same buff. Different buffs of 
 | type | value means |
 |---|---|
 | `guideLines` | `1` = the green guarantee lines are drawn on both sliders while the buff is active (they are hidden otherwise). Does NOT affect the event dots (see `eventDot`) |
-| `eventDot` | `1` = the dot that marks the running event's face on both sliders (yellow for the banana face, purple for the disco) is drawn while the buff is active; **without it no event dot is shown** (the epic Skyr) |
+| `eventDot` | `1` = the dot that marks the running event's face on both sliders (yellow for the banana face, purple for the disco, orange for the guitar) is drawn while the buff is active; **without it no event dot is shown** (the epic Skyr) |
 | `centerLine` | `1` = ONE green line at the middle of the hit zone on each slider: the middle of the offset bar, and the middle of the strength band that hits W20 from the chosen offset (Blue Skyr). Independent of `guideLines` (both can be on) |
 | `miracle` | `1` = the Diamond Cross: the NEXT throw is helped (see NOTES.md, "Diamond Cross"): no event running - a throw that misses is carried to the middle of W20; the face event running - anything but a face hit is carried to the middle of the face. Used up by that throw. Needs `"charge": true` on the item (no `duration`): it has no timer, its card shows "+1" |
 | `precision` | offset (angle) slider: its hit zone gets `value` times bigger (1.2 = 20% bigger, 25% -> 30%; at most the whole bar), so its range shrinks to 1/value (same marker speed) |
@@ -239,4 +239,4 @@ player's finger. The buff cards and list always show the live state.
 | epic | 55.6 min | 0.90% | 111 | 0.899% (1 in 111) |
 | legendary | 8.3 h | 0.10% | 1000 | 0.100% (1 in 1000) |
 
-  Only epic and legendary have events today: the banana face (epic, the only one: 1 in 111 throws) and the disco (legendary, the only one: 1 in 1000 throws). It follows the shop and the snowball by itself: change a rarity's shop odds, the slots, the timers or the snowball's regen and the events follow (`py tools/economy_report.py` prints this table); `events.rarityChances { legendary: 0.0008 }` overrides a rarity by hand. A rarity that has no item in the shop cannot spawn events.
+  Only epic and legendary have events today: the banana face and the guitar (epic: 1 in 111 throws for an epic event, each of the two half of those) and the disco (legendary, the only one: 1 in 1000 throws). It follows the shop and the snowball by itself: change a rarity's shop odds, the slots, the timers or the snowball's regen and the events follow (`py tools/economy_report.py` prints this table); `events.rarityChances { legendary: 0.0008 }` overrides a rarity by hand. A rarity that has no item in the shop cannot spawn events.

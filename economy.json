@@ -83,6 +83,7 @@
     "stone": { "infinite": false, "rarity": "common", "hitValue": 40, "weight": "heavy", "leavesMark": false, "spins": true },
     "pinecone": { "infinite": false, "rarity": "rare", "weight": "heavy", "leavesMark": false, "spins": true },
     "grenade": { "infinite": false, "rarity": "epic", "hitValue": 2400, "weight": "heavy", "leavesMark": true, "spins": false },
+    "drone": { "infinite": false, "rarity": "legendary", "hitValue": 12000, "weight": "very_light", "leavesMark": true, "spins": false },
     "tomato": { "infinite": false, "rarity": "epic", "weight": "heavy", "leavesMark": true, "spins": true },
     "test_very_heavy": { "infinite": true, "godOnly": true, "rarity": "default", "weight": "very_heavy", "leavesMark": false, "spins": true }
   },
@@ -296,6 +297,17 @@
         "image": "assets/snowball/grenade.png",
         "effect": { "type": "givesProjectile", "value": "grenade" },
         "description": "What a great day to have one!"
+      },
+      {
+        "id": "drone",
+        "name": "Drone",
+        "category": "projectile",
+        "amount": { "min": 1, "max": 3 },
+        "unitPrice": { "min": 5600, "max": 9400 },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/drone.png",
+        "effect": { "type": "givesProjectile", "value": "drone" },
+        "description": "I'm pretty sure my licence expired..."
       },
       {
         "id": "tomato",

@@ -192,8 +192,9 @@ const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
 
 // What each equippable projectile LOOKS and SOUNDS like (texture / sound keys from preload; `mark` = the texture and
-// on-screen size of the mark it leaves on the wall, `launchSound` = the sound when it is thrown - both optional, the
-// defaults are the snowball's mark and the throw whoosh). Its
+// on-screen size of the mark it leaves on the wall, `launchSound` = the sound when it is thrown (`launchLoop`: it repeats until the projectile lands
+// and the impact sound cuts it), `ballScale` = how big the projectile in the air is compared with the others - all optional, the
+// defaults are the snowball's mark, the throw whoosh and 1). Its
 // gameplay numbers (aim range/speed, coin multiplier, mark or bounce, spin) live in economy.json
 // under "projectiles", keyed by the same id. Character sprites that aren't listed fall back to the
 // normal ones - there is no chestnut "throwing" sprite yet, so that pose uses the plain one.
@@ -267,6 +268,20 @@ const PROJECTILE_VISUALS = {
     // On impact: a radial flash growing out of the grenade (ms, and how big it gets as a multiple of its 128px
     // texture) and a short shake of the game picture (share of the screen size, x/y; the UI does not shake).
     explosion: { flashMs: 340, flashScale: 4.6, shakeMs: 330, shakeX: 0.014, shakeY: 0.008 },
+  },
+  drone: {
+    ball: "drone", // (the same picture as its card: it is drawn 2x bigger in the air, see ballScale)
+    sprites: { idle: "char_idle", aiming: "char_aiming", throwing: "char_throwing" }, // (no pictures of its own: it is drawn in the hand, see CHARACTERS)
+    hold: { character1: { idle: { size: 9 }, aiming: { size: 10 } } }, // calibrated: its picture is a wide 26 x 13 px drawing in a 32 px canvas, so at the normal 5-6 px it added only 2-3 pixels (too few)
+    ballScale: 2, // the projectile in the air is twice the size of the others (the card / shop / counter picture is not affected)
+    launchSound: "drone_fly", // the whole flight: it loops until the projectile lands, and the impact sound cuts it
+    launchLoop: true,
+    launchVolume: 0.6,
+    impactSound: "drone_impact",
+    impactVolume: 0.6,
+    mark: { texture: "grenade_impact", size: 40 }, // the grenade's scorch mark
+    // Like the grenade's explosion, but stronger: a longer and bigger flash and a harder, longer shake.
+    explosion: { flashMs: 520, flashScale: 7, shakeMs: 520, shakeX: 0.024, shakeY: 0.014 },
   },
 };
 // A TEST projectile (economy.json projectiles.test_very_heavy, "godOnly": only a god mode save can list and equip it): it looks and sounds
@@ -361,6 +376,7 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("onion", "assets/snowball/onion.png");
+    this.load.image("drone", "assets/snowball/drone.png");
     this.load.image("potato", "assets/snowball/potato.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
     this.load.image("stone", "assets/snowball/stone.png");
@@ -397,6 +413,8 @@ class MainScene extends Phaser.Scene {
     this.load.audio("chestnut_impact", "assets/audio/chestnut_impact.mp3");
     this.load.audio("grenade_launch", "assets/audio/grenade_launch.mp3");
     this.load.audio("grenade_impact", "assets/audio/grenade_impact.mp3");
+    this.load.audio("drone_fly", "assets/audio/drone_fly.mp3");
+    this.load.audio("drone_impact", "assets/audio/drone_impact.mp3");
     this.load.audio("buff_use", "assets/audio/buff_use.mp3");
     this.load.audio("angels", "assets/audio/angels.mp3");
     this.load.audio("hard_impact", "assets/audio/hard_impact.mp3");
@@ -1228,13 +1246,35 @@ class MainScene extends Phaser.Scene {
     this.cameraFollowing = true;
     this.bounce = null;
     this.ball.setTexture(this.projVisuals.ball);
-    this.ball.setDisplaySize(BALL_SIZE, BALL_SIZE);
+    this.ball.setDisplaySize(this.ballSize(), this.ballSize());
     this.ball.clearMask(); // in front of the wall until (and unless) it falls back behind the roof
     this.ball.setRotation(0);
     this.ball.setAlpha(1);
     this.ball.setVisible(true);
     this.flightWorst = 0;
-    this.sound.play(this.projVisuals.launchSound || "throw_whoosh", { volume: this.projVisuals.launchVolume || 0.6 });
+    this.stopLaunchSound();
+    const sound = this.projVisuals.launchSound || "throw_whoosh";
+    const volume = this.projVisuals.launchVolume || 0.6;
+    if (this.projVisuals.launchLoop) {
+      // A sound that lasts the whole flight (the drone's): kept, so the landing can cut it (stopLaunchSound).
+      this.launchLoopSound = this.sound.add(sound, { loop: true, volume });
+      this.launchLoopSound.play();
+    } else {
+      this.sound.play(sound, { volume });
+    }
+  }
+
+  // Cuts the looping launch sound (the drone's), if one is playing: when the projectile lands or leaves the picture, and before the next throw.
+  stopLaunchSound() {
+    if (!this.launchLoopSound) return;
+    this.launchLoopSound.stop();
+    this.launchLoopSound.destroy();
+    this.launchLoopSound = null;
+  }
+
+  // How big the projectile in the air is at the start of its flight (BALL_SIZE, times the projectile's `ballScale`).
+  ballSize() {
+    return BALL_SIZE * (this.projVisuals.ballScale || 1);
   }
 
   updateFlight(dt) {
@@ -1258,7 +1298,7 @@ class MainScene extends Phaser.Scene {
     this.ball.setPosition(x, y);
     // Smaller and smaller on the way to the apex, shrinking faster the closer it gets (progress 0..1 of the flight up to it; it stays small for a ball that goes on over the roof).
     const shrink = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * logCurve(1 - Math.min(1, t / this.apexTime));
-    this.ball.setDisplaySize(BALL_SIZE * shrink, BALL_SIZE * shrink);
+    this.ball.setDisplaySize(this.ballSize() * shrink, this.ballSize() * shrink);
     if (this.proj.spins) this.ball.setRotation(t * SPIN_RATE); // stops turning at the apex, where it hits the wall
 
     this.followBallCamera(y, dt);
@@ -1487,7 +1527,7 @@ class MainScene extends Phaser.Scene {
     if (!b || b.resting || !this.ball.visible) return;
     const img = this.add.image(b.x, this.worldY(b.h), this.ball.texture.key);
     img.setDisplaySize(this.ball.displayWidth, this.ball.displayHeight).setRotation(this.ball.rotation).setDepth(10);
-    this.fallingBalls.push({ img, b: { ...b }, spins: !!this.proj.spins });
+    this.fallingBalls.push({ img, b: { ...b }, spins: !!this.proj.spins, size: this.ballSize() });
   }
 
   updateFallingBalls(dt) {
@@ -1496,7 +1536,7 @@ class MainScene extends Phaser.Scene {
       const b = f.b;
       b.age += dt * 1000;
       const grow = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * logCurve(b.age / BALL_REGROW_MS);
-      f.img.setDisplaySize(BALL_SIZE * grow, BALL_SIZE * grow);
+      f.img.setDisplaySize(f.size * grow, f.size * grow);
       b.vh -= GRAVITY * dt;
       b.h += b.vh * dt;
       b.x += b.vx * dt; // (no ground for it: it keeps falling out of the picture)
@@ -1516,12 +1556,12 @@ class MainScene extends Phaser.Scene {
     // Bouncing back towards the player: it grows from its apex size back to full size, fastest at first, slower the further it gets.
     b.age += dt * 1000;
     const grow = BALL_APEX_SCALE + (1 - BALL_APEX_SCALE) * logCurve(b.age / BALL_REGROW_MS);
-    this.ball.setDisplaySize(BALL_SIZE * grow, BALL_SIZE * grow);
+    this.ball.setDisplaySize(this.ballSize() * grow, this.ballSize() * grow);
     if (b.resting) return;
     b.vh -= GRAVITY * dt;
     b.h += b.vh * dt;
     b.x += b.vx * dt;
-    const GROUND_CONTACT = 8; // ball radius: it rests on the ground, not in it
+    const GROUND_CONTACT = this.ballSize() / 2; // ball radius: it rests on the ground, not in it
     if (b.h <= GROUND_CONTACT && b.vh < 0) {
       b.h = GROUND_CONTACT;
       b.vh = -b.vh * BOUNCE_RESTITUTION;
@@ -1570,6 +1610,7 @@ class MainScene extends Phaser.Scene {
   }
 
   finishThrow(hit, win, stickX, stickHeight, faceHit, escaped) {
+    this.stopLaunchSound(); // the launch sound (the drone's, which lasts the whole flight) ends here; the impact sound below takes over
     this.state = STATE.RESULT;
     this.cameraFollowing = false;
     // An escaped ball never touched the wall: no mark, no bounce, no impact sound.

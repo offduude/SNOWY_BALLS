@@ -1244,6 +1244,7 @@ class MainScene extends Phaser.Scene {
   // fall speed - a slow weather is not thinner than a fast one. When a weather starts the sky is already full (the particles are spread over the whole fall).
   applyWeather(id) {
     this.clearWeather();
+    if (id === "none") return; // no weather equipped: the sky is empty
     const list = (this.eco && this.eco.weathers) || [];
     const def = list.find((x) => x.id === id) || list[0];
     if (!def) return;

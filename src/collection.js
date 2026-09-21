@@ -97,6 +97,7 @@ const Collection = (() => {
   const SKIN_KINDS = ["skins", ...SKIN_MENUS];
   const SKIN_TITLES = { skins: "SKINS", character: "CHARACTERS", scenery: "SCENERIES", weather: "WEATHER" };
   const SKIN_LISTS = { character: "characters", scenery: "sceneries", weather: "weathers" };
+  const CAN_UNEQUIP = ["weather"]; // a kind that can have nothing equipped: tapping the equipped one's button turns it off (equipped id "none")
 
   function skinItems(kind) {
     return (eco && eco[SKIN_LISTS[kind]]) || [];
@@ -234,7 +235,7 @@ const Collection = (() => {
   function skinsMenuHtml() {
     const now = (kind) => {
       const it = skinItems(kind).find((x) => x.id === Economy.getEquipped(kind));
-      return it ? esc(it.name) : "";
+      return it ? esc(it.name) : Economy.getEquipped(kind) === "none" ? "None" : "";
     };
     return (
       `<button class="skins-choice" type="button" data-skins="character"><span class="skins-choice-name">CHARACTERS</span><span class="skins-choice-now">${now("character")}</span></button>` +
@@ -464,15 +465,17 @@ const Collection = (() => {
       return;
     }
     const btn = e.target.closest(".pick-equip");
-    if (!btn || btn.classList.contains("on")) return;
-    Economy.setEquipped(openKind, btn.dataset.id);
+    if (!btn) return;
+    const unequip = btn.classList.contains("on") && CAN_UNEQUIP.includes(openKind); // the equipped weather's button: the weather is turned off
+    if (btn.classList.contains("on") && !unequip) return;
+    Economy.setEquipped(openKind, unequip ? "none" : btn.dataset.id);
     if (SKIN_MENUS.includes(openKind)) {
       // A character / scenery / weather is equipped in place: the list stays open (its buttons show the change), the game switches at once.
       click();
       refreshButtons();
       const game = window.snowyBallsGame;
       const scene = game && game.scene.getScene("main");
-      if (scene) scene[{ character: "onCharacterEquipped", scenery: "onSceneryEquipped", weather: "onWeatherEquipped" }[openKind]](btn.dataset.id);
+      if (scene) scene[{ character: "onCharacterEquipped", scenery: "onSceneryEquipped", weather: "onWeatherEquipped" }[openKind]](unequip ? "none" : btn.dataset.id);
       return;
     }
     if (openKind === "projectile") {

@@ -39,7 +39,7 @@ const Economy = (() => {
       unlockedCharacters: ["andek"], // the ids of the characters the player has (the default one always)
       unlockedSceneries: ["frosty"], // ... and of the sceneries
       unlockedWeathers: ["snow"], // ... and of the weathers
-      equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" }, // what the player currently uses
+      equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" }, // what the player currently uses (weather can also be "none": unequipped)
       buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
       shop: {
         offers: [], // per slot: null, or { amount, unitPrice } rolled for a stack item on sale there

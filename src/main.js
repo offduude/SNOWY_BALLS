@@ -260,18 +260,28 @@ const PROJECTILE_VISUALS = {
 // A TEST projectile (economy.json projectiles.test_very_heavy, "godOnly": only a god mode save can list and equip it): it looks and sounds
 // like the stone. To try another weight tier, change its `weight` in economy.json.
 PROJECTILE_VISUALS.test_very_heavy = { ...PROJECTILE_VISUALS.stone };
-// HELD PROJECTILES (experiment, branch held-projectile): the character has only EMPTY-handed idle and aiming pictures ("char_idle", "char_aiming"); the
-// equipped projectile is drawn as a small sprite of its own at the hand's place, so a new projectile needs no character picture at all and a new
-// character only needs the two empty poses and these numbers. x, y: the middle of the projectile in the 64x64 picture (pixels from its top-left
-// corner); size: its width and height in pixels; rotation: idle = upside down (PI), aiming = upright; behind: true = drawn under the character
-// (the fingers are over it), false = over the character. Turn the experiment off with USE_HELD_PROJECTILES = false (every projectile then
-// uses its own pictures again, see PROJECTILE_VISUALS.sprites).
+// HELD PROJECTILES: a character has only EMPTY-handed idle and aiming pictures; the equipped projectile is drawn as a small sprite of its own at the
+// hand's place, so a new projectile needs no character picture at all and a new character only needs the two empty poses, the throwing pose and
+// its hand numbers. THE CHARACTERS: `sprites` are the texture keys of its three poses (loaded in preload); `hands.<pose>` (idle / aiming) are
+// x, y: the middle of the projectile in the 64x64 picture (pixels from its top-left corner); size: its width and height in pixels; rotation:
+// idle = upside down (PI), aiming = upright; behind: true = drawn under the character (the fingers are over it), false = over the character;
+// rest: (aiming) the row of the fingertips - a projectile smaller than `size` sits ON them (fully visible) instead of behind the fist.
+// A single projectile can adjust any pair with `hold: { <characterId>: { <pose>: { dx, dy, size, rotation, behind } } }` in PROJECTILE_VISUALS
+// (dx / dy move it from the character's hand point). EVERY NEW PROJECTILE MUST BE CALIBRATED WITH EVERY CHARACTER and every new character with
+// every projectile: see docs/CALIBRATION.md and calibrateHeldProjectiles() below. Turn the whole thing off with USE_HELD_PROJECTILES = false
+// (every projectile then uses its own pictures again, see PROJECTILE_VISUALS.sprites).
 const USE_HELD_PROJECTILES = true;
 const HELD_MIN_CONTENT_PX = 2; // the drawn part of a projectile in the hand is never narrower than this (the same 2 px the rowan berry is when thrown)
-const CHARACTER_HANDS = {
-  idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
-  aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 }, // rest: the row of the fingertips - a projectile smaller than `size` sits ON them (fully visible) instead of behind the fist
+const CHARACTERS = {
+  character1: {
+    sprites: { idle: "char_idle", aiming: "char_aiming", throwing: "char_throwing" }, // (all empty-handed)
+    hands: {
+      idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
+      aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
+    },
+  },
 };
+const DEFAULT_CHARACTER = "character1";
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
 // apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex - and the closer it gets to the apex the
@@ -485,6 +495,10 @@ class MainScene extends Phaser.Scene {
     this.discoSound = this.sound.add("disco", { volume: DISCO_VOLUME });
     this.applauseSound = this.sound.add("applause", { volume: APPLAUSE_VOLUME });
     this.resumeSavedEvent(); // a disco that was running when the game was closed goes on where the clock says it is
+    if (/^(localhost|127\.)/.test(location.hostname)) {
+      window.calibrateHeld = () => this.calibrateHeldProjectiles(); // dev tools, see docs/CALIBRATION.md
+      window.calibrateSheet = () => this.showCalibrationSheet();
+    }
     window.snowyBallsReady = true; // the game is up: the "grand cleansing" screen (index.html) may fade out now
 
     // Mobile-only from here on - no keyboard control, tap is the only input.
@@ -860,29 +874,182 @@ class MainScene extends Phaser.Scene {
   // updateCharacterPose().
   drawCharacter() {
     const baseY = this.worldY(0) + CHARACTER_Y_OFFSET;
-    this.character = this.add.image(Math.round(ORIGIN_X), baseY + 1, "char_idle").setOrigin(0.5, 1);
+    this.characterId = DEFAULT_CHARACTER;
+    this.character = this.add.image(Math.round(ORIGIN_X), baseY + 1, CHARACTERS[this.characterId].sprites.idle).setOrigin(0.5, 1);
     this.character.setDepth(2);
-    this.heldBall = this.add.image(0, 0, "snowball").setVisible(false); // the projectile in the hand, see CHARACTER_HANDS
+    this.heldBall = this.add.image(0, 0, "snowball").setVisible(false); // the projectile in the hand, see CHARACTERS
   }
 
   updateCharacterPose() {
-    const sprites = this.projVisuals.sprites; // the equipped projectile's set (chestnut in hand, etc.)
+    if (this.calibrating) return; // calibrateHeldProjectiles() sets the pose itself
+    const sprites = this.projVisuals.sprites; // the equipped projectile's own set (used when USE_HELD_PROJECTILES is off)
+    const mine = CHARACTERS[this.characterId].sprites; // the character's empty-handed pictures
     const held = USE_HELD_PROJECTILES; // the empty-handed pictures + the projectile drawn in the hand
-    let key = held ? "char_idle" : sprites.idle;
+    let key = held ? mine.idle : sprites.idle;
     let pose = "idle";
     if (this.state === STATE.IDLE && !this.hasAmmo()) {
-      key = "char_idle"; // out of snowballs: empty hands
+      key = mine.idle; // out of snowballs: empty hands
       pose = "empty";
     }
     if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
-      key = held ? "char_aiming" : sprites.aiming;
+      key = held ? mine.aiming : sprites.aiming;
       pose = "aiming";
     } else if (this.state === STATE.FLIGHT && this.flightTime < 0.35) {
-      key = sprites.throwing;
+      key = held ? mine.throwing : sprites.throwing;
       pose = "throwing";
     }
     if (this.character.texture.key !== key) this.character.setTexture(key);
     this.updateHeldBall(held ? pose : "none");
+  }
+
+  // CALIBRATION CHECK (a dev tool, also `calibrateHeld()` in the console on localhost): for every character x every projectile x the two poses it
+  // places the projectile in the hand exactly as the game does and compares the picture rendered at the DEFAULT zoom with and without the projectile,
+  // so it counts the pixels the projectile really adds. Returns the rows; `ok` is false when fewer than 4 pixels show (a 2 x 2 dot: what the rowan
+  // berry has), i.e. the projectile vanishes (too small, hidden behind the hand, wrong place). It cannot judge how it LOOKS (position, upside down,
+  // layer): after it passes, look at each new pair zoomed in (docs/CALIBRATION.md).
+  async calibrateHeldProjectiles() {
+    const frames = (n) =>
+      new Promise((res) => {
+        let k = 0;
+        const f = () => (++k >= n ? res() : requestAnimationFrame(f));
+        requestAnimationFrame(f);
+      });
+    const grab = (x, y, w, h) =>
+      new Promise((res) =>
+        this.game.renderer.snapshotArea(x, y, w, h, (img) => {
+          const c = document.createElement("canvas");
+          c.width = w;
+          c.height = h;
+          const g = c.getContext("2d");
+          g.drawImage(img, 0, 0);
+          res(g.getImageData(0, 0, w, h).data);
+        })
+      );
+    const rows = [];
+    const cam = this.cameras.main;
+    const saved = { proj: this.projVisuals, char: this.characterId, tex: this.character.texture.key, sx: cam.scrollX, sy: cam.scrollY, z: cam.zoom };
+    this.calibrating = true;
+    cam.setZoom(1);
+    cam.scrollX = INITIAL_SCROLL_X;
+    cam.scrollY = INITIAL_SCROLL_Y;
+    try {
+      for (const charId of Object.keys(CHARACTERS)) {
+        this.characterId = charId;
+        for (const projId of Object.keys(PROJECTILE_VISUALS)) {
+          if (!this.eco.projectiles[projId]) continue;
+          this.projVisuals = PROJECTILE_VISUALS[projId];
+          for (const pose of ["idle", "aiming"]) {
+            this.character.setTexture(CHARACTERS[charId].sprites[pose]);
+            const b = this.heldBall;
+            b.setAlpha(1);
+            this.updateHeldBall(pose);
+            await frames(3);
+            const sx = Math.round((b.x - cam.scrollX) * cam.zoom) - 12;
+            const sy = Math.round((b.y - cam.scrollY) * cam.zoom) - 12;
+            const withBall = await grab(sx, sy, 24, 24);
+            b.setAlpha(0);
+            await frames(3);
+            const without = await grab(sx, sy, 24, 24);
+            b.setAlpha(1);
+            let added = 0;
+            for (let i = 0; i < withBall.length; i += 4) if (withBall[i] !== without[i] || withBall[i + 1] !== without[i + 1] || withBall[i + 2] !== without[i + 2]) added++;
+            const drawn = (this.textureContentPx(b.texture.key) * b.displayWidth) / b.frame.width;
+            rows.push({ character: charId, projectile: projId, pose, drawnPx: +drawn.toFixed(1), spritePx: b.displayWidth, layer: b.depth < this.character.depth ? "under" : "over", addedPixels: added, ok: added >= 4 });
+          }
+        }
+      }
+    } finally {
+      this.calibrating = false;
+      this.characterId = saved.char;
+      this.projVisuals = saved.proj;
+      this.character.setTexture(saved.tex);
+      cam.setZoom(saved.z);
+      cam.scrollX = saved.sx;
+      cam.scrollY = saved.sy;
+    }
+    return rows;
+  }
+
+  // CONTACT SHEET (a dev tool, `calibrateSheet()` in the console on localhost; tap it to close): every character x every projectile, the idle hand
+  // on the top row and the aiming hand under it, cut out of the rendered game at the default zoom and enlarged 4 times - for LOOKING at each pair
+  // (position, size, upside down, layer) after calibrateHeldProjectiles() has said they all show. See docs/CALIBRATION.md.
+  async showCalibrationSheet() {
+    const frames = (n) =>
+      new Promise((res) => {
+        let k = 0;
+        const f = () => (++k >= n ? res() : requestAnimationFrame(f));
+        requestAnimationFrame(f);
+      });
+    const grab = (x, y, w, h) =>
+      new Promise((res) =>
+        this.game.renderer.snapshotArea(x, y, w, h, (img) => {
+          const c = document.createElement("canvas");
+          c.width = w;
+          c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0);
+          res(c);
+        })
+      );
+    const ids = Object.keys(PROJECTILE_VISUALS).filter((id) => this.eco.projectiles[id]);
+    const chars = Object.keys(CHARACTERS);
+    const CW = 24, CH = 22, K = 4, GAP = 6, LABEL = 26;
+    const sheet = document.createElement("canvas");
+    sheet.width = ids.length * (CW * K + GAP) + GAP;
+    sheet.height = chars.length * (2 * CH * K + LABEL * 2 + GAP) + GAP;
+    const g = sheet.getContext("2d");
+    g.fillStyle = "#222";
+    g.fillRect(0, 0, sheet.width, sheet.height);
+    g.imageSmoothingEnabled = false;
+    g.font = "11px monospace";
+    const cam = this.cameras.main;
+    const saved = { proj: this.projVisuals, char: this.characterId, tex: this.character.texture.key, sx: cam.scrollX, sy: cam.scrollY, z: cam.zoom };
+    this.calibrating = true;
+    cam.setZoom(1);
+    cam.scrollX = INITIAL_SCROLL_X;
+    cam.scrollY = INITIAL_SCROLL_Y;
+    try {
+      let y0 = GAP;
+      for (const charId of chars) {
+        this.characterId = charId;
+        g.fillStyle = "#ffd";
+        g.fillText(charId, GAP, y0 + 10);
+        ids.forEach(() => {});
+        for (let i = 0; i < ids.length; i++) {
+          this.projVisuals = PROJECTILE_VISUALS[ids[i]];
+          for (let r = 0; r < 2; r++) {
+            const pose = r === 0 ? "idle" : "aiming";
+            this.character.setTexture(CHARACTERS[charId].sprites[pose]);
+            this.heldBall.setAlpha(1);
+            this.updateHeldBall(pose);
+            await frames(3);
+            const left = Math.round(this.character.x - 32 - cam.scrollX);
+            const top = Math.round(this.character.y - 64 - cam.scrollY);
+            const img = await grab(left + 28, top + (r === 0 ? 22 : -2), CW, CH);
+            const x = GAP + i * (CW * K + GAP);
+            const y = y0 + LABEL + r * (CH * K + LABEL);
+            g.drawImage(img, x, y, CW * K, CH * K);
+            if (r === 0) {
+              g.fillStyle = "#fff";
+              g.fillText(ids[i], x, y - 3);
+            }
+          }
+        }
+        y0 += 2 * CH * K + LABEL * 2 + GAP;
+      }
+    } finally {
+      this.calibrating = false;
+      this.characterId = saved.char;
+      this.projVisuals = saved.proj;
+      this.character.setTexture(saved.tex);
+      cam.setZoom(saved.z);
+      cam.scrollX = saved.sx;
+      cam.scrollY = saved.sy;
+    }
+    const el = document.createElement("img");
+    el.src = sheet.toDataURL();
+    el.style.cssText = "position:fixed;left:0;top:0;z-index:99999;background:#222;width:100vw;image-rendering:pixelated";
+    el.addEventListener("click", () => el.remove());
+    document.body.appendChild(el);
   }
 
   // How many pixels the drawn part of a picture is wide / high (the larger of the two; its opaque bounding box), measured once per picture.
@@ -908,10 +1075,12 @@ class MainScene extends Phaser.Scene {
     return px;
   }
 
-  // The projectile in the character's hand (idle: upside down, aiming: upright), placed by CHARACTER_HANDS; hidden when the hands are empty
+  // The projectile in the character's hand (idle: upside down, aiming: upright), placed by CHARACTERS[..].hands and the projectile's `hold`; hidden when the hands are empty
   // or while the projectile is being thrown.
   updateHeldBall(pose) {
-    const hand = CHARACTER_HANDS[pose];
+    const base = CHARACTERS[this.characterId].hands[pose];
+    const adj = ((this.projVisuals.hold || {})[this.characterId] || {})[pose] || {}; // this projectile's own adjustment for this character and pose
+    const hand = base ? { ...base, ...adj, x: base.x + (adj.dx || 0), y: base.y + (adj.dy || 0), rest: base.rest !== undefined ? base.rest + (adj.dy || 0) : undefined } : null;
     const b = this.heldBall;
     if (!hand) {
       b.setVisible(false);

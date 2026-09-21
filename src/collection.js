@@ -292,14 +292,30 @@ const Collection = (() => {
 
   let buffKeyShown = "";
 
-  // Full redraw...
+  // Scrolls the list so the card `id` is in the MIDDLE of what is shown - so the one the player probably wants (what they have equipped, or used
+  // last) is in sight and its neighbours are a short scroll away in both directions. Where the middle is impossible (the card is near the top or the
+  // bottom of a long list) the list simply stops at its top / bottom; no id or no such card: the top. Call after the cards are drawn and fitted.
+  function centerOn(id) {
+    scrollEl.scrollTop = 0;
+    if (!id) return;
+    const row = [...scrollEl.querySelectorAll(".pick-row")].find((r) => r.dataset.id === id);
+    if (!row) return;
+    const r = row.getBoundingClientRect();
+    const top = r.top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop; // the card's top inside the scrolled content
+    const target = top + r.height / 2 - scrollEl.clientHeight / 2;
+    scrollEl.scrollTop = Math.max(0, Math.min(target, scrollEl.scrollHeight - scrollEl.clientHeight));
+  }
+
+  // Full redraw (the scroll position is kept: a redraw because a buff was used or ran out must not throw the player back to the top)...
   function renderBuffList() {
     const list = Buffs.owned();
     buffKeyShown = buffKey(list);
+    const keep = scrollEl.scrollTop;
     scrollEl.innerHTML = list.length
       ? list.map(buffRowHtml).join("")
       : `<div class="list-empty">NO BUFFS YET<br /><br />BUY ONE IN THE SHOP FIRST</div>`;
     fitNames();
+    scrollEl.scrollTop = keep;
   }
 
   // ...and a cheap timer-only refresh twice a second while it's open.
@@ -347,7 +363,7 @@ const Collection = (() => {
           .map(skinRowHtml)
           .join("") + `<div class="list-soon">More coming soon!</div>`; // (under the last card: the default one)
       fitNames();
-      scrollEl.scrollTop = 0;
+      centerOn(Economy.getEquipped(kind)); // opens on what is equipped
       refreshButtons();
       container.classList.add("list-open");
       buttons.projectile.classList.remove("active");
@@ -365,7 +381,7 @@ const Collection = (() => {
       Economy.clearUnseenBuffs(); // the player is looking at the tab now: its red dot goes
       titleEl.textContent = "BUFFS";
       renderBuffList();
-      scrollEl.scrollTop = 0;
+      centerOn(Economy.getLastUsedBuff()); // opens on the buff used last (which may be running now)
       container.classList.add("list-open");
       buttons.projectile.classList.remove("active");
       return;
@@ -376,7 +392,7 @@ const Collection = (() => {
       .map((it) => rowHtml(kind, it))
       .join("");
     fitNames();
-    scrollEl.scrollTop = 0;
+    centerOn(Economy.getEquipped("projectile")); // opens on the equipped projectile
     refreshButtons();
     container.classList.add("list-open");
     buttons.projectile.classList.toggle("active", kind === "projectile");

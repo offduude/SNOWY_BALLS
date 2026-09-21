@@ -175,6 +175,7 @@ const Buffs = (() => {
     if (eventBlocked(item)) return false; // an event is running: no second one
     if (!Economy.takeBuff(id)) return false;
     activate(item);
+    Economy.setLastUsedBuff(id); // the BUFFS list opens on the buff used last
     return true;
   }
 

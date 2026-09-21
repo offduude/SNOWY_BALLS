@@ -43,7 +43,7 @@
     {
       "id": "frosty",
       "name": "Frosty",
-      "description": "Look! It's snowing!",
+      "description": "I forgot to bring my jacket!",
       "image": "assets/scenery/frosty.png",
       "background": "assets/building/background.png",
       "rarity": "default",

@@ -341,7 +341,7 @@ const CHARACTERS = {
 };
 const DEFAULT_CHARACTER = "character1";
 const DEFAULT_BACKGROUND = "assets/building/background.png"; // the wall picture that is loaded at the start (the key "background"); the default scenery Frosty uses it
-const WEATHER_DEPTH = 1; // the weather's particles are drawn one layer under the character (depth 2): over the building, behind the character, the marks (5) and the ball (10)
+const WEATHER_DEPTH = 9; // the weather's particles are drawn over the character (depth 2) - the same depth as the roses: over the building, over the marks (5), under the live ball (10)
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
 // apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex - and the closer it gets to the apex the

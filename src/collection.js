@@ -97,7 +97,6 @@ const Collection = (() => {
   const SKIN_KINDS = ["skins", ...SKIN_MENUS];
   const SKIN_TITLES = { skins: "SKINS", character: "CHARACTERS", scenery: "SCENERIES", weather: "WEATHER" };
   const SKIN_LISTS = { character: "characters", scenery: "sceneries", weather: "weathers" };
-  const CAN_UNEQUIP = ["weather"]; // a kind that can have nothing equipped: tapping the equipped one's button turns it off (equipped id "none")
 
   function skinItems(kind) {
     return (eco && eco[SKIN_LISTS[kind]]) || [];
@@ -216,36 +215,66 @@ const Collection = (() => {
     });
   }
 
-  // A character / scenery card: picture, name, description, the rarity in the top-right corner (no amount), the EQUIP button, the detail at the bottom.
-  function skinRowHtml(item) {
+  // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner (no amount), the EQUIP button, the detail at the bottom.
+  // `action` replaces the EQUIP button (the SKINS list's CHANGE, the shop's price button), `extraClass` is added to the card.
+  function skinRowHtml(item, action, extraClass) {
     const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
     return (
-      `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}" data-id="${esc(item.id)}">` +
+      `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}" data-id="${esc(item.id)}">` +
       `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description || "")}</div></div>` +
-      `<div class="pick-action"><button class="pick-equip" type="button" data-id="${esc(item.id)}"></button></div>` +
+      `<div class="pick-action">${action || `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>`}</div>` +
       detail +
       cornerHtml(item.rarity, "") +
       `</div>`
     );
   }
 
-  // The SKINS list itself: one card per category, looking like a skin card - the picture and the name of what is equipped now, the category as the title -
-  // with a CHANGE button in place of EQUIP that opens the category's menu. The three cards share the whole height of the list (see the CSS for
-  // #list-scroll[data-kind="skins"]), so it never scrolls.
+  // The SKINS list itself: one card per category, and each is the card of the skin that is EQUIPPED in it (name, description, rarity, detail - exactly what
+  // its own menu shows) with a CHANGE button in place of EQUIP that opens the category's menu. The three cards share the whole height of the list (see
+  // the CSS for #list-scroll[data-kind="skins"]), so it never scrolls.
   function skinsMenuHtml() {
     return SKIN_MENUS.map((kind) => {
-      const it = skinItems(kind).find((x) => x.id === Economy.getEquipped(kind));
-      const now = it ? it.name : Economy.getEquipped(kind) === "none" ? "None" : "";
+      const list = skinItems(kind);
+      const it = list.find((x) => x.id === Economy.getEquipped(kind)) || list[0];
+      return it ? skinRowHtml(it, `<button class="pick-equip skins-change" type="button" data-skins="${kind}">CHANGE</button>`, " skins-category") : "";
+    }).join("");
+  }
+
+  // ---- The SHOP's inspect card (shop.js: holding a card down): the card the item has in its own list (PROJECTILES, BUFFS, a SKINS menu) with `action` - the
+  //      price button - in place of EQUIP / USE. A stack shows how many are on sale (x14) where the list shows how many the player has.
+  function shopCardHtml(item, offer, action) {
+    if (item.category === "projectile") {
+      const cat = CATALOG.projectile.items.find((i) => i.id === item.id) || { id: item.id, name: item.name, description: item.description, image: item.image };
+      const stats = statsHtml("projectile", cat);
+      const p = eco && eco.projectiles && eco.projectiles[item.id];
       return (
-        `<div class="pick-row buff-row skins-category" data-skins="${kind}">` +
-        (it ? `<img class="pick-pic" src="${esc(it.image || "")}" alt="" draggable="false" />` : `<span class="pick-pic"></span>`) +
-        `<div class="pick-text"><div class="pick-name">${esc(SKIN_TITLES[kind])}</div><div class="pick-desc">${esc(now)}</div></div>` +
-        `<div class="pick-action"><button class="pick-equip skins-change" type="button" data-skins="${kind}">CHANGE</button></div>` +
+        `<div class="pick-row${stats ? " has-stats" : ""}" data-id="${esc(item.id)}">` +
+        `<img class="pick-pic" src="${esc(cat.image || "")}" alt="" draggable="false" />` +
+        `<div class="pick-text"><div class="pick-name">${esc(cat.name)}</div><div class="pick-desc">${esc(cat.description || "")}</div></div>` +
+        `<div class="pick-action">${action}</div>` +
+        cornerHtml(p && p.rarity, offer && offer.amount ? `x${offer.amount}` : "") +
+        stats +
         `</div>`
       );
-    }).join("");
+    }
+    if (item.category === "consumable") {
+      const len = Buffs.summonMs(item);
+      const maxText = len ? clock(len) : Buffs.isCharge(item) ? "+1" : clock(Buffs.durationMs(item)); // (how long it lasts, under the button like in the BUFFS list)
+      const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
+      return (
+        `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}" data-id="${esc(item.id)}">` +
+        `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
+        `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div><div class="pick-desc">${esc(item.description || "")}</div></div>` +
+        `<div class="pick-action">${action}<div class="pick-regen"><span>${maxText}</span></div></div>` +
+        detail +
+        cornerHtml(Rarity.ofItem(item), "") +
+        `</div>`
+      );
+    }
+    const skin = skinItems(item.category).find((x) => x.id === item.id) || item; // a character / scenery / weather
+    return skinRowHtml(skin, action);
   }
 
   // ---- BUFFS list: the buffs the player has (bought, waiting) or is running. Same cards as the projectiles list without
@@ -470,16 +499,15 @@ const Collection = (() => {
     }
     const btn = e.target.closest(".pick-equip");
     if (!btn) return;
-    const unequip = btn.classList.contains("on") && CAN_UNEQUIP.includes(openKind); // the equipped weather's button: the weather is turned off
-    if (btn.classList.contains("on") && !unequip) return;
-    Economy.setEquipped(openKind, unequip ? "none" : btn.dataset.id);
+    if (btn.classList.contains("on")) return;
+    Economy.setEquipped(openKind, btn.dataset.id);
     if (SKIN_MENUS.includes(openKind)) {
       // A character / scenery / weather is equipped in place: the list stays open (its buttons show the change), the game switches at once.
       click();
       refreshButtons();
       const game = window.snowyBallsGame;
       const scene = game && game.scene.getScene("main");
-      if (scene) scene[{ character: "onCharacterEquipped", scenery: "onSceneryEquipped", weather: "onWeatherEquipped" }[openKind]](unequip ? "none" : btn.dataset.id);
+      if (scene) scene[{ character: "onCharacterEquipped", scenery: "onSceneryEquipped", weather: "onWeatherEquipped" }[openKind]](btn.dataset.id);
       return;
     }
     if (openKind === "projectile") {
@@ -499,6 +527,7 @@ const Collection = (() => {
 
   return {
     isOpen: () => openKind !== null,
+    shopCardHtml,
     projectileImage: (id) => ((CATALOG.projectile.items.find((i) => i.id === id) || {}).image) || "", // (the counter under the top-right buttons)
     close,
     setEconomy(economyJson) {

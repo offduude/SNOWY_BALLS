@@ -1252,7 +1252,6 @@ class MainScene extends Phaser.Scene {
   // everywhere else - and are gone when they leave over the other side.
   applyWeather(id) {
     this.clearWeather();
-    if (id === "none") return; // no weather equipped: the sky is empty
     const list = (this.eco && this.eco.weathers) || [];
     const def = list.find((x) => x.id === id) || list[0];
     if (!def) return;

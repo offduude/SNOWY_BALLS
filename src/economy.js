@@ -40,7 +40,7 @@ const Economy = (() => {
       unlockedSceneries: ["frosty"], // ... and of the sceneries
       unlockedWeathers: ["snow"], // ... and of the weathers
       shopClock: { base: 0, shop: 0, rate: 1 }, // the SHOP's clock (see shopNow): shop time = shop + rate x (device time - base); the default is the device clock itself
-      equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" }, // what the player currently uses (weather can also be "none": unequipped)
+      equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" }, // what the player currently uses
       buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
       shop: {
         offers: [], // per slot: null, or { amount, unitPrice } rolled for a stack item on sale there
@@ -117,6 +117,7 @@ const Economy = (() => {
       equipped: (() => {
         const eq = { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) };
         if (eq.character === "default") eq.character = "andek";
+        if (eq.weather === "none") eq.weather = base.equipped.weather; // (weather could be turned off for a day: it cannot any more)
         return eq;
       })(),
       buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number").map((b) => ({ ...b, id: rn(b.id) })) : [],

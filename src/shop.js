@@ -305,6 +305,73 @@ const Shop = (() => {
 
   // ---------- UI ----------
 
+  // HOLD TO INSPECT: holding a card down (HOLD_MS, without moving) opens an inspect popup - the item's card from its own list (Collection.shopCardHtml) with a
+  // button that shows the price and buys it - and a tap on a card still buys at once, as before. A click anywhere outside the popup's card closes it. The
+  // release of the hold must not count as a tap (holdFired), and the popup ignores clicks for a moment after it opens so the finger that is still on it can't buy.
+  const HOLD_MS = 450;
+  const HOLD_SLOP = 10; // px the finger may move and still be a hold
+  let holdTimer = null;
+  let holdFrom = null;
+  let holdFired = false;
+  let inspectEl = null;
+  let inspecting = null; // { slot, id } of the card in the popup
+  let inspectOpenedAt = 0;
+
+  function cancelHold() {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+  }
+
+  function closeInspect() {
+    inspecting = null;
+    if (inspectEl) inspectEl.classList.remove("show");
+  }
+
+  function openInspect(slot) {
+    const st = Economy.getShopState();
+    const id = st.stock && st.stock[slot];
+    const item = id && itemById(id);
+    if (!item || !inspectEl) return;
+    const offer = (st.offers || [])[slot] || null;
+    const p = price(item, offer);
+    const afford = Economy.getCoins() >= p && !isMaxed(item);
+    inspecting = { slot, id };
+    inspectOpenedAt = Date.now();
+    inspectEl.querySelector("#shop-inspect-card").innerHTML = Collection.shopCardHtml(
+      item,
+      offer,
+      `<button class="pick-equip shop-buy${afford ? "" : " cant"}" type="button"><i class="coin"></i><span>${p}</span></button>`
+    );
+    inspectEl.classList.add("show");
+  }
+
+  function onInspectClick(e) {
+    if (Date.now() - inspectOpenedAt < 350) return;
+    const btn = e.target.closest(".shop-buy");
+    if (!btn) {
+      if (!e.target.closest(".pick-row")) closeInspect(); // outside the card
+      return;
+    }
+    if (!inspecting) return;
+    const { slot, id } = inspecting;
+    const st = Economy.getShopState();
+    if (!st.stock || st.stock[slot] !== id) {
+      closeInspect(); // the slot changed meanwhile (its timer ran out): not the item that was inspected any more
+      render();
+      return;
+    }
+    const result = buy(slot);
+    if (result.ok) {
+      playUiClick();
+      closeInspect();
+      render();
+    } else {
+      btn.classList.remove("shake");
+      void btn.offsetWidth;
+      btn.classList.add("shake");
+    }
+  }
+
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
@@ -401,6 +468,10 @@ const Shop = (() => {
   }
 
   function onClick(e) {
+    if (holdFired) {
+      holdFired = false; // the click that ends a hold (the inspect popup opened): not a purchase
+      return;
+    }
     const btn = e.target.closest(".shop-card[data-slot]");
     if (!btn) return;
     // A just-bought card lingers ~220ms while it fades; a quick double-tap on it must not count as
@@ -430,6 +501,26 @@ const Shop = (() => {
       syncRate();
       root = document.getElementById("shop-items");
       root.addEventListener("click", onClick);
+      inspectEl = document.getElementById("shop-inspect");
+      inspectEl.addEventListener("click", onInspectClick);
+      // hold to inspect; and no browser menu for an image / a card that is held down (it offered to save or share the picture)
+      root.addEventListener("pointerdown", (e) => {
+        holdFired = false;
+        const card = e.target.closest(".shop-card[data-slot]");
+        cancelHold();
+        if (!card) return;
+        holdFrom = { x: e.clientX, y: e.clientY };
+        holdTimer = setTimeout(() => {
+          holdTimer = null;
+          holdFired = true;
+          openInspect(Number(card.dataset.slot));
+        }, HOLD_MS);
+      });
+      root.addEventListener("pointermove", (e) => {
+        if (holdTimer && holdFrom && Math.hypot(e.clientX - holdFrom.x, e.clientY - holdFrom.y) > HOLD_SLOP) cancelHold();
+      });
+      ["pointerup", "pointercancel", "pointerleave"].forEach((t) => root.addEventListener(t, cancelHold));
+      [root, inspectEl].forEach((el) => el.addEventListener("contextmenu", (e) => e.preventDefault()));
       dotEl = document.getElementById("shop-dot");
       // generate / repair / restock the saved stock right away, before the shop is ever opened
       announceRestock(ensureStock(), false); // timers that ran out while the app was closed: dot, no sound
@@ -442,6 +533,7 @@ const Shop = (() => {
     // Called every time the shop screen opens.
     onOpen() {
       if (!eco) return;
+      closeInspect();
       ensureStock();
       // The player is looking at the shop now, so whatever the dot was about is seen.
       Economy.getShopState().unseen = false;

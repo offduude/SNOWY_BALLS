@@ -242,6 +242,82 @@
       }
     }
 
+    /* HOLD to INSPECT: under the cork board, in the style of the game's "TAP to AIM" (#message). */
+    #shop-hint {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 2.4%;
+      text-align: center;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+        0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: 4;
+    }
+
+    #game-container.shop-open #shop-hint { opacity: 1; }
+
+    /* The inspect popup (shop.js): a dimmed backdrop over the shop with the item's card in the middle; a click outside the card closes it. */
+    #shop-inspect {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 6;
+    }
+
+    #game-container.shop-open #shop-inspect.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #shop-inspect-card {
+      width: 52%;
+      font-family: "Press Start 2P", monospace;
+      color: #3b2412;
+    }
+
+    /* The buy button: the coin and the price (wider than EQUIP when the price needs it). */
+    .pick-equip.shop-buy {
+      width: auto;
+      min-width: calc(var(--u) * (1.2 * 8 + 2.4) + 4px);
+      padding-left: calc(var(--u) * 1);
+      padding-right: calc(var(--u) * 1);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: calc(var(--u) * 0.7);
+    }
+
+    .pick-equip.shop-buy .coin {
+      display: inline-block;
+      width: calc(var(--u) * 1.4);
+      height: calc(var(--u) * 1.4);
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
+
+    .pick-equip.shop-buy.cant { opacity: 0.7; }
+    .pick-equip.shop-buy.shake { animation: shop-shake 0.3s linear; }
+
+    /* A held-down picture must not open the browser's image menu (save / share): the pictures take no touches at all, nothing is selectable or draggable. */
+    img { -webkit-touch-callout: none; -webkit-user-drag: none; user-select: none; }
+    .shop-pic img, .pick-pic { pointer-events: none; }
+    .shop-card, #shop-inspect { -webkit-touch-callout: none; }
+
     /* Space for the item's picture: takes whatever height is left between the category and the name. */
     .shop-pic {
       position: relative; /* the availability timer sits in its top-left corner */
@@ -665,7 +741,6 @@
 
     .pick-equip:active { background: #74491f; }
     .pick-equip.on { background: #b9a88f; border-color: #8a7a62; color: #f4ead0; cursor: default; }
-    #list-scroll[data-kind="weather"] .pick-equip.on { cursor: pointer; } /* the equipped weather's button turns it off */
     /* a USE button that cannot be used now (an event buff while an event runs) */
     .pick-use.off { opacity: 0.45; filter: grayscale(0.6); cursor: default; }
 
@@ -1227,6 +1302,8 @@
     <div id="message"></div>
     <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
     <div id="shop-items"></div>
+    <div id="shop-hint">HOLD to INSPECT</div>
+    <div id="shop-inspect"><div id="shop-inspect-card"></div></div>
     <div id="list-backdrop"></div>
     <div id="list-panel">
       <div id="list-title"></div>
@@ -1251,8 +1328,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=226"></script>
-  <script src="src/economy.js?v=31"></script>
+  <script src="src/version.js?v=227"></script>
+  <script src="src/economy.js?v=32"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1281,18 +1358,18 @@
   </script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
-  <script src="src/shop.js?v=26"></script>
+  <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=1"></script>
   <script src="src/saves.js?v=7"></script>
-  <script src="src/collection.js?v=67"></script>
-  <script src="src/main.js?v=160"></script>
+  <script src="src/collection.js?v=68"></script>
+  <script src="src/main.js?v=161"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-inspect", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

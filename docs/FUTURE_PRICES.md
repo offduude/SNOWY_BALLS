@@ -83,6 +83,14 @@ The disco event (built) pays a fixed **x1.25** on every hit of the singer's face
 - Sensitivity: the price scales with the face-hit rate and with (multiplier - 1): at a 20% face-hit rate the average would be about 3,900, at 50% about 9,700; a x1.5 multiplier instead of x1.25 would double it.
 - While it runs it also blocks every other event and every event buff for about 3 minutes (a real cost, not priced).
 
+## Guitar buff (epic; built as the Guitar Pick, 2026-09-21) - price estimate
+
+The guitar event pays a fixed x1.25 on every hit of the guitarist's face while the 38.6 s song plays (the face stays); same method as the disco above.
+
+- Assumptions: about 10 throws a minute -> **6.4 throws** in the song; the face (15 x 15 px) is hit on about **35%** of them with the orange dot to aim at -> **2.25 face hits**; each is worth 0.25 x the hit value extra.
+- Return: an epic standard projectile (Tomato, hit 960): 2.25 x 0.25 x 960 = **about 540**; the Grenade (2,400): about 1,350.
+- Price at the plan's 60% of the standard return: **about 325**, +-25%: **245-405** (Tomato Juice, the banana face's buff, is 410-685: the banana pays x2 once, the guitar x1.25 a few times, for a shorter time than the disco).
+
 ## The banana face becomes an epic event (2026-09-20)
 
 The banana face event and its buff Tomato Juice moved from legendary to **epic**: the event has the rarity of its summon buff, so its natural chance follows the epic shop rarity - **1 in 111 throws** instead of about 1 in 2000 (18x more often). Fair values:

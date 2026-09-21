@@ -76,6 +76,7 @@
   "projectiles": {
     "snowball": { "infinite": false, "regen": { "max": 50, "everySeconds": 30 }, "rarity": "default", "weight": "moderate", "leavesMark": true, "spins": false },
     "chestnut": { "infinite": false, "rarity": "common", "weight": "moderate", "leavesMark": false, "spins": true },
+    "onion": { "infinite": false, "rarity": "rare", "weight": "light", "leavesMark": false, "spins": true },
     "egg": { "infinite": false, "rarity": "rare", "hitValue": 320, "weight": "heavy", "leavesMark": true, "spins": true },
     "rowan_berry": { "infinite": false, "rarity": "common", "weight": "light", "leavesMark": false, "spins": true },
     "stone": { "infinite": false, "rarity": "common", "hitValue": 40, "weight": "heavy", "leavesMark": false, "spins": true },
@@ -316,6 +317,17 @@
         "image": "assets/snowball/chestnut.png",
         "effect": { "type": "givesProjectile", "value": "chestnut" },
         "description": "Found it in someone's backpack. How convenient!"
+      },
+      {
+        "id": "onion",
+        "name": "Onion",
+        "category": "projectile",
+        "amount": { "min": 3, "max": 7 },
+        "unitPrice": { "min": 60, "max": 100 },
+        "ignorePriceOverride": true,
+        "image": "assets/snowball/onion.png",
+        "effect": { "type": "givesProjectile", "value": "onion" },
+        "description": "Cry Me a River."
       },
       {
         "id": "pinecone",

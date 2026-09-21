@@ -210,6 +210,12 @@ const PROJECTILE_VISUALS = {
     impactSound: "chestnut_impact",
     impactVolume: 0.5,
   },
+  onion: {
+    ball: "onion",
+    sprites: { idle: "char_idle", aiming: "char_aiming", throwing: "char_throwing" }, // (no pictures of its own: it is drawn in the hand, see CHARACTERS)
+    impactSound: "chestnut_impact", // sounds and behaves like the chestnut (no mark, it bounces off)
+    impactVolume: 0.5,
+  },
   egg: {
     ball: "egg",
     sprites: { idle: "char_idle_egg", aiming: "char_aiming_egg", throwing: "char_throwing" },
@@ -348,6 +354,7 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_aiming_snowball", "assets/character/character1_aiming_snowball.png"); // a snowball in hand (used when USE_HELD_PROJECTILES is off)
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
+    this.load.image("onion", "assets/snowball/onion.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
     this.load.image("stone", "assets/snowball/stone.png");
     this.load.image("egg", "assets/snowball/egg.png");

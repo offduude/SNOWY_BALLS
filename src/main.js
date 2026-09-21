@@ -1238,7 +1238,7 @@ class MainScene extends Phaser.Scene {
   }
 
   // ---- WEATHER (economy.json weathers, the third skins category) ----
-  // Particles fall from the sky just like the roses of the applause (they start above the top of the world, fall straight down and are gone below the bottom of
+  // Particles fall from the sky just like the roses of the applause (they start above the top of the world, fall and are gone below the bottom of
   // the default view), over the whole game picture, for as long as the weather is equipped. A weather names its density and its fall speed (economy.json
   // weatherDensities / weatherSpeeds): the density is how many particles are in the picture (432 x 243) at once, so the spawn rate is worked out from it and the
   // fall speed - a slow weather is not thinner than a fast one. When a weather starts the sky is already full (the particles are spread over the whole fall).
@@ -1294,8 +1294,8 @@ class MainScene extends Phaser.Scene {
       x0: x,
       age: 0,
       vy: Phaser.Math.FloatBetween(w.from, w.to),
-      vx: Phaser.Math.FloatBetween(-4, 4), // a hair of sideways drift
-      swayPx: (w.def.sway || 0) * Phaser.Math.FloatBetween(0.5, 1.2), // and a gentle swing from side to side
+      vx: (w.def.drift || 0) * Phaser.Math.FloatBetween(-1, 1), // sideways drift (economy.json `drift`, none by default: straight down)
+      swayPx: (w.def.sway || 0) * Phaser.Math.FloatBetween(0.5, 1.2), // a gentle swing from side to side (`sway`, none by default)
       swayHz: Phaser.Math.FloatBetween(0.4, 0.9),
       phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
     });

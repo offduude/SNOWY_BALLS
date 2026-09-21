@@ -217,10 +217,11 @@ const Collection = (() => {
 
   // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner (no amount), the EQUIP button, the detail at the bottom.
   // `action` replaces the EQUIP button (the SKINS list's CHANGE, the shop's price button), `extraClass` is added to the card.
-  function skinRowHtml(item, action, extraClass) {
+  function skinRowHtml(item, action, extraClass, dot) {
     const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
     return (
       `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}" data-id="${esc(item.id)}">` +
+      (dot ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description || "")}</div></div>` +
@@ -238,7 +239,7 @@ const Collection = (() => {
     return SKIN_MENUS.map((kind) => {
       const list = skinItems(kind);
       const it = list.find((x) => x.id === Economy.getEquipped(kind)) || list[0];
-      return it ? skinRowHtml(it, `<button class="pick-equip skins-change" type="button" data-skins="${kind}">CHANGE</button>`, " skins-category") : "";
+      return it ? skinRowHtml(it, `<button class="pick-equip skins-change" type="button" data-skins="${kind}">CHANGE</button>`, " skins-category", Economy.kindHasUndisplayedSkins(kind)) : "";
     }).join("");
   }
 
@@ -391,6 +392,20 @@ const Collection = (() => {
   function markSeen() {
     if (openKind === "buff") Economy.clearNewBuffs();
     else if (openKind === "projectile") Economy.clearNewProjectiles();
+    else if (SKIN_MENUS.includes(openKind)) Economy.closeSkinKind(openKind); // the dots of the new skins that were on display go when the menu is closed / left
+  }
+
+  // In a skin menu: a new skin whose card is on screen (at least half of it inside the visible part of the list) has been DISPLAYED - the player has seen it,
+  // so its category's dot (in the SKINS list) goes. Checked when the menu opens and whenever it is scrolled.
+  function checkDisplayed() {
+    if (!SKIN_MENUS.includes(openKind)) return;
+    const view = scrollEl.getBoundingClientRect();
+    scrollEl.querySelectorAll(".pick-row").forEach((row) => {
+      if (!Economy.isNewSkin(openKind, row.dataset.id)) return;
+      const r = row.getBoundingClientRect();
+      const visible = Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top);
+      if (visible >= r.height / 2) Economy.markSkinDisplayed(openKind, row.dataset.id);
+    });
   }
 
   function open(kind) {
@@ -415,13 +430,15 @@ const Collection = (() => {
       titleEl.textContent = SKIN_TITLES[kind];
       scrollEl.innerHTML =
         sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
-          .map((it) => skinRowHtml(it))
+          .map((it) => skinRowHtml(it, null, "", Economy.isNewSkin(kind, it.id)))
           .join("") + `<div class="list-soon">More coming soon!</div>`; // (under the last card: the default one)
       fitNames();
       centerOn(Economy.getEquipped(kind)); // opens on what is equipped
       refreshButtons();
       container.classList.add("list-open");
       buttons.projectile.classList.remove("active");
+      Economy.enterSkinKind(kind); // the SKINS button's dot goes: the category with the new skin was entered
+      checkDisplayed(); // ... and if the new skin is already in view, the category's dot goes with it (otherwise: when it is scrolled to)
       return;
     }
     if (kind === "options") {
@@ -502,6 +519,11 @@ const Collection = (() => {
     if (btn.classList.contains("on")) return;
     Economy.setEquipped(openKind, btn.dataset.id);
     if (SKIN_MENUS.includes(openKind)) {
+      Economy.clearNewSkin(openKind, btn.dataset.id); // equipping a new skin takes its dot away
+      const dot = btn.closest(".pick-row").querySelector(".pick-new");
+      if (dot) dot.remove();
+    }
+    if (SKIN_MENUS.includes(openKind)) {
       // A character / scenery / weather is equipped in place: the list stays open (its buttons show the change), the game switches at once.
       click();
       refreshButtons();
@@ -570,6 +592,12 @@ const Collection = (() => {
           if (regen) regen.textContent = regenText(id);
         });
       }, 500);
+      // Red dot on the top-right corner of the SKINS button: a skin was unlocked and its category has not been entered yet.
+      const skinsDot = document.getElementById("skins-dot");
+      const updateSkinsDot = () => skinsDot && skinsDot.classList.toggle("show", Economy.hasNewSkinsToEnter());
+      Economy.onSkinsChange(updateSkinsDot);
+      updateSkinsDot();
+      scrollEl.addEventListener("scroll", checkDisplayed);
       // Red dot on the top-left corner of the BUFFS button: a new kind of buff arrived (not more of one already there).
       const buffDot = document.getElementById("buffs-dot");
       const updateBuffDot = () => buffDot && buffDot.classList.toggle("show", Economy.hasUnseenBuffs());

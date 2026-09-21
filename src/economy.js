@@ -25,6 +25,7 @@ const Economy = (() => {
       bestStreak: 0,
       newBuffs: [], // ids of the buffs that are NEW in the BUFFS tab: each card shows a red dot until the tab is closed
       newProjectiles: [], // same for the PROJECTILES list
+      newSkins: [], // skins that were UNLOCKED and not dealt with yet: { kind, id, entered, displayed } - see the skin dots below
       buffsUnseen: false, // a NEW kind of buff arrived and the player hasn't opened the BUFFS tab yet (red dot)
       buffItems: {}, // how many of each buff the player has bought and not used yet (id -> count); using one starts it (see buffs.js)
       projectiles: {}, // how many of each consumable projectile the player has (not the snowball - see regen)
@@ -104,6 +105,11 @@ const Economy = (() => {
       buffItems: rnCounts(cleanCounts(p.buffItems)),
       newBuffs: [...new Set(cleanIds(p.newBuffs).map(rn))],
       newProjectiles: cleanIds(p.newProjectiles),
+      newSkins: Array.isArray(p.newSkins)
+        ? p.newSkins
+            .filter((n) => n && ["character", "scenery", "weather"].includes(n.kind) && typeof n.id === "string")
+            .map((n) => ({ kind: n.kind, id: n.id, entered: n.entered === true, displayed: n.displayed === true }))
+        : [],
       buffsUnseen: p.buffsUnseen === true,
       projectilesUnseen: p.projectilesUnseen === true,
       // (the default character used to be called "default": it is Andek now)
@@ -475,6 +481,14 @@ const Economy = (() => {
     return state.bestStreak;
   }
 
+  const skinListeners = [];
+  function onSkinsChange(fn) {
+    skinListeners.push(fn);
+  }
+  function skinsChanged() {
+    skinListeners.forEach((fn) => fn());
+  }
+
   // The list of the ids the player has of a skin kind.
   function unlockedList(kind) {
     return kind === "character" ? state.unlockedCharacters : kind === "weather" ? state.unlockedWeathers : state.unlockedSceneries;
@@ -623,7 +637,49 @@ const Economy = (() => {
       const list = unlockedList(kind);
       if (!list.includes(id)) {
         list.push(id);
+        state.newSkins.push({ kind, id, entered: false, displayed: false }); // a new skin: the red dots (below)
         save();
+        skinsChanged();
+      }
+    },
+    // ---- THE RED DOTS OF A NEW SKIN (three of them, each with its own rule) ----
+    //  - the SKINS button's: on while a new skin's category has not been ENTERED (opening the SKINS list itself does not count) - enterSkinKind
+    //  - the category's (its card in the SKINS list): on until the new skin has been DISPLAYED, i.e. it was on screen in the category's menu (the player scrolls
+    //    down to it unless it is already in view) - markSkinDisplayed
+    //  - the skin's own card: on until the skin is EQUIPPED (clearNewSkin) or the menu is closed / left after the skin was displayed (closeSkinKind)
+    onSkinsChange,
+    hasNewSkinsToEnter: () => state.newSkins.some((n) => !n.entered),
+    kindHasUndisplayedSkins: (kind) => state.newSkins.some((n) => n.kind === kind && !n.displayed),
+    isNewSkin: (kind, id) => state.newSkins.some((n) => n.kind === kind && n.id === id),
+    enterSkinKind: (kind) => {
+      let changed = false;
+      for (const n of state.newSkins) if (n.kind === kind && !n.entered) ((n.entered = true), (changed = true));
+      if (changed) {
+        save();
+        skinsChanged();
+      }
+    },
+    markSkinDisplayed: (kind, id) => {
+      const n = state.newSkins.find((x) => x.kind === kind && x.id === id);
+      if (!n || n.displayed) return;
+      n.displayed = true;
+      save();
+      skinsChanged();
+    },
+    clearNewSkin: (kind, id) => {
+      const before = state.newSkins.length;
+      state.newSkins = state.newSkins.filter((n) => !(n.kind === kind && n.id === id));
+      if (state.newSkins.length !== before) {
+        save();
+        skinsChanged();
+      }
+    },
+    closeSkinKind: (kind) => {
+      const before = state.newSkins.length;
+      state.newSkins = state.newSkins.filter((n) => !(n.kind === kind && n.displayed));
+      if (state.newSkins.length !== before) {
+        save();
+        skinsChanged();
       }
     },
     getBuffList,

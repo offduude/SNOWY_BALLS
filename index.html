@@ -976,6 +976,12 @@
       top: -8px;
     }
 
+    /* The same dot on the top-right corner of the SKINS button (the second button: 32px tall buttons, 8px gap -> it starts 40px down). */
+    #skins-dot {
+      right: -8px;
+      top: 32px;
+    }
+
     /* Same dot on the top-left corner of the BUFFS button (button: 10px from the right edge, 96px wide, 10px from the top). */
     #buffs-dot {
       right: 98px; /* 10 + 96 - half the dot */
@@ -1341,6 +1347,7 @@
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
       <span id="projectiles-dot" class="notif-dot"></span>
       <button id="skins-btn" class="side-btn" type="button">SKINS</button>
+      <span id="skins-dot" class="notif-dot"></span>
       <button id="options-btn" class="side-btn" type="button">OPTIONS</button>
     </div>
     <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
@@ -1349,8 +1356,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=231"></script>
-  <script src="src/economy.js?v=33"></script>
+  <script src="src/version.js?v=232"></script>
+  <script src="src/economy.js?v=34"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1382,7 +1389,7 @@
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=8"></script>
-  <script src="src/collection.js?v=69"></script>
+  <script src="src/collection.js?v=70"></script>
   <script src="src/main.js?v=164"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

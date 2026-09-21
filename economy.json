@@ -314,7 +314,7 @@
         "priceRange": { "min": 245, "max": 405 },
         "ignorePriceOverride": true,
         "charge": true,
-        "image": "assets/items/guitar_pick.png",
+        "image": "assets/items/guitar_pick.png?v=2",
         "effects": [{ "type": "triggerEvent", "value": "guitar" }],
         "description": "Thin pick, perfect for a beginner!",
         "detail": "Listen to a virtuoso of our times."

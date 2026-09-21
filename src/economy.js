@@ -35,8 +35,9 @@ const Economy = (() => {
       coinCarry: 0, // the fraction of a coin left over from a payout with a coin multiplier (0 <= x < 1), added to the next payout
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
-      unlockedCharacters: ["default"],
-      equipped: { character: "default", projectile: "snowball" }, // what the player currently uses
+      unlockedCharacters: ["andek"], // the ids of the characters the player has (the default one always)
+      unlockedSceneries: ["frosty"], // ... and of the sceneries
+      equipped: { character: "andek", scenery: "frosty", projectile: "snowball" }, // what the player currently uses
       buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
       shop: {
         offers: [], // per slot: null, or { amount, unitPrice } rolled for a stack item on sale there
@@ -101,8 +102,14 @@ const Economy = (() => {
       newProjectiles: cleanIds(p.newProjectiles),
       buffsUnseen: p.buffsUnseen === true,
       projectilesUnseen: p.projectilesUnseen === true,
-      unlockedCharacters: p.unlockedCharacters || base.unlockedCharacters,
-      equipped: { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) },
+      // (the default character used to be called "default": it is Andek now)
+      unlockedCharacters: [...new Set([...base.unlockedCharacters, ...(Array.isArray(p.unlockedCharacters) ? p.unlockedCharacters : []).map((id) => (id === "default" ? "andek" : id))])],
+      unlockedSceneries: [...new Set([...base.unlockedSceneries, ...(Array.isArray(p.unlockedSceneries) ? p.unlockedSceneries : [])])],
+      equipped: (() => {
+        const eq = { ...base.equipped, ...(p.equipped && typeof p.equipped === "object" ? p.equipped : {}) };
+        if (eq.character === "default") eq.character = "andek";
+        return eq;
+      })(),
       buffs: Array.isArray(p.buffs) ? p.buffs.filter((b) => b && typeof b.id === "string" && typeof b.endsAt === "number").map((b) => ({ ...b, id: rn(b.id) })) : [],
       shop: {
         stock: Array.isArray(shop.stock) ? shop.stock.map(rn) : null,
@@ -546,6 +553,15 @@ const Economy = (() => {
     onProjectilesChange,
     getEquipped,
     setEquipped,
+    // Characters and sceneries the player has (kind: "character" or "scenery"); the default ones are always there.
+    isUnlocked: (kind, id) => (kind === "character" ? state.unlockedCharacters : state.unlockedSceneries).includes(id),
+    unlock: (kind, id) => {
+      const list = kind === "character" ? state.unlockedCharacters : state.unlockedSceneries;
+      if (!list.includes(id)) {
+        list.push(id);
+        save();
+      }
+    },
     getBuffList,
     saveBuffs,
     getShopState,

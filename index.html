@@ -476,6 +476,57 @@
       text-align: center;
     }
 
+    /* The BACK button of the CHARACTERS / SCENERIES menus (top-left of the panel), back to the SKINS list. */
+    #list-back {
+      display: none;
+      position: absolute;
+      top: calc(var(--u) * 1.1);
+      left: calc(var(--u) * 1.6);
+      padding: calc(var(--u) * 0.5) calc(var(--u) * 0.9);
+      background: #dcc9a0;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #3b2412;
+      font-family: inherit;
+      font-size: calc(var(--u) * 1);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #list-panel.nested #list-back {
+      display: block;
+    }
+
+    /* The SKINS list: two big buttons, one for each menu, with what is equipped now under the name. */
+    .skins-choice {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: calc(var(--u) * 0.9);
+      padding: calc(var(--u) * 2.2) calc(var(--u) * 1.2);
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+      color: #3b2412;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .skins-choice:active {
+      background: #e8d9b4;
+    }
+
+    .skins-choice-name {
+      font-size: calc(var(--u) * 1.6);
+    }
+
+    .skins-choice-now {
+      font-size: calc(var(--u) * 1);
+      color: #8a6a44;
+    }
+
     /* Scrolled with the finger - no scrollbar/slider. */
     #list-scroll {
       flex: 1;
@@ -1131,6 +1182,7 @@
     <div id="list-backdrop"></div>
     <div id="list-panel">
       <div id="list-title"></div>
+      <button id="list-back" type="button">BACK</button>
       <div id="version-tag"></div>
       <div id="list-scroll"></div>
     </div>
@@ -1142,6 +1194,7 @@
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
       <span id="projectiles-dot" class="notif-dot"></span>
+      <button id="skins-btn" class="side-btn" type="button">SKINS</button>
       <button id="options-btn" class="side-btn" type="button">OPTIONS</button>
     </div>
     <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
@@ -1153,8 +1206,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=198"></script>
-  <script src="src/economy.js?v=26"></script>
+  <script src="src/version.js?v=199"></script>
+  <script src="src/economy.js?v=27"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1185,8 +1238,8 @@
   <script src="src/buffs.js?v=27"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=57"></script>
-  <script src="src/main.js?v=142"></script>
+  <script src="src/collection.js?v=58"></script>
+  <script src="src/main.js?v=143"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

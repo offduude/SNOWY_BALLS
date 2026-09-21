@@ -282,6 +282,7 @@ const CHARACTERS = {
   },
 };
 const DEFAULT_CHARACTER = "character1";
+const DEFAULT_BACKGROUND = "assets/building/background.png"; // the wall picture that is loaded at the start (the key "background"); the default scenery Frosty uses it
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
 // apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex - and the closer it gets to the apex the
@@ -438,6 +439,7 @@ class MainScene extends Phaser.Scene {
     // image pixel row r sits at Phaser y = -IMG_GROUND_Y + r, so placing the top-left origin
     // at y = -IMG_GROUND_Y puts row IMG_GROUND_Y exactly at y = 0.
     this.bgImage = this.add.image(0, -IMG_GROUND_Y, "background").setOrigin(0, 0);
+    this.applyScenery(Economy.getEquipped("scenery")); // the equipped scenery's wall picture (Frosty = background.png)
 
     this.drawCharacter();
 
@@ -874,7 +876,7 @@ class MainScene extends Phaser.Scene {
   // updateCharacterPose().
   drawCharacter() {
     const baseY = this.worldY(0) + CHARACTER_Y_OFFSET;
-    this.characterId = DEFAULT_CHARACTER;
+    this.characterId = this.characterKeyFor(Economy.getEquipped("character")); // which CHARACTERS entry the equipped character uses
     this.character = this.add.image(Math.round(ORIGIN_X), baseY + 1, CHARACTERS[this.characterId].sprites.idle).setOrigin(0.5, 1);
     this.character.setDepth(2);
     this.heldBall = this.add.image(0, 0, "snowball").setVisible(false); // the projectile in the hand, see CHARACTERS
@@ -1073,6 +1075,44 @@ class MainScene extends Phaser.Scene {
     }
     this.contentPx[key] = px;
     return px;
+  }
+
+  // ---- SKINS (the SKINS button, collection.js): characters and sceneries, economy.json characters / sceneries ----
+
+  // The CHARACTERS entry (pictures, hand numbers) a character of economy.json uses (its `character`); the default one if unknown.
+  characterKeyFor(id) {
+    const c = ((this.eco && this.eco.characters) || []).find((x) => x.id === id);
+    return c && CHARACTERS[c.character] ? c.character : DEFAULT_CHARACTER;
+  }
+
+  // Called by the list when the player equips another character: it is used from the next frame (the pose code reads characterId every frame).
+  onCharacterEquipped(id) {
+    this.characterId = this.characterKeyFor(id);
+    this.updateCharacterPose();
+  }
+
+  // The wall picture of a scenery. It must be exactly as big as background.png (704 x 1000) with the windows in the same places, so this is only
+  // a visual change - nothing else in the game moves. The default background is already loaded ("background"); another one is loaded the first time it is used.
+  applyScenery(id) {
+    const list = (this.eco && this.eco.sceneries) || [];
+    const s = list.find((x) => x.id === id) || list[0];
+    if (!s) return;
+    const key = s.background === DEFAULT_BACKGROUND ? "background" : "scenery_" + s.id;
+    const set = () => {
+      const img = this.textures.get(key).getSourceImage();
+      if (img.width !== WORLD_WIDTH || img.height !== 1000) console.warn(`scenery ${s.id}: ${s.background} is ${img.width}x${img.height}, it must be ${WORLD_WIDTH}x1000 like background.png`);
+      this.bgImage.setTexture(key);
+    };
+    if (this.textures.exists(key)) set();
+    else {
+      this.load.image(key, s.background);
+      this.load.once("complete", set);
+      this.load.start();
+    }
+  }
+
+  onSceneryEquipped(id) {
+    this.applyScenery(id);
   }
 
   // The projectile in the character's hand (idle: upside down, aiming: upright), placed by CHARACTERS[..].hands and the projectile's `hold`; hidden when the hands are empty

@@ -21,6 +21,30 @@
     }
   },
 
+  "_skinsNote": "SKINS (the SKINS button, between PROJECTILES and OPTIONS): characters and sceneries are equipped, never consumed, never unequipped (only by equipping another one), and listed by rarity, the rarest first. characters: the thrower; `character` names its entry in CHARACTERS (main.js: the empty-handed pictures and hand numbers), `image` is the face on its card, `detail` will describe the bonus it gives (empty for the default one). sceneries: the picture behind the game; `background` is the wall texture - it must be EXACTLY the size of assets/building/background.png (704x1000) with the windows in the same places, so a scenery is only a visual change; `image` is its card picture. rarity: one of the rarities below (default = free, always owned); others must be unlocked (Economy.unlock).",
+  "characters": [
+    {
+      "id": "andek",
+      "name": "Andek",
+      "description": "The classic. Cold, slim and reliable.",
+      "image": "assets/character/character1_face.png",
+      "character": "character1",
+      "rarity": "default",
+      "detail": ""
+    }
+  ],
+  "sceneries": [
+    {
+      "id": "frosty",
+      "name": "Frosty",
+      "description": "Look! It's snowing!",
+      "image": "assets/scenery/frosty.png",
+      "background": "assets/building/background.png",
+      "rarity": "default",
+      "detail": ""
+    }
+  ],
+
   "_aimNote": "Speed of the two aim markers (offset and strength - always the same, fixed speed). markerHz = full back-and-forth sweeps per second (1.275 = one sweep in ~0.8s; it was 0.85 = ~1.2s). Nothing changes it: not the streak, not the projectile; only the Triangles buffs slow the OFFSET marker (effect offsetSpeed). (The width of the offset slider's hit zone comes from the projectile's weight tier, see weightTiers / offsetZone.)",
   "aim": {
     "markerHz": 1.275

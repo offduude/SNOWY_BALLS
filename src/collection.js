@@ -69,19 +69,18 @@ const Collection = (() => {
         },
       ],
     },
-    character: {
-      title: "CHARACTERS",
-      items: [
-        {
-          id: "default",
-          name: "Character 1",
-          description: "Your starting thrower. Bundled up and ready.",
-          image: "assets/character/character1_idle.png",
-          free: true,
-        },
-      ],
-    },
   };
+
+  // SKINS (the SKINS button): a list with two buttons, CHARACTERS and SCENERIES, each opening a menu of cards (economy.json characters / sceneries).
+  // Their cards are like the buff cards (name, description, rarity in the corner, the EQUIP button, the detail line at the bottom) without an amount:
+  // they are never consumed and never unequipped - only by equipping another one (the equipped one's button just says EQUIPPED). Listed by
+  // rarity, the rarest on top, the default one at the bottom.
+  const SKIN_KINDS = ["skins", "character", "scenery"];
+  const SKIN_TITLES = { skins: "SKINS", character: "CHARACTERS", scenery: "SCENERIES" };
+
+  function skinItems(kind) {
+    return (eco && eco[kind === "character" ? "characters" : "sceneries"]) || [];
+  }
 
   let container, panelEl, titleEl, scrollEl, buttons, dotEl;
   let eco = null; // economy.json - set by the game scene (setEconomy); projectile numbers come from it
@@ -130,7 +129,7 @@ const Collection = (() => {
   }
 
   function isListed(kind, it) {
-    if (it.free) return true;
+    if (kind === "character" || kind === "scenery") return it.rarity === "default" || Economy.isUnlocked(kind, it.id); // the default ones are always there
     if (kind !== "projectile") return false;
     const p = eco && eco.projectiles && eco.projectiles[it.id];
     if (p && p.godOnly && !Economy.isGod()) return false; // a test projectile: god mode saves only
@@ -155,6 +154,10 @@ const Collection = (() => {
   // Projectiles are listed by RARITY, the rarest first (economy.json projectiles.<id>.rarity, see rarity.js; an item
   // without a rarity goes last). Ties keep the older order: highest W20 base value first, then the catalog order.
   function sortedItems(kind, items) {
+    if ((kind === "character" || kind === "scenery") && eco) {
+      // by rarity, the rarest first (legendary on top, default at the bottom); equal rarities keep the file's order
+      return items.map((it, i) => ({ it, i })).sort((a, b) => Rarity.rank(b.it.rarity) - Rarity.rank(a.it.rarity) || a.i - b.i).map((x) => x.it);
+    }
     if (kind !== "projectile" || !eco) return items;
     const p = (it) => eco.projectiles[it.id] || { hitValue: 0 };
     return items
@@ -190,6 +193,33 @@ const Collection = (() => {
       b.textContent = isOn ? "EQUIPPED" : "EQUIP";
       b.classList.toggle("on", isOn);
     });
+  }
+
+  // A character / scenery card: picture, name, description, the rarity in the top-right corner (no amount), the EQUIP button, the detail at the bottom.
+  function skinRowHtml(item) {
+    const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
+    return (
+      `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}" data-id="${esc(item.id)}">` +
+      `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
+      `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
+      `<div class="pick-desc">${esc(item.description || "")}</div></div>` +
+      `<div class="pick-action"><button class="pick-equip" type="button" data-id="${esc(item.id)}"></button></div>` +
+      detail +
+      cornerHtml(item.rarity, "") +
+      `</div>`
+    );
+  }
+
+  // The SKINS list itself: the two buttons, each with the name of what is equipped now.
+  function skinsMenuHtml() {
+    const now = (kind) => {
+      const it = skinItems(kind).find((x) => x.id === Economy.getEquipped(kind));
+      return it ? esc(it.name) : "";
+    };
+    return (
+      `<button class="skins-choice" type="button" data-skins="character"><span class="skins-choice-name">CHARACTERS</span><span class="skins-choice-now">${now("character")}</span></button>` +
+      `<button class="skins-choice" type="button" data-skins="scenery"><span class="skins-choice-name">SCENERIES</span><span class="skins-choice-now">${now("scenery")}</span></button>`
+    );
   }
 
   // ---- BUFFS list: the buffs the player has (bought, waiting) or is running. Same cards as the projectiles list without
@@ -300,6 +330,28 @@ const Collection = (() => {
     document.getElementById("version-tag").textContent = typeof GAME_VERSION_TEXT === "string" ? GAME_VERSION_TEXT : "";
     buttons.buff.classList.toggle("active", kind === "buff");
     buttons.options.classList.toggle("active", kind === "options");
+    buttons.skins.classList.toggle("active", SKIN_KINDS.includes(kind));
+    panelEl.classList.toggle("nested", kind === "character" || kind === "scenery"); // (the BACK button of the two skin menus)
+    if (kind === "skins") {
+      titleEl.textContent = SKIN_TITLES.skins;
+      scrollEl.innerHTML = skinsMenuHtml();
+      scrollEl.scrollTop = 0;
+      container.classList.add("list-open");
+      buttons.projectile.classList.remove("active");
+      return;
+    }
+    if (kind === "character" || kind === "scenery") {
+      titleEl.textContent = SKIN_TITLES[kind];
+      scrollEl.innerHTML = sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
+        .map(skinRowHtml)
+        .join("");
+      fitNames();
+      scrollEl.scrollTop = 0;
+      refreshButtons();
+      container.classList.add("list-open");
+      buttons.projectile.classList.remove("active");
+      return;
+    }
     if (kind === "options") {
       titleEl.textContent = "OPTIONS";
       Saves.renderOptions(scrollEl);
@@ -327,7 +379,6 @@ const Collection = (() => {
     refreshButtons();
     container.classList.add("list-open");
     buttons.projectile.classList.toggle("active", kind === "projectile");
-    buttons.character?.classList.toggle("active", kind === "character");
   }
 
   function close() {
@@ -338,7 +389,8 @@ const Collection = (() => {
     buttons.projectile.classList.remove("active");
     buttons.buff.classList.remove("active");
     buttons.options.classList.remove("active");
-    buttons.character?.classList.remove("active");
+    buttons.skins.classList.remove("active");
+    panelEl.classList.remove("nested");
   }
 
   // The sound of drinking / using a buff (instead of the plain click).
@@ -360,6 +412,12 @@ const Collection = (() => {
   }
 
   function onEquip(e) {
+    const choice = e.target.closest(".skins-choice");
+    if (choice) {
+      click();
+      open(choice.dataset.skins); // CHARACTERS or SCENERIES
+      return;
+    }
     const use = e.target.closest(".pick-use");
     if (use) {
       Economy.clearNewBuff(use.dataset.id); // using a new buff takes its red dot away (the list redraws without it)
@@ -370,6 +428,15 @@ const Collection = (() => {
     const btn = e.target.closest(".pick-equip");
     if (!btn || btn.classList.contains("on")) return;
     Economy.setEquipped(openKind, btn.dataset.id);
+    if (openKind === "character" || openKind === "scenery") {
+      // A character / scenery is equipped in place: the list stays open (its buttons show the change), the game switches at once.
+      click();
+      refreshButtons();
+      const game = window.snowyBallsGame;
+      const scene = game && game.scene.getScene("main");
+      if (scene) (openKind === "character" ? scene.onCharacterEquipped : scene.onSceneryEquipped).call(scene, btn.dataset.id);
+      return;
+    }
     if (openKind === "projectile") {
       Economy.clearNewProjectile(btn.dataset.id); // equipping a new projectile takes its red dot away
       const dot = btn.closest(".pick-row").querySelector(".pick-new");
@@ -403,7 +470,7 @@ const Collection = (() => {
       scrollEl = document.getElementById("list-scroll");
       buttons = {
         projectile: document.getElementById("projectiles-btn"),
-        character: document.getElementById("characters-btn"),
+        skins: document.getElementById("skins-btn"),
         buff: document.getElementById("buffs-btn"),
         options: document.getElementById("options-btn"),
       };
@@ -435,7 +502,16 @@ const Collection = (() => {
       Buffs.onChange(tickBuffList);
       Buffs.onTick(tickBuffList); // the list's timers ride on the buffs' own clock, so they change at the same moment as the cards on screen
       buttons.projectile.addEventListener("click", () => toggle("projectile"));
-      buttons.character?.addEventListener("click", () => toggle("character")); // no CHARACTERS button for now
+      // SKINS: opens its list (two buttons); pressing it while any skin list is open closes it. BACK (in the CHARACTERS / SCENERIES menus) returns to it.
+      buttons.skins.addEventListener("click", () => {
+        click();
+        if (SKIN_KINDS.includes(openKind)) close();
+        else open("skins");
+      });
+      document.getElementById("list-back").addEventListener("click", () => {
+        click();
+        open("skins");
+      });
       scrollEl.addEventListener("click", onEquip);
       window.addEventListener("resize", () => openKind && fitNames());
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => openKind && fitNames()); // (the pixel font arriving changes every height)

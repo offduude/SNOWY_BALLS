@@ -1086,6 +1086,13 @@
       gap: calc(var(--u) * 1.4);
     }
 
+    /* The name over the Weather slider (the first slider, the master volume, has none: the section's title is its name). */
+    .vol-name {
+      flex: none;
+      color: #ffffff;
+      font-size: calc(var(--u) * 1.2);
+    }
+
     .vol-value {
       flex: none;
       width: calc(var(--u) * 5.2);
@@ -1342,7 +1349,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=230"></script>
+  <script src="src/version.js?v=231"></script>
   <script src="src/economy.js?v=33"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1373,10 +1380,10 @@
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
-  <script src="src/volume.js?v=1"></script>
-  <script src="src/saves.js?v=7"></script>
+  <script src="src/volume.js?v=2"></script>
+  <script src="src/saves.js?v=8"></script>
   <script src="src/collection.js?v=69"></script>
-  <script src="src/main.js?v=163"></script>
+  <script src="src/main.js?v=164"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

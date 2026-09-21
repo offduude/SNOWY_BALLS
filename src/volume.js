@@ -28,5 +28,33 @@ const Volume = (() => {
     return x;
   }
 
-  return { get, set };
+  // The WEATHER volume: the slider under the volume slider in OPTIONS. A share (0..1, default 1 = every weather's own `soundVolume`) that the sound of the
+  // equipped weather (rain, blizzard) is multiplied by, on top of the master volume. Kept on the device, like the master volume.
+  const WEATHER_KEY = "snowyBallsWeatherVolume";
+
+  function getWeather() {
+    try {
+      const v = parseFloat(localStorage.getItem(WEATHER_KEY));
+      if (v >= 0 && v <= 1) return v;
+    } catch (e) {
+      /* no storage: the default */
+    }
+    return 1;
+  }
+
+  // Sets and remembers it, and tells the game so the weather sound that is playing changes at once.
+  function setWeather(v) {
+    const x = Math.min(1, Math.max(0, Number(v) || 0));
+    try {
+      localStorage.setItem(WEATHER_KEY, String(x));
+    } catch (e) {
+      /* it just won't be remembered */
+    }
+    const game = window.snowyBallsGame;
+    const scene = game && game.scene.getScene("main");
+    if (scene && scene.applyWeatherVolume) scene.applyWeatherVolume();
+    return x;
+  }
+
+  return { get, set, getWeather, setWeather };
 })();

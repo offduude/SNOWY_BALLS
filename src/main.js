@@ -1291,11 +1291,23 @@ class MainScene extends Phaser.Scene {
   }
 
   // A weather's sound (economy.json `sound`, `soundVolume`): a loop for as long as the weather is equipped, played ALONGSIDE everything else - the theme, the events'
-  // music, the throws' sounds: it is never ducked, cut or paused by them (the master volume of the OPTIONS slider still scales it, like every sound).
+  // music and songs, the applause, the throws' sounds: it always plays, EVEN DURING EVENTS, and is never ducked, cut or paused by them (the master volume and the
+  // Weather slider of OPTIONS still scale it). Nothing may stop or duck `weather.sound`: the duck / crossfade code only ever touches the theme and the event music.
   startWeatherSound(w, key) {
     if (!w.def.sound || w.sound || !this.cache.audio.exists(key)) return;
-    w.sound = this.sound.add(key, { loop: true, volume: typeof w.def.soundVolume === "number" ? w.def.soundVolume : 0.5 });
+    w.sound = this.sound.add(key, { loop: true, volume: this.weatherSoundVolume(w.def) });
     w.sound.play();
+  }
+
+  // The volume of a weather's sound: its own (`soundVolume`) x the player's Weather slider (Volume.getWeather).
+  weatherSoundVolume(def) {
+    return (typeof def.soundVolume === "number" ? def.soundVolume : 0.5) * Volume.getWeather();
+  }
+
+  // The Weather slider was moved: the sound that is playing follows at once.
+  applyWeatherVolume() {
+    const w = this.weather;
+    if (w && w.sound) w.sound.setVolume(this.weatherSoundVolume(w.def));
   }
 
   onWeatherEquipped(id) {

@@ -421,25 +421,29 @@ const Saves = (() => {
     // Every section of the list is a rectangle of its own (SAVES now, others may follow).
     el.innerHTML =
       `<div class="opt-section"><div class="opt-head">SAVES</div>${getSlots().map(slotHtml).join("")}</div>` +
-      `<div class="opt-section"><div class="opt-head">VOLUME</div><div class="vol-row"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Volume" /><span class="vol-value"></span></div></div>`;
+      `<div class="opt-section"><div class="opt-head">VOLUME</div><div class="vol-row" data-vol="master"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Volume" /><span class="vol-value"></span></div>` +
+      `<div class="vol-name">Weather</div><div class="vol-row" data-vol="weather"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Weather" /><span class="vol-value"></span></div></div>`;
     wireVolume(el);
   }
 
-  // The VOLUME slider: dragging it sets the master volume live (Volume.set remembers it on the device). It makes no sound of its own (no click when it
-  // is let go). It shows the volume that is saved.
+  // The VOLUME sliders: dragging one sets its volume live (Volume.set / Volume.setWeather remember it on the device). The first is the master volume, the
+  // second ("Weather") the volume of the weather's sound. They make no sound of their own (no click when one is let go). They show the volumes that are saved.
   function wireVolume(el) {
-    const slider = el.querySelector(".vol-slider");
-    const label = el.querySelector(".vol-value");
-    if (!slider) return;
-    const show = () => {
-      slider.style.setProperty("--p", slider.value + "%");
-      label.textContent = slider.value + "%";
-    };
-    slider.value = Math.round(Volume.get() * 100);
-    show();
-    slider.addEventListener("input", () => {
-      Volume.set(slider.value / 100);
+    el.querySelectorAll(".vol-row").forEach((row) => {
+      const slider = row.querySelector(".vol-slider");
+      const label = row.querySelector(".vol-value");
+      const weather = row.dataset.vol === "weather";
+      const show = () => {
+        slider.style.setProperty("--p", slider.value + "%");
+        label.textContent = slider.value + "%";
+      };
+      slider.value = Math.round((weather ? Volume.getWeather() : Volume.get()) * 100);
       show();
+      slider.addEventListener("input", () => {
+        if (weather) Volume.setWeather(slider.value / 100);
+        else Volume.set(slider.value / 100);
+        show();
+      });
     });
   }
 

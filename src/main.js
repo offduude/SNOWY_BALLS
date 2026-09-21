@@ -200,7 +200,7 @@ const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the 
 const PROJECTILE_VISUALS = {
   snowball: {
     ball: "snowball",
-    sprites: { idle: "char_idle_snowball", aiming: "char_aiming", throwing: "char_throwing" }, // (the bare "char_idle" is the empty-handed pose, see updateCharacterPose)
+    sprites: { idle: "char_idle_snowball", aiming: "char_aiming_snowball", throwing: "char_throwing" }, // (the bare "char_idle" / "char_aiming" are the empty-handed poses, see updateCharacterPose)
     impactSound: "snowball_impact",
     impactVolume: 0.3, // halved from 0.6
   },
@@ -260,6 +260,17 @@ const PROJECTILE_VISUALS = {
 // A TEST projectile (economy.json projectiles.test_very_heavy, "godOnly": only a god mode save can list and equip it): it looks and sounds
 // like the stone. To try another weight tier, change its `weight` in economy.json.
 PROJECTILE_VISUALS.test_very_heavy = { ...PROJECTILE_VISUALS.stone };
+// HELD PROJECTILES (experiment, branch held-projectile): the character has only EMPTY-handed idle and aiming pictures ("char_idle", "char_aiming"); the
+// equipped projectile is drawn as a small sprite of its own at the hand's place, so a new projectile needs no character picture at all and a new
+// character only needs the two empty poses and these numbers. x, y: the middle of the projectile in the 64x64 picture (pixels from its top-left
+// corner); size: its width and height in pixels; rotation: idle = upside down (PI), aiming = upright; behind: true = drawn under the character
+// (the fingers are over it), false = over the character. Turn the experiment off with USE_HELD_PROJECTILES = false (every projectile then
+// uses its own pictures again, see PROJECTILE_VISUALS.sprites).
+const USE_HELD_PROJECTILES = true;
+const CHARACTER_HANDS = {
+  idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
+  aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true },
+};
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
 // apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex - and the closer it gets to the apex the
@@ -321,7 +332,8 @@ class MainScene extends Phaser.Scene {
     this.load.image("goal_window_face_hit", "assets/building/goal_window_face_hit.png?v=2");
     this.load.image("char_idle", "assets/character/character1_idle.png?v=2"); // empty-handed: no snowballs left
     this.load.image("char_idle_snowball", "assets/character/character1_idle_snowball.png"); // a snowball in hand
-    this.load.image("char_aiming", "assets/character/character1_aiming.png?v=2");
+    this.load.image("char_aiming", "assets/character/character1_aiming.png?v=3"); // empty-handed
+    this.load.image("char_aiming_snowball", "assets/character/character1_aiming_snowball.png"); // a snowball in hand (used when USE_HELD_PROJECTILES is off)
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
@@ -849,15 +861,42 @@ class MainScene extends Phaser.Scene {
     const baseY = this.worldY(0) + CHARACTER_Y_OFFSET;
     this.character = this.add.image(Math.round(ORIGIN_X), baseY + 1, "char_idle").setOrigin(0.5, 1);
     this.character.setDepth(2);
+    this.heldBall = this.add.image(0, 0, "snowball").setVisible(false); // the projectile in the hand, see CHARACTER_HANDS
   }
 
   updateCharacterPose() {
     const sprites = this.projVisuals.sprites; // the equipped projectile's set (chestnut in hand, etc.)
-    let key = sprites.idle;
-    if (this.state === STATE.IDLE && !this.hasAmmo()) key = "char_idle"; // out of snowballs: empty hands
-    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) key = sprites.aiming;
-    else if (this.state === STATE.FLIGHT && this.flightTime < 0.35) key = sprites.throwing;
+    const held = USE_HELD_PROJECTILES; // the empty-handed pictures + the projectile drawn in the hand
+    let key = held ? "char_idle" : sprites.idle;
+    let pose = "idle";
+    if (this.state === STATE.IDLE && !this.hasAmmo()) {
+      key = "char_idle"; // out of snowballs: empty hands
+      pose = "empty";
+    }
+    if (this.state === STATE.AIM_ANGLE || this.state === STATE.AIM_POWER) {
+      key = held ? "char_aiming" : sprites.aiming;
+      pose = "aiming";
+    } else if (this.state === STATE.FLIGHT && this.flightTime < 0.35) {
+      key = sprites.throwing;
+      pose = "throwing";
+    }
     if (this.character.texture.key !== key) this.character.setTexture(key);
+    this.updateHeldBall(held ? pose : "none");
+  }
+
+  // The projectile in the character's hand (idle: upside down, aiming: upright), placed by CHARACTER_HANDS; hidden when the hands are empty
+  // or while the projectile is being thrown.
+  updateHeldBall(pose) {
+    const hand = CHARACTER_HANDS[pose];
+    const b = this.heldBall;
+    if (!hand) {
+      b.setVisible(false);
+      return;
+    }
+    if (b.texture.key !== this.projVisuals.ball) b.setTexture(this.projVisuals.ball);
+    const c = this.character;
+    b.setPosition(c.x - c.displayWidth / 2 + hand.x, c.y - c.displayHeight + hand.y);
+    b.setDisplaySize(hand.size, hand.size).setRotation(hand.rotation).setDepth(hand.behind ? c.depth - 0.5 : c.depth + 0.5).setVisible(true);
   }
 
   handleFreezeInput() {

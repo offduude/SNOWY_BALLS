@@ -455,6 +455,7 @@ const Collection = (() => {
 
   return {
     isOpen: () => openKind !== null,
+    projectileImage: (id) => ((CATALOG.projectile.items.find((i) => i.id === id) || {}).image) || "", // (the counter under the top-right buttons)
     close,
     setEconomy(economyJson) {
       eco = economyJson;

@@ -820,7 +820,7 @@
       display: block;
     }
 
-    /* STREAK: always visible, right under the top-right buttons. Same width as the BUFFS + mute
+    /* The projectile counter (it was the STREAK counter): always visible, right under the top-right buttons. Same width as the BUFFS + mute
        buttons together (mute 10..38px from the right edge, BUFFS 46..106px -> 96px), same brown as the coin
        counter. Under the shop board (z 3), so they disappear with the rest of the game view in the shop. */
     .hud-stat {
@@ -843,7 +843,15 @@
       z-index: 2;
     }
 
-    #streak-box { top: 44px; } /* 10px margin + 28px buttons + 6px gap */
+    #ammo-box { top: 44px; } /* 10px margin + 28px buttons + 6px gap */
+
+    /* The equipped projectile's picture and how many are left ("[picture] x12"), where the STREAK counter was. */
+    #ammo-box img {
+      width: 14px;
+      height: 14px;
+      margin-right: 4px;
+      image-rendering: pixelated;
+    }
 
     #game-container.shop-open #buffs-btn {
       opacity: 0;
@@ -1199,7 +1207,7 @@
     <div id="aim-label"></div>
     <button id="buffs-btn" class="side-btn" type="button">BUFFS</button>
     <span id="buffs-dot" class="notif-dot"></span>
-    <div id="streak-box" class="hud-stat"><span id="streak-text">STREAK: 0</span></div>
+    <div id="ammo-box" class="hud-stat"><img id="ammo-icon" alt="" draggable="false" /><span id="ammo-text">x0</span></div>
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
       <span id="projectiles-dot" class="notif-dot"></span>
@@ -1215,7 +1223,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=200"></script>
+  <script src="src/version.js?v=201"></script>
   <script src="src/economy.js?v=27"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1247,15 +1255,15 @@
   <script src="src/buffs.js?v=27"></script>
   <script src="src/shop.js?v=23"></script>
   <script src="src/saves.js?v=5"></script>
-  <script src="src/collection.js?v=59"></script>
-  <script src="src/main.js?v=143"></script>
+  <script src="src/collection.js?v=60"></script>
+  <script src="src/main.js?v=144"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "buff-hud", "streak-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-btn", "volume-btn", "buffs-btn", "buff-hud", "ammo-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

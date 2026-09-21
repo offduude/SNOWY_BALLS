@@ -521,7 +521,7 @@ class MainScene extends Phaser.Scene {
       !(this.eco.projectiles[id].godOnly && !Economy.isGod()) && // (a test projectile equipped in a god save, then a normal save loaded)
       (this.eco.projectiles[id].infinite || this.eco.projectiles[id].regen || Economy.getProjectileCount(id) > 0);
     if (!known || !available) {
-      id = "snowball"; // the default
+      id = known && !this.eco.projectiles[id].godOnly ? this.nextProjectileAfter(id) : "snowball"; // one that ran out: the next one (same rarity, then one step down); else the default
       if (Economy.getEquipped("projectile") !== id) Economy.setEquipped("projectile", id); // keep the save honest
     }
     this.projectileId = id;
@@ -602,11 +602,13 @@ class MainScene extends Phaser.Scene {
     tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
   }
 
-  // Throwing away an aim in progress (opening the shop, equipping something else, closing the app) counts as a
-  // failed throw: the projectile the tap used up is NOT given back, and the streak is lost - otherwise a bad aim
-  // could be escaped for free. (No miss coins, no message: nothing was thrown.)
+  // Throwing away an aim in progress (opening the shop, equipping something else, closing the app): before the offset was chosen it costs nothing (the
+  // projectile is only used up when the offset is chosen); after that it counts as a failed throw - the projectile is NOT given back and the streak is
+  // lost, otherwise a bad aim could be escaped for free. (No miss coins, no message: nothing was thrown.) Call it while the state is still the aim's.
   abandonAim() {
+    const committed = this.state === STATE.AIM_POWER; // the offset was chosen: the projectile is gone
     Economy.setAiming(false);
+    if (!committed) return;
     this.streak = 0;
     Economy.setStreak(0);
     this.updateStreakHud();
@@ -625,9 +627,10 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  // Consumable projectiles: one is used up the moment the player taps "TAP to aim". The throw still uses it
-  // (this.proj is unchanged until the throw is over); if it was the LAST one, the snowball is equipped again -
-  // saved right now, applied when the throw concludes (pendingProjectile), so the aim isn't disturbed.
+  // Consumable projectiles: one is used up the moment the player CHOOSES THE OFFSET (the second tap of the aim; a tap on "TAP to aim" alone, or
+  // an aim thrown away before that, costs nothing). The throw still uses it (this.proj is unchanged until the throw is over); if it was the LAST
+  // one, the next projectile is equipped (nextProjectileAfter) - saved right now, applied when the throw concludes (pendingProjectile), so the
+  // aim isn't disturbed.
   consumeProjectile() {
     this.savedBy = null; // the buff that saved THIS throw's projectile, shown on the result message
     if (this.proj.infinite) return;
@@ -638,9 +641,29 @@ class MainScene extends Phaser.Scene {
     const id = this.projectileId;
     if (!Economy.useProjectile(id)) return;
     if (id !== "snowball" && Economy.getProjectileCount(id) === 0) {
-      Economy.setEquipped("projectile", "snowball");
-      this.pendingProjectile = "snowball";
+      const next = this.nextProjectileAfter(id);
+      Economy.setEquipped("projectile", next);
+      this.pendingProjectile = next;
     }
+  }
+
+  // What to equip when `id` has run out: a projectile of the SAME rarity that the player still has (the one with the highest hit value, like the list);
+  // none -> the same for the rarity ONE STEP LOWER; and so on down to the snowball (rarity default; it refills, so it is always there). Deliberately
+  // one step down and not "the best one they have": a player may be saving their best projectile (for an event) and must not throw it by accident.
+  nextProjectileAfter(id) {
+    const order = (this.eco.rarities || []).map((r) => r.id);
+    const rank = (pid) => order.indexOf((this.eco.projectiles[pid] || {}).rarity);
+    const usable = (pid) => {
+      const p = this.eco.projectiles[pid];
+      return pid !== id && p && PROJECTILE_VISUALS[pid] && !(p.godOnly && !Economy.isGod()) && (p.infinite || p.regen || Economy.getProjectileCount(pid) > 0);
+    };
+    for (let r = Math.max(0, rank(id)); r >= 0; r--) {
+      const cands = Object.keys(this.eco.projectiles)
+        .filter((pid) => rank(pid) === r && usable(pid))
+        .sort((a, b) => (this.eco.projectiles[b].hitValue || 0) - (this.eco.projectiles[a].hitValue || 0));
+      if (cands.length) return cands[0];
+    }
+    return "snowball";
   }
 
   // Can the equipped projectile be thrown? Only a refilling one can be out (the others fall back to the snowball).
@@ -666,16 +689,26 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  // The always-visible STREAK: x box under the top-right buttons. The text shrinks a little if it would be
-  // wider than the box (a streak in the hundreds). (The best streak is still saved, just not shown.)
+  // The always-visible counter under the top-right buttons (where the STREAK counter was): the equipped projectile's picture and how many are left,
+  // "[picture] x12" ("xINF" in god mode; the snowball shows its refilling stock). Redrawn only when the projectile or the number changes (checked every
+  // frame). The text shrinks a little if it would be wider than the box. (The streak itself is still counted and saved, just not shown.)
+  updateAmmoHud() {
+    if (!this.projectileId) return; // (not chosen yet while the scene is being built)
+    const n = Economy.isGod() ? "INF" : String(Economy.getProjectileCount(this.projectileId));
+    const key = this.projectileId + ":" + n;
+    if (key === this.ammoHudShown) return;
+    this.ammoHudShown = key;
+    const icon = document.getElementById("ammo-icon");
+    const text = document.getElementById("ammo-text");
+    if (!icon || !text) return;
+    const src = Collection.projectileImage(this.projectileId);
+    if (icon.getAttribute("src") !== src) icon.setAttribute("src", src);
+    text.textContent = "x" + n;
+    text.style.fontSize = Math.min(8, Math.floor(60 / (n.length + 1))) + "px"; // 60px = the box minus its border, padding and the picture
+  }
+
   updateStreakHud() {
-    const fit = (id, text) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.textContent = text;
-      el.style.fontSize = Math.min(8, Math.floor(88 / text.length)) + "px"; // 88px = the box minus its border and padding
-    };
-    fit("streak-text", "STREAK: " + this.streak);
+    this.updateAmmoHud(); // (the streak is no longer shown; the counter is redrawn whenever it changes)
   }
 
   // Called by the PROJECTILES list when the player equips something.
@@ -1146,12 +1179,13 @@ class MainScene extends Phaser.Scene {
     if (this.state === STATE.IDLE) {
       if (!this.hasAmmo()) return; // out of snowballs: nothing to throw (updateStockMessage tells the player when the next one comes)
       this.takeAimSnapshot(); // the one moment the player's buffs are read for this throw
-      this.consumeProjectile(); // ... and the moment a consumable projectile is used up
-      Economy.setAiming(true); // an aim is open until the ball is thrown (see abandonAim)
       this.state = STATE.AIM_ANGLE;
       this.aimStartTime = this.time.now;
       this.showMessage("");
     } else if (this.state === STATE.AIM_ANGLE) {
+      // The offset is chosen: NOW the projectile is used up (a tap on "TAP to aim" alone costs nothing) and the aim is committed.
+      this.consumeProjectile();
+      Economy.setAiming(true); // an aim is open until the ball is thrown (see abandonAim)
       this.state = STATE.AIM_POWER;
       this.aimStartTime = this.time.now;
     } else if (this.state === STATE.AIM_POWER) {
@@ -2275,6 +2309,7 @@ class MainScene extends Phaser.Scene {
     this.updateFallingBalls(dt);
 
     this.updateStockMessage();
+    this.updateAmmoHud();
     this.syncBuffEvent();
     this.syncSummonBuff();
     this.updateCharacterPose();

@@ -1255,32 +1255,47 @@ class MainScene extends Phaser.Scene {
     const list = (this.eco && this.eco.weathers) || [];
     const def = list.find((x) => x.id === id) || list[0];
     if (!def) return;
+    let w;
     if (!def.particle) {
-      this.weather = { id: def.id, def, noParticles: true, particles: [] }; // a weather with no particles (Sunny): nothing falls, and it does not affect the event particles either
-      return;
+      w = { id: def.id, def, noParticles: true, particles: [] }; // a weather with no particles (Sunny): nothing falls, and it does not affect the event particles either
+    } else {
+      const speed = ((this.eco.weatherSpeeds || {})[def.fallSpeed]) || { from: 50, to: 75 };
+      const onScreen = ((this.eco.weatherDensities || {})[def.density]) ?? 15;
+      const angle = ((def.angle || 0) * Math.PI) / 180;
+      w = { id: def.id, def, key: "weather_" + def.id, onScreen, from: speed.from, to: speed.to, sin: Math.sin(angle), cos: Math.cos(angle), accTop: 0, accSide: 0, particles: [], age: 0 };
+      const mean = (speed.from + speed.to) / 2;
+      w.left = INITIAL_SCROLL_X - WEATHER_MARGIN; // the sides of the sky the particles live in (a little wider than the picture)
+      w.right = INITIAL_SCROLL_X + GAME_WIDTH + WEATHER_MARGIN;
+      w.top = this.worldY(TOP_BOUNDARY_HEIGHT);
+      w.bottom = INITIAL_SCROLL_Y + GAME_HEIGHT; // the bottom edge of the default camera view: a particle is gone once it is below it
+      const perArea = onScreen / ((w.right - w.left) * GAME_HEIGHT); // particles per px of sky
+      w.rateTop = (onScreen * mean * w.cos) / GAME_HEIGHT; // a second, over the top: the ones in the picture x how fast they leave it downwards / its height
+      w.rateSide = perArea * (w.bottom - w.top) * mean * Math.abs(w.sin); // a second, over the left / right edge (0 for a straight fall)
     }
-    const speed = ((this.eco.weatherSpeeds || {})[def.fallSpeed]) || { from: 50, to: 75 };
-    const onScreen = ((this.eco.weatherDensities || {})[def.density]) ?? 15;
-    const angle = ((def.angle || 0) * Math.PI) / 180;
-    const w = { id: def.id, def, key: "weather_" + def.id, onScreen, from: speed.from, to: speed.to, sin: Math.sin(angle), cos: Math.cos(angle), accTop: 0, accSide: 0, particles: [], age: 0 };
-    const mean = (speed.from + speed.to) / 2;
-    w.left = INITIAL_SCROLL_X - WEATHER_MARGIN; // the sides of the sky the particles live in (a little wider than the picture)
-    w.right = INITIAL_SCROLL_X + GAME_WIDTH + WEATHER_MARGIN;
-    w.top = this.worldY(TOP_BOUNDARY_HEIGHT);
-    w.bottom = INITIAL_SCROLL_Y + GAME_HEIGHT; // the bottom edge of the default camera view: a particle is gone once it is below it
-    const perArea = onScreen / ((w.right - w.left) * GAME_HEIGHT); // particles per px of sky
-    w.rateTop = (onScreen * mean * w.cos) / GAME_HEIGHT; // a second, over the top: the ones in the picture x how fast they leave it downwards / its height
-    w.rateSide = perArea * (w.bottom - w.top) * mean * Math.abs(w.sin); // a second, over the left / right edge (0 for a straight fall)
     this.weather = w;
+    // What the weather needs is loaded the first time it is used (its particle picture, its sound): both are queued before ONE start, then the weather starts.
+    const soundKey = "weather_sound_" + def.id;
+    const needPicture = !!def.particle && !this.textures.exists(w.key);
+    const needSound = !!def.sound && !this.cache.audio.exists(soundKey);
     const start = () => {
-      if (this.weather === w && !w.filled && this.textures.exists(w.key)) this.fillWeather();
+      if (this.weather !== w) return; // another weather was equipped while this one loaded
+      if (def.particle && !w.filled && this.textures.exists(w.key)) this.fillWeather();
+      this.startWeatherSound(w, soundKey);
     };
-    if (this.textures.exists(w.key)) start();
-    else {
-      this.load.image(w.key, def.particle);
+    if (needPicture) this.load.image(w.key, def.particle);
+    if (needSound) this.load.audio(soundKey, def.sound);
+    if (needPicture || needSound) {
       this.load.once("complete", start);
       this.load.start();
-    }
+    } else start();
+  }
+
+  // A weather's sound (economy.json `sound`, `soundVolume`): a loop for as long as the weather is equipped, played ALONGSIDE everything else - the theme, the events'
+  // music, the throws' sounds: it is never ducked, cut or paused by them (the master volume of the OPTIONS slider still scales it, like every sound).
+  startWeatherSound(w, key) {
+    if (!w.def.sound || w.sound || !this.cache.audio.exists(key)) return;
+    w.sound = this.sound.add(key, { loop: true, volume: typeof w.def.soundVolume === "number" ? w.def.soundVolume : 0.5 });
+    w.sound.play();
   }
 
   onWeatherEquipped(id) {
@@ -1288,7 +1303,13 @@ class MainScene extends Phaser.Scene {
   }
 
   clearWeather() {
-    if (this.weather) this.weather.particles.forEach((p) => p.img.destroy());
+    if (this.weather) {
+      this.weather.particles.forEach((p) => p.img.destroy());
+      if (this.weather.sound) {
+        this.weather.sound.stop();
+        this.weather.sound.destroy();
+      }
+    }
     this.weather = null;
   }
 
@@ -2084,10 +2105,10 @@ class MainScene extends Phaser.Scene {
   // eventFallMotion({ from, to }): the particle falls straight down at its own speed range (`base`, px/s) - unless the equipped weather falls at least as
   // fast as that (the mean of its speed range is not below the particle's own mean): then it falls the way the weather does, its speed range and its angle,
   // so a Blizzard's applause is blown across the picture like the snow. A slower weather (Snow) leaves the particles as they are; so does a weather with no
-  // particles (Sunny). Speeds are along the path. Returns { from, to, sin, cos }.
+  // particles (Sunny), and a weather that says `affectsEvents: false` in economy.json (Rain, although it falls fast). Speeds are along the path. Returns { from, to, sin, cos }.
   eventFallMotion(base) {
     const w = this.weather;
-    if (w && !w.noParticles && (w.from + w.to) / 2 >= (base.from + base.to) / 2) return { from: w.from, to: w.to, sin: w.sin, cos: w.cos };
+    if (w && !w.noParticles && w.def.affectsEvents !== false && (w.from + w.to) / 2 >= (base.from + base.to) / 2) return { from: w.from, to: w.to, sin: w.sin, cos: w.cos };
     return { from: base.from, to: base.to, sin: 0, cos: 1 };
   }
 

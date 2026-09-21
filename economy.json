@@ -61,7 +61,7 @@
     }
   ],
 
-  "_weatherNote": "WEATHER (the third skins category, the WEATHER button in the SKINS list): particles that fall from the sky over the whole game picture - the same way the roses fall in the disco / guitar applause (they start at the top of the world, fall straight down and leave below the bottom of the default view) - for as long as the weather is equipped. It is equipped, never consumed, never unequipped (only by equipping another one - there is always a weather), and listed by rarity like the other skins. weathers: id, name, description, image (the card picture), particle (the falling picture, any size: it is drawn particleSize px wide, each one a little bigger or smaller), particleSize, particle (the falling picture; null = a weather that drops nothing, like Sunny - it also leaves the event particles alone), angle (degrees from straight down the particles fall at: 0 = straight down, positive = towards the right, so 65 is a fast wind-blown fall from the left to the right; the spawn also comes in over the left edge), sway (px the particle swings from side to side while it falls; 0 = none), drift (the most px a second a particle drifts sideways, each rolls its own between -drift and +drift; 0 or missing = none: straight down), rarity (default = free, always owned; others must be unlocked, Economy.unlock('weather', id)), detail (the bottom line of the card - NOT the density or the speed: the card does not tell them). effects (optional, like a buff's: what equipping it does - none of the weathers has one today: the Blizzard is purely visual; an offsetCenter effect, the offset slider's hit zone centered elsewhere than the middle of the bar, is still supported). density and fallSpeed are NAMES of the two scales below. weatherDensities: how many particles are in the game picture (432 x 243) at any moment; the spawn rate follows from it and the fall speed (density x average speed / 243 a second), so a slow weather does not look thinner than a fast one. The roses of the applause are 30 at once (spawned at 30 a second, falling 200-300 px/s) - that is 'heavy' density and 'moderate' fall speed. EVENT PARTICLES: whatever an event drops from the sky (the applause roses today, every future event item) falls through main.js eventFallMotion / eventFallRates, so the equipped weather always changes it: it takes the weather's speed range and angle when the weather falls at least as fast as the particle's own fall (a Blizzard blows the roses across the picture; Snow, Sunny and no particles leave them alone). weatherSpeeds: px a second, each particle rolls its own between from and to (very_slow 25-40, slow 50-75, moderate 200-300 like the roses, fast 400-550, very_fast 700-900; for a slanted weather this is the speed ALONG its path).",
+  "_weatherNote": "WEATHER (the third skins category, the WEATHER button in the SKINS list): particles that fall from the sky over the whole game picture - the same way the roses fall in the disco / guitar applause (they start at the top of the world, fall straight down and leave below the bottom of the default view) - for as long as the weather is equipped. It is equipped, never consumed, never unequipped (only by equipping another one - there is always a weather), and listed by rarity like the other skins. weathers: id, name, description, image (the card picture), particle (the falling picture, any size: it is drawn particleSize px wide, each one a little bigger or smaller), particleSize, particle (the falling picture; null = a weather that drops nothing, like Sunny - it also leaves the event particles alone), sound (optional: a sound file that loops for as long as the weather is equipped, played along with every other sound and never ducked; `soundVolume` 0-1, default 0.5; loaded the first time the weather is used) and affectsEvents (false = the event particles do NOT take this weather's speed and angle even when it falls faster than they do - Rain), angle (degrees from straight down the particles fall at: 0 = straight down, positive = towards the right, so 65 is a fast wind-blown fall from the left to the right; the spawn also comes in over the left edge), sway (px the particle swings from side to side while it falls; 0 = none), drift (the most px a second a particle drifts sideways, each rolls its own between -drift and +drift; 0 or missing = none: straight down), rarity (default = free, always owned; others must be unlocked, Economy.unlock('weather', id)), detail (the bottom line of the card - NOT the density or the speed: the card does not tell them). effects (optional, like a buff's: what equipping it does - none of the weathers has one today: the Blizzard is purely visual; an offsetCenter effect, the offset slider's hit zone centered elsewhere than the middle of the bar, is still supported). density and fallSpeed are NAMES of the two scales below. weatherDensities: how many particles are in the game picture (432 x 243) at any moment; the spawn rate follows from it and the fall speed (density x average speed / 243 a second), so a slow weather does not look thinner than a fast one. The roses of the applause are 30 at once (spawned at 30 a second, falling 200-300 px/s) - that is 'heavy' density and 'moderate' fall speed. EVENT PARTICLES: whatever an event drops from the sky (the applause roses today, every future event item) falls through main.js eventFallMotion / eventFallRates, so the equipped weather always changes it: it takes the weather's speed range and angle when the weather falls at least as fast as the particle's own fall (a Blizzard blows the roses across the picture; Snow, Sunny and no particles leave them alone). weatherSpeeds: px a second, each particle rolls its own between from and to (very_slow 25-40, slow 50-75, moderate 200-300 like the roses, fast 400-550, very_fast 700-900; for a slanted weather this is the speed ALONG its path).",
   "weatherDensities": { "light": 7, "moderate": 15, "heavy": 30, "very_heavy": 60 },
   "weatherSpeeds": {
     "very_slow": { "from": 25, "to": 40 },
@@ -91,6 +91,24 @@
       "description": "Clear as day. Nothing falls from the sky.",
       "image": "assets/weather/sunny.png",
       "particle": null,
+      "rarity": "common",
+      "detail": ""
+    },
+    {
+      "id": "rain",
+      "name": "Rain",
+      "description": "Calming rain to help you hit your throws.",
+      "image": "assets/weather/rain_item.png",
+      "particle": "assets/weather/rain_particle.png",
+      "particleSize": 12,
+      "sway": 0,
+      "drift": 0,
+      "angle": 0,
+      "density": "heavy",
+      "fallSpeed": "fast",
+      "sound": "assets/audio/rain.mp3",
+      "soundVolume": 0.5,
+      "affectsEvents": false,
       "rarity": "common",
       "detail": ""
     },
@@ -521,6 +539,16 @@
         "ignorePriceOverride": true,
         "image": "assets/weather/sunny.png",
         "description": "Clear as day. Nothing falls from the sky."
+      },
+      {
+        "id": "rain",
+        "name": "Rain",
+        "category": "weather",
+        "rarity": "common",
+        "priceRange": { "min": 300, "max": 500 },
+        "ignorePriceOverride": true,
+        "image": "assets/weather/rain_item.png",
+        "description": "Calming rain to help you hit your throws."
       },
       {
         "id": "blizzard",

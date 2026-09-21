@@ -415,7 +415,7 @@ const Collection = (() => {
       titleEl.textContent = SKIN_TITLES[kind];
       scrollEl.innerHTML =
         sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
-          .map(skinRowHtml)
+          .map((it) => skinRowHtml(it))
           .join("") + `<div class="list-soon">More coming soon!</div>`; // (under the last card: the default one)
       fitNames();
       centerOn(Economy.getEquipped(kind)); // opens on what is equipped
@@ -535,7 +535,8 @@ const Collection = (() => {
       const items = (eco.shop && eco.shop.items) || [];
       Economy.fillGod(
         Object.entries(eco.projectiles || {}).filter(([id, p]) => id !== "snowball" && !p.infinite && !p.regen).map(([id]) => id),
-        items.filter((it) => it.category === "consumable").map((it) => it.id)
+        items.filter((it) => it.category === "consumable").map((it) => it.id),
+        { character: skinItems("character").map((s) => s.id), scenery: skinItems("scenery").map((s) => s.id), weather: skinItems("weather").map((s) => s.id) } // every skin
       );
     },
     init() {

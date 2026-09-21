@@ -1255,6 +1255,10 @@ class MainScene extends Phaser.Scene {
     const list = (this.eco && this.eco.weathers) || [];
     const def = list.find((x) => x.id === id) || list[0];
     if (!def) return;
+    if (!def.particle) {
+      this.weather = { id: def.id, def, noParticles: true, particles: [] }; // a weather with no particles (Sunny): nothing falls, and it does not affect the event particles either
+      return;
+    }
     const speed = ((this.eco.weatherSpeeds || {})[def.fallSpeed]) || { from: 50, to: 75 };
     const onScreen = ((this.eco.weatherDensities || {})[def.density]) ?? 15;
     const angle = ((def.angle || 0) * Math.PI) / 180;
@@ -1319,7 +1323,7 @@ class MainScene extends Phaser.Scene {
 
   updateWeather(dt) {
     const w = this.weather;
-    if (!w || !w.filled) return;
+    if (!w || w.noParticles || !w.filled) return;
     w.accTop += dt * w.rateTop;
     while (w.accTop >= 1) {
       w.accTop -= 1;
@@ -1958,17 +1962,17 @@ class MainScene extends Phaser.Scene {
       } else if (this.songPhase === "applause") {
         const ap = el - songMs;
         if (ap < applauseMs - this.roseFallMs()) {
-          // The number of roses in the picture stays the same whatever they fall like (see roseMotion): over the top, and - for a slanted fall - over the side the wind blows in from.
+          // The number of roses in the picture stays the same whatever they fall like (see eventFallMotion): over the top, and - for a slanted fall - over the side the wind blows in from.
           const m = this.roseMotion();
-          const mean = (m.from + m.to) / 2;
-          const sky = this.roseSky();
-          this.roseAcc += (dt * ROSE_ON_SCREEN * mean * m.cos) / GAME_HEIGHT;
+          const sky = this.eventSky();
+          const rates = this.eventFallRates(m, ROSE_ON_SCREEN);
+          this.roseAcc += dt * rates.top;
           while (this.roseAcc >= 1) {
             this.roseAcc -= 1;
             this.spawnRose(m);
           }
-          if (m.sin !== 0) {
-            this.roseAccSide += (dt * ROSE_ON_SCREEN * (sky.bottom - sky.top) * mean * Math.abs(m.sin)) / ((sky.right - sky.left) * GAME_HEIGHT);
+          if (rates.side > 0) {
+            this.roseAccSide += dt * rates.side;
             while (this.roseAccSide >= 1) {
               this.roseAccSide -= 1;
               this.spawnRose(m, m.sin > 0 ? sky.left : sky.right, Phaser.Math.FloatBetween(sky.top, sky.bottom));
@@ -2072,24 +2076,46 @@ class MainScene extends Phaser.Scene {
     Economy.setEvent(null);
   }
 
-  // How the roses of the applause fall: straight down at their own speed (ROSE_SPEED_MIN-MAX) - unless the equipped weather falls at least as fast as that
-  // (the mean of its speed range is not below the roses' mean): then they fall the way the weather does, its speed range and its angle, so a Blizzard's
-  // applause is blown across the picture like the snow. A slower weather (Snow) leaves the roses as they are; so does no weather. Speeds are along the path.
-  roseMotion() {
+  // ---- EVENT PARTICLES ----
+  // Anything an event drops from the sky - the applause roses today, and EVERY event item added in the future - must fall through these three, so the
+  // equipped weather always affects it (the owner's rule): eventFallMotion (how it falls), eventSky (where it lives) and eventFallRates (how many are
+  // spawned a second, over the top and over the side the wind blows in from). Never give a new event particle a motion of its own.
+  //
+  // eventFallMotion({ from, to }): the particle falls straight down at its own speed range (`base`, px/s) - unless the equipped weather falls at least as
+  // fast as that (the mean of its speed range is not below the particle's own mean): then it falls the way the weather does, its speed range and its angle,
+  // so a Blizzard's applause is blown across the picture like the snow. A slower weather (Snow) leaves the particles as they are; so does a weather with no
+  // particles (Sunny). Speeds are along the path. Returns { from, to, sin, cos }.
+  eventFallMotion(base) {
     const w = this.weather;
-    if (w && (w.from + w.to) / 2 >= ROSE_MEAN_SPEED) return { from: w.from, to: w.to, sin: w.sin, cos: w.cos };
-    return { from: ROSE_SPEED_MIN, to: ROSE_SPEED_MAX, sin: 0, cos: 1 };
+    if (w && !w.noParticles && (w.from + w.to) / 2 >= (base.from + base.to) / 2) return { from: w.from, to: w.to, sin: w.sin, cos: w.cos };
+    return { from: base.from, to: base.to, sin: 0, cos: 1 };
   }
 
-  // The sky the roses fall in: the same as the weather's (a little wider than the picture, from the top of the world to the bottom of the default view).
-  roseSky() {
+  // The sky an event particle lives in: the same as the weather's (a little wider than the picture, from the top of the world to the bottom of the default view).
+  eventSky() {
     return { left: INITIAL_SCROLL_X - 6, right: INITIAL_SCROLL_X + GAME_WIDTH + 6, top: this.worldY(TOP_BOUNDARY_HEIGHT), bottom: INITIAL_SCROLL_Y + GAME_HEIGHT };
+  }
+
+  // How many particles to spawn a second - { top, side } - so that `onScreen` of them are in the picture (432 x 243) at once whatever the motion `m` is:
+  // over the top, and (for a slanted fall) over the left edge (or the right one) so the picture is as full at the side as everywhere else.
+  eventFallRates(m, onScreen) {
+    const mean = (m.from + m.to) / 2;
+    const sky = this.eventSky();
+    return {
+      top: (onScreen * mean * m.cos) / GAME_HEIGHT,
+      side: (onScreen * (sky.bottom - sky.top) * mean * Math.abs(m.sin)) / ((sky.right - sky.left) * GAME_HEIGHT),
+    };
+  }
+
+  // The roses' own fall (ROSE_SPEED_MIN-MAX), through the rules above.
+  roseMotion() {
+    return this.eventFallMotion({ from: ROSE_SPEED_MIN, to: ROSE_SPEED_MAX });
   }
 
   // One rose, a little tilted (each its own angle), falling the way roseMotion says: by default at the very top of the picture (anywhere across) - or at (x, y).
   spawnRose(m, x, y) {
     m = m || this.roseMotion();
-    const sky = this.roseSky();
+    const sky = this.eventSky();
     const size = ROSE_SIZE * Phaser.Math.FloatBetween(0.85, 1.15);
     // (across the whole default view: it starts at world x INITIAL_SCROLL_X, not at 0)
     const img = this.add.image(x === undefined ? Phaser.Math.FloatBetween(sky.left, sky.right) : x, y === undefined ? sky.top - size : y, "rose");

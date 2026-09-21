@@ -574,12 +574,17 @@ const Economy = (() => {
       state.event = ev || null;
       save();
     },
-    // God mode: a god save made before an item existed has none of it - give 999 of every listed projectile / buff it lacks.
-    fillGod: (projectileIds, buffIds) => {
+    // God mode: a god save made before an item existed has none of it - give 999 of every listed projectile / buff it lacks, and unlock every skin
+    // (skins: { character: [ids], scenery: [ids], weather: [ids] }).
+    fillGod: (projectileIds, buffIds, skins) => {
       if (!state.god) return;
       let changed = false;
       for (const id of projectileIds) if (!state.projectiles[id]) ((state.projectiles[id] = 999), (changed = true));
       for (const id of buffIds) if (!state.buffItems[id]) ((state.buffItems[id] = 999), (changed = true));
+      for (const [kind, ids] of Object.entries(skins || {})) {
+        const list = unlockedList(kind);
+        for (const id of ids) if (!list.includes(id)) (list.push(id), (changed = true));
+      }
       if (changed) save();
     },
     freshJson: () => JSON.stringify(fresh()), // a brand-new game

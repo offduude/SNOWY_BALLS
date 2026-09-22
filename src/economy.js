@@ -173,6 +173,16 @@ const Economy = (() => {
   let state = load();
   if (cleansed) save(); // write the fresh save over the old one right away, so it can only ever be cleansed once
 
+  // Ask the browser to mark this site's storage as "persistent" - a hint that it should not be the first thing cleared if the
+  // device runs low on space (a save is small, but a phone that's been idle a while can otherwise have its site data swept).
+  // This can't do anything about Incognito, an in-app browser's throwaway storage, or a "clear on exit" setting - only about
+  // that one case - so it's a small, silent improvement, not a guarantee. Some browsers don't have the API at all.
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  } catch (e) {
+    /* no such API: nothing lost by not asking */
+  }
+
   function save() {
     if (locked) return;
     try {

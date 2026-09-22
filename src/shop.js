@@ -363,6 +363,7 @@ const Shop = (() => {
     const result = buy(slot);
     if (result.ok) {
       playUiClick();
+      if (typeof Cloud !== "undefined") Cloud.notePurchase();
       closeInspect();
       render();
     } else {
@@ -480,6 +481,7 @@ const Shop = (() => {
     const result = buy(Number(btn.dataset.slot));
     if (result.ok) {
       playUiClick();
+      if (typeof Cloud !== "undefined") Cloud.notePurchase();
       btn.classList.add("bought");
       setTimeout(render, 220); // let the "bought" flash play, then show SOLD OUT + its timer
     } else if (result.reason === "funds" || result.reason === "max") {

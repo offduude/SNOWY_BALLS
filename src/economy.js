@@ -217,6 +217,16 @@ const Economy = (() => {
     /* no such API: nothing lost by not asking */
   }
 
+  // Fires after every successful local save, no matter what changed - this is the ONE choke point every state-changing
+  // action in this file already runs through (all ~34 call sites), so it is the reliable place for Cloud to hear
+  // "something changed, sync it eventually" without needing its own listener wired to every individual kind of change
+  // (coins, projectiles, buffs, skins, equipped, ...) and risking missing one (equipping a character, for instance, has
+  // no dedicated change event of its own).
+  const saveListeners = [];
+  function onSave(fn) {
+    saveListeners.push(fn);
+  }
+
   function save() {
     if (locked) return;
     try {
@@ -224,6 +234,7 @@ const Economy = (() => {
     } catch (e) {
       // localStorage unavailable (private mode, quota) - progress just won't persist this session
     }
+    saveListeners.forEach((fn) => fn());
   }
 
   // Listeners are told the new balance whenever it changes (the on-screen coin counter).
@@ -633,6 +644,7 @@ const Economy = (() => {
 
   return {
     onCoinsChange,
+    onSave,
     addCoins,
     takePayout,
     spendCoins,

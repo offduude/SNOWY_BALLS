@@ -1027,10 +1027,11 @@
       top: 32px;
     }
 
-    /* Same dot on the top-left corner of the BUFFS button (button: 10px from the right edge, 96px wide, 10px from the top). */
+    /* Same dot on the top-left corner of the BUFFS button (button: 10px from the right edge, 96px wide, 72px from the
+       top - it swapped places with LEADERBOARD, this dot has to follow it there). */
     #buffs-dot {
       right: 98px; /* 10 + 96 - half the dot */
-      top: 2px; /* 10 - half the dot */
+      top: 64px; /* 72 - half the dot */
     }
 
     #game-container.shop-open #buffs-dot {
@@ -1544,8 +1545,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=256"></script>
-  <script src="src/economy.js?v=39"></script>
+  <script src="src/version.js?v=257"></script>
+  <script src="src/economy.js?v=40"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1572,10 +1573,10 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=16"></script>
+  <script src="src/cloud.js?v=17"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
-  <script src="src/shop.js?v=27"></script>
+  <script src="src/shop.js?v=28"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=20"></script>
   <script src="src/collection.js?v=73"></script>

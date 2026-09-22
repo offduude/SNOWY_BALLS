@@ -35,7 +35,7 @@ const FIREBASE_CONFIG = {
 // save can never become, or overwrite, a real signed-in save). SYNC_INTERVAL_MS is the safety-net cadence while the tab
 // stays open and active; the tab being backgrounded/closed (visibilitychange, pagehide) also triggers one right away, since
 // that is the reliable signal here - not "the tab closing", which mobile browsers do not always report.
-const SYNC_INTERVAL_MS = 60 * 1000;
+const SYNC_INTERVAL_MS = 30 * 1000;
 const LEADERBOARD_SIZE = 20; // plenty for a 5-person group with room to grow
 const SAVES_COLLECTION = "saves";
 const SESSION_KEY = "snowyBallsSession"; // this device's own remembered { uid, token } - separate from Economy's save data (see resetLocalSave/claimSession)
@@ -93,6 +93,11 @@ const Cloud = (() => {
       return; // a bad config, or the SDK failed some other way: the game carries on without the account system
     }
     mySession = loadMySession();
+    // The real bug this fixes: without this, `dirty` was only ever set right after a sign-in or a name/description
+    // edit - ordinary play (coins, shop purchases, buffs, equipping something) never marked the save dirty, so the
+    // periodic sync below had nothing to do almost all the time. Economy.onSave fires after EVERY local save, so this
+    // is the one place that can't miss a kind of change.
+    if (typeof Economy !== "undefined" && Economy.onSave) Economy.onSave(() => { dirty = true; });
     auth.onAuthStateChanged((u) => {
       const wasSignedIn = !!user;
       // The Google display name has no length limit of its own (unlike a custom account name - see Economy.accountNameMax)
@@ -359,6 +364,19 @@ const Cloud = (() => {
     dirty = true;
   }
 
+  // A shop purchase is worth syncing sooner than the normal cadence - it's real coins spent and a real item gained,
+  // exactly the kind of thing worth protecting against a lost/crashed tab. Debounced: several purchases in quick
+  // succession (buying out a slot, then another) only schedule ONE sync, 5s after the LATEST one, not one per purchase.
+  let purchaseFlushTimer = null;
+  function notePurchase() {
+    dirty = true; // onSave already does this (Economy.spendCoins/addProjectiles/etc. all save()), but cheap to be explicit
+    clearTimeout(purchaseFlushTimer);
+    purchaseFlushTimer = setTimeout(() => {
+      purchaseFlushTimer = null;
+      syncNow();
+    }, 5000);
+  }
+
   // Pushes the leaderboard card AND the full save together (one batched write) if signed in, not in god mode, and
   // something actually changed since the last successful write. Called on the timer and on the two "the player is
   // leaving" signals above - never on every single coin/character change. Returns a promise that resolves once the
@@ -433,6 +451,7 @@ const Cloud = (() => {
     signOut,
     getUser,
     markDirty,
+    notePurchase,
     getAuthError,
     setConfirmOverwrite,
     getLeaderboardCache,

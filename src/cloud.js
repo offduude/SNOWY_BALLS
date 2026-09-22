@@ -85,11 +85,23 @@ const Cloud = (() => {
       return; // a bad config, or the SDK failed some other way: the game carries on without the account system
     }
     auth.onAuthStateChanged((u) => {
+      const wasSignedIn = !!user;
       // The Google display name has no length limit of its own (unlike a custom account name - see Economy.accountNameMax)
       // - truncated here, once, at the source, so it can never stick out of the card or the leaderboard's name column.
       const nameMax = (typeof Economy !== "undefined" && Economy.accountNameMax) || 16;
       user = u ? { uid: u.uid, name: (u.displayName || "Player").slice(0, nameMax) } : null;
       if (user) authError = null; // any stale failure from an earlier attempt is done being relevant once we're actually signed in
+      if (wasSignedIn && !user) {
+        // Signed out for ANY reason - the SIGN OUT button (which already resets this itself, see signOut()), a revoked
+        // or expired session, another tab signing out, the browser clearing site data, Firebase simply failing to
+        // restore the session on this load - not just the button. This device's local save must never keep carrying
+        // that account's progress once its auth session is gone: the next sign-in (this account or a different one)
+        // must not upload/duplicate it. Reloading keeps the running game (Economy's in-memory state) from carrying on
+        // with numbers that no longer match what was just written to localStorage.
+        resetLocalSave();
+        location.reload();
+        return;
+      }
       notifyAuth();
       if (user && !signingIn) {
         // A restored session (the page was reloaded while already signed in) - not a fresh interactive sign-in, which
@@ -123,6 +135,20 @@ const Cloud = (() => {
   // Error codes that are not real failures worth showing the player: they closed the popup themselves, or a second sign-in
   // attempt cancelled an earlier one (only possible if `signingIn` somehow didn't already stop it - kept as a backstop).
   const BENIGN_AUTH_ERRORS = new Set(["auth/popup-closed-by-user", "auth/cancelled-popup-request"]);
+
+  // Resets THIS DEVICE's local save to a brand-new game - never the account itself (the cloud save under a uid is
+  // untouched). Used whenever an auth session ends (see onAuthStateChanged above and signOut() below) so a save can
+  // never ride along to a different account: without this, signing out with real progress and signing into a
+  // different (or brand-new) account would upload/duplicate that progress there too.
+  function resetLocalSave() {
+    if (typeof Economy === "undefined") return;
+    Economy.lockSaves(); // nothing may write the old save back over this in the moment before the reload
+    try {
+      localStorage.setItem(Economy.storageKey, Economy.freshJson());
+    } catch (e) {
+      /* storage unavailable - the reload will just keep whatever was there, no harm done */
+    }
+  }
 
   function setConfirmOverwrite(fn) {
     confirmOverwrite = fn;
@@ -226,19 +252,11 @@ const Cloud = (() => {
 
   function signOut() {
     if (!ready) return;
-    // This device's local save must NOT keep carrying the account's progress after signing out - otherwise signing into
-    // a different (or brand-new) account next would upload/duplicate it there too (sign out with 1000 coins, sign into a
-    // fresh account, and that account's "first time, upload this device's save" would hand it those same 1000 coins -
-    // a real exploit, not just a display glitch). The ACCOUNT ITSELF (the cloud save under this uid) is never touched -
-    // only this device's local copy resets to a brand-new game, exactly like starting the app for the first time.
-    if (typeof Economy !== "undefined") {
-      Economy.lockSaves(); // nothing may write the old save back over this in the moment before the reload
-      try {
-        localStorage.setItem(Economy.storageKey, Economy.freshJson());
-      } catch (e) {
-        /* storage unavailable - the reload will just keep whatever was there, no harm done */
-      }
-    }
+    // Reset immediately (snappy, and certain regardless of exactly when auth.signOut()'s promise settles relative to
+    // onAuthStateChanged firing) - the listener's own signed-in-to-signed-out branch does the same reset as a safety
+    // net for every OTHER way a session can end, so this is never the only thing standing between an account and a
+    // duplicated save (see resetLocalSave() and onAuthStateChanged above).
+    resetLocalSave();
     auth.signOut().finally(() => location.reload());
   }
 

@@ -36,6 +36,12 @@ const Cloud = (() => {
   let lastWrittenCoins = null;
   let leaderboardRows = null; // cache of the last fetch: [{ name, coins }], newest first by coins; null = not fetched yet (or signed out)
   let leaderboardLoading = false;
+  let signingIn = false; // true for the whole span of an interactive Cloud.signIn() call - tells onAuthStateChanged a fresh
+  // sign-in (which drives its own sync below, after the "already has a save" check) apart from a page reload that merely
+  // restores an already-signed-in session (which is synced right away too, but never asks that question again)
+  let confirmOverwrite = null; // set by saves.js: (existingLeaderboardDoc) => Promise<boolean> - see setConfirmOverwrite
+  let authError = null; // the last sign-in failure, as a short readable line - shown in the ACCOUNT section (see saves.js) so it's
+  // diagnosable without opening devtools; null once sign-in succeeds, restores a session, or the player just closed the popup themselves
   const authListeners = [];
 
   function isConfigured() {
@@ -62,10 +68,16 @@ const Cloud = (() => {
     }
     auth.onAuthStateChanged((u) => {
       user = u ? { uid: u.uid, name: u.displayName || "Player" } : null;
-      dirty = true; // a fresh sign-in should show up right away, not wait for the next coin change
-      lastWrittenCoins = null;
+      if (user) authError = null; // any stale failure from an earlier attempt is done being relevant once we're actually signed in
       notifyAuth();
-      if (user) syncNow();
+      if (user && !signingIn) {
+        // A restored session (the page was reloaded while already signed in) - not a fresh interactive sign-in, which drives
+        // its own sync explicitly below (after the "already has a save" check). Still worth syncing promptly rather than
+        // waiting for the next scheduled trigger, and never needs to ask the overwrite question again.
+        dirty = true;
+        lastWrittenCoins = null;
+        syncNow();
+      }
     });
     if (typeof Economy !== "undefined") {
       Economy.onCoinsChange(() => {
@@ -79,25 +91,55 @@ const Cloud = (() => {
     window.addEventListener("pagehide", syncNow);
   }
 
-  let authError = null; // the last sign-in failure, as a short readable line - shown in the ACCOUNT section (see saves.js) so it's
-  // diagnosable without opening devtools; null once sign-in succeeds or the player just closed the popup themselves (not a real error)
-
   function getAuthError() {
     return authError;
   }
 
+  // Error codes that are not real failures worth showing the player: they closed the popup themselves, or a second sign-in
+  // attempt cancelled an earlier one (only possible if `signingIn` somehow didn't already stop it - kept as a backstop).
+  const BENIGN_AUTH_ERRORS = new Set(["auth/popup-closed-by-user", "auth/cancelled-popup-request"]);
+
+  function setConfirmOverwrite(fn) {
+    confirmOverwrite = fn;
+  }
+
   function signIn() {
-    if (!ready) return;
+    if (!ready || signingIn) return; // already mid-attempt: a second click must not fire a second popup (that is what produced auth/cancelled-popup-request)
+    signingIn = true;
     authError = null;
     notifyAuth(); // clears any old error line immediately, before the new attempt resolves
     auth
       .signInWithPopup(new firebase.auth.GoogleAuthProvider())
+      .then(async (result) => {
+        // This account may already have a save on the leaderboard (another device, or an earlier test) - signing in here
+        // never downloads it, it only starts overwriting it with THIS device's numbers, so ask first. Only for a FRESH
+        // interactive sign-in (this function), never for onAuthStateChanged restoring an existing session on page load.
+        let existing = null;
+        try {
+          const doc = await db.collection("leaderboard").doc(result.user.uid).get();
+          if (doc.exists) existing = doc.data();
+        } catch (e) {
+          /* couldn't check (offline, or not readable) - proceed rather than block sign-in over a read failure */
+        }
+        if (existing && confirmOverwrite) {
+          const proceed = await confirmOverwrite(existing);
+          if (!proceed) {
+            await auth.signOut();
+            return;
+          }
+        }
+        dirty = true; // a fresh sign-in should show up right away, not wait for the next coin change
+        lastWrittenCoins = null;
+        syncNow();
+      })
       .catch((e) => {
-        if (e && e.code === "auth/popup-closed-by-user") return; // the player closed it themselves - not a failure worth showing
-        // eslint-disable-next-line no-console
+        if (e && BENIGN_AUTH_ERRORS.has(e.code)) return;
         console.error("Cloud.signIn failed:", e);
         authError = (e && e.code) || (e && e.message) || "sign-in failed";
         notifyAuth();
+      })
+      .finally(() => {
+        signingIn = false;
       });
   }
 
@@ -158,5 +200,5 @@ const Cloud = (() => {
       });
   }
 
-  return { init, isConfigured, onAuthChange, signIn, signOut, getUser, getAuthError, getLeaderboardCache, refreshLeaderboard };
+  return { init, isConfigured, onAuthChange, signIn, signOut, getUser, getAuthError, setConfirmOverwrite, getLeaderboardCache, refreshLeaderboard };
 })();

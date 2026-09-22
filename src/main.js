@@ -581,6 +581,26 @@ class MainScene extends Phaser.Scene {
     if (/^(localhost|127\.)/.test(location.hostname)) {
       window.calibrateHeld = () => this.calibrateHeldProjectiles(); // dev tools, see docs/CALIBRATION.md
       window.calibrateSheet = () => this.showCalibrationSheet();
+      // God mode, for testing: was the "god mode" import code (SAVES section, removed 2026-09-22 - see docs/NOTES.md "The
+      // leaderboard"); this is its replacement, a console-only dev tool. Builds the same save the old code did (a huge wallet,
+      // 999 of every projectile / buff, flagged god so Economy never uses anything up or charges) and reloads into it.
+      window.godMode = async () => {
+        let eco;
+        try {
+          eco = await (await fetch("economy.json?t=" + Date.now())).json();
+        } catch (e) {
+          console.error("godMode: could not load economy.json", e);
+          return;
+        }
+        const s = JSON.parse(Economy.freshJson());
+        s.god = true;
+        s.coins = 999999999;
+        s.lifetimeCoins = 999999999;
+        for (const [id, p] of Object.entries(eco.projectiles || {})) if (id !== "snowball" && !p.infinite && !p.regen) s.projectiles[id] = 999;
+        for (const it of (eco.shop && eco.shop.items) || []) if (it.category === "consumable") s.buffItems[it.id] = 999;
+        localStorage.setItem(Economy.storageKey, JSON.stringify(s));
+        location.reload();
+      };
     }
     window.snowyBallsReady = true; // the game is up: the "grand cleansing" screen (index.html) may fade out now
     const loadingEl = document.getElementById("loading-screen");

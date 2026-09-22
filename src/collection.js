@@ -575,7 +575,7 @@ const Collection = (() => {
         options: document.getElementById("options-btn"),
       };
       buttons.options.addEventListener("click", () => toggle("options"));
-      scrollEl.addEventListener("click", (e) => Saves.onClick(e)); // the SAVES section of the OPTIONS list
+      scrollEl.addEventListener("click", (e) => Saves.onClick(e)); // the ACCOUNT section's SIGN IN / SIGN OUT (the OPTIONS list's own onEquip handles the rest)
       buttons.buff.addEventListener("click", () => toggle("buff"));
       // Red dot on the PROJECTILES button (same dot as the shop's, but silent).
       dotEl = document.getElementById("projectiles-dot");

@@ -646,6 +646,7 @@ const Economy = (() => {
     setAccountName,
     getAccountNameChangeCost,
     accountNameChangeCost: ACCOUNT_NAME_CHANGE_COST, // the flat cost every rename after the first one is - a plain value, not a function, since it never changes
+    accountNameMax: ACCOUNT_NAME_MAX, // also used by cloud.js to cap a Google display name, which isn't run through sanitizeAccountName (nothing to strip, it's already a trusted value from Firebase Auth - just too long, sometimes)
     getStreak,
     setStreak,
     wasAiming,

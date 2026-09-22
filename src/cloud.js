@@ -77,7 +77,10 @@ const Cloud = (() => {
       return; // a bad config, or the SDK failed some other way: the game carries on without the account system
     }
     auth.onAuthStateChanged((u) => {
-      user = u ? { uid: u.uid, name: u.displayName || "Player" } : null;
+      // The Google display name has no length limit of its own (unlike a custom account name - see Economy.accountNameMax)
+      // - truncated here, once, at the source, so it can never stick out of the card or the leaderboard's name column.
+      const nameMax = (typeof Economy !== "undefined" && Economy.accountNameMax) || 16;
+      user = u ? { uid: u.uid, name: (u.displayName || "Player").slice(0, nameMax) } : null;
       if (user) authError = null; // any stale failure from an earlier attempt is done being relevant once we're actually signed in
       notifyAuth();
       if (user && !signingIn) {

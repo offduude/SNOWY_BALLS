@@ -137,11 +137,24 @@ const Cloud = (() => {
       .then(async (result) => {
         const uid = result.user.uid;
         let cloudSave = null;
+        let checkFailed = false;
         try {
           const doc = await db.collection(SAVES_COLLECTION).doc(uid).get();
           if (doc.exists) cloudSave = doc.data();
         } catch (e) {
-          /* couldn't check (offline, or the rules aren't published yet) - treat as "nothing to download" rather than block sign-in */
+          checkFailed = true; // offline, or the rules aren't published yet - see below: this must NOT be treated as "no save"
+        }
+        if (checkFailed) {
+          // Not knowing whether this account has a save is NOT the same as it having none - guessing "none" here is
+          // exactly how a real cloud save gets silently overwritten by whatever's on this device instead of downloaded
+          // (this bit a real sign-in: a fresh account read back 36 coins, the player played a bit signed OUT - device-only,
+          // never synced - then signed back in and the account showed 40, because the existence check failed and the code
+          // used to fall through to "first time, upload this device's save" instead of refusing). Abort and sign back out;
+          // signing in again retries the check rather than guessing.
+          authError = "couldn't check this account for an existing save - try again";
+          notifyAuth();
+          await auth.signOut();
+          return;
         }
         if (cloudSave) {
           const proceed = confirmOverwrite ? await confirmOverwrite(cloudSave) : true;
@@ -177,7 +190,10 @@ const Cloud = (() => {
         lastWrittenCoins = null;
         lastWrittenCharacter = null;
         lastWrittenSave = null;
-        syncNow();
+        // Refresh the leaderboard only AFTER the write actually lands (syncNow now resolves once its commit settles) -
+        // otherwise the read can beat the write and the account card keeps showing "unranked" until the next time
+        // LEADERBOARD happens to be opened, even though this player is on the board now.
+        syncNow().then(() => refreshLeaderboard(() => { if (typeof Saves !== "undefined") Saves.refresh(); }));
       })
       .catch((e) => {
         if (e && BENIGN_AUTH_ERRORS.has(e.code)) return;
@@ -207,16 +223,18 @@ const Cloud = (() => {
 
   // Pushes the leaderboard card AND the full save together (one batched write) if signed in, not in god mode, and
   // something actually changed since the last successful write. Called on the timer and on the two "the player is
-  // leaving" signals above - never on every single coin/character change.
+  // leaving" signals above - never on every single coin/character change. Returns a promise that resolves once the
+  // write (or the decision to skip it) has settled - signIn()'s first-time-upload path waits on this before refreshing
+  // the leaderboard, so it doesn't read before its own write has landed.
   function syncNow() {
-    if (!ready || !user || !dirty) return;
-    if (typeof Economy !== "undefined" && Economy.isGod()) return; // a god save is never published, in either collection
+    if (!ready || !user || !dirty) return Promise.resolve();
+    if (typeof Economy !== "undefined" && Economy.isGod()) return Promise.resolve(); // a god save is never published, in either collection
     const coins = typeof Economy !== "undefined" ? Economy.getCoins() : 0;
     const character = typeof Economy !== "undefined" ? Economy.getEquipped("character") : null;
     const saveJson = typeof Economy !== "undefined" ? Economy.snapshot() : null;
     if (coins === lastWrittenCoins && character === lastWrittenCharacter && saveJson === lastWrittenSave) {
       dirty = false;
-      return;
+      return Promise.resolve();
     }
     const description = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
     // A custom name (set via CHANGE NAME) overrides the Google account name everywhere the leaderboard shows it; "" means
@@ -226,7 +244,7 @@ const Cloud = (() => {
     const batch = db.batch();
     batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, updatedAt: now });
     if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now });
-    batch
+    return batch
       .commit()
       .then(() => {
         lastWrittenCoins = coins;

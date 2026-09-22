@@ -1315,13 +1315,16 @@
       background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
         rgba(77, 210, 255, 0.32), rgba(106, 107, 255, 0.32), rgba(193, 77, 255, 0.32), rgba(255, 77, 77, 0.32));
       background-size: 200% 100%;
-      animation: rarity-wave 2.4s linear infinite, buff-card-shine 1.7s ease-in-out infinite;
+      /* ammo-shine, not buff-card-shine: that one also pulses `filter: brightness()`, which repaints every descendant
+         (including the account card's picture) each frame - on a pixelated image that reads as a visible "wobble".
+         ammo-shine (already used by #ammo-box/#leaderboard-btn with no such complaint) only pulses box-shadow. */
+      animation: rarity-wave 2.4s linear infinite, ammo-shine 1.7s ease-in-out infinite;
     }
 
     .board-place {
       flex: none;
       width: calc(var(--u) * 2.6);
-      text-align: right;
+      text-align: center;
       color: #8a6a44;
     }
 
@@ -1530,7 +1533,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=249"></script>
+  <script src="src/version.js?v=250"></script>
   <script src="src/economy.js?v=39"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1558,7 +1561,7 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=11"></script>
+  <script src="src/cloud.js?v=12"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>

@@ -226,7 +226,20 @@ const Cloud = (() => {
 
   function signOut() {
     if (!ready) return;
-    auth.signOut();
+    // This device's local save must NOT keep carrying the account's progress after signing out - otherwise signing into
+    // a different (or brand-new) account next would upload/duplicate it there too (sign out with 1000 coins, sign into a
+    // fresh account, and that account's "first time, upload this device's save" would hand it those same 1000 coins -
+    // a real exploit, not just a display glitch). The ACCOUNT ITSELF (the cloud save under this uid) is never touched -
+    // only this device's local copy resets to a brand-new game, exactly like starting the app for the first time.
+    if (typeof Economy !== "undefined") {
+      Economy.lockSaves(); // nothing may write the old save back over this in the moment before the reload
+      try {
+        localStorage.setItem(Economy.storageKey, Economy.freshJson());
+      } catch (e) {
+        /* storage unavailable - the reload will just keep whatever was there, no harm done */
+      }
+    }
+    auth.signOut().finally(() => location.reload());
   }
 
   function getUser() {

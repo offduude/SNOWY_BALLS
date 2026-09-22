@@ -20,14 +20,16 @@ const Saves = (() => {
     layer = null;
   }
 
-  // buttons: [{ label, cls, onClick }]; onClick returns false to keep the popup open. Returns the panel element.
+  // buttons: [{ label, cls, html, onClick }]; onClick returns false to keep the popup open. `html: true` renders `label`
+  // as raw markup instead of escaping it - only for a button whose label is built from trusted, fixed pieces (e.g. the
+  // CHANGE NAME price button's coin icon), never from player-typed text. Returns the panel element.
   function openModal(title, bodyHtml, buttons) {
     closeModal();
     layer = document.createElement("div");
     layer.id = "modal-layer";
     layer.innerHTML =
       `<div class="modal-panel"><div class="modal-title">${esc(title)}</div>${bodyHtml}` +
-      `<div class="modal-buttons">${buttons.map((b, k) => `<button type="button" class="modal-btn ${b.cls || ""}" data-k="${k}">${esc(b.label)}</button>`).join("")}</div></div>`;
+      `<div class="modal-buttons">${buttons.map((b, k) => `<button type="button" class="modal-btn ${b.cls || ""}" data-k="${k}">${b.html ? b.label : esc(b.label)}</button>`).join("")}</div></div>`;
     // taps on the popup must not reach the game underneath
     ["touchstart", "touchend", "mousedown", "mouseup", "pointerdown", "pointerup", "click"].forEach((ev) => layer.addEventListener(ev, (e) => e.stopPropagation()));
     layer.addEventListener("click", (e) => {
@@ -98,7 +100,7 @@ const Saves = (() => {
     const errorLine = error ? `<div class="account-error">${user ? "" : "Sign-in failed: "}${esc(error)}</div>` : "";
     const nameBtn = `<button type="button" class="save-icon-btn" data-act="editname">CHANGE NAME</button>`;
     const descBtn = `<button type="button" class="save-icon-btn" data-act="editdesc">CHANGE DESCRIPTION</button>`;
-    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${errorLine}${nameBtn}${descBtn}</div>`;
+    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${errorLine}<div class="account-btn-row">${nameBtn}${descBtn}</div></div>`;
   }
 
   // CHANGE DESCRIPTION: edit the account's own bio line. Sanitized and capped the same way on save as everywhere else
@@ -132,45 +134,75 @@ const Saves = (() => {
     input.addEventListener("input", show);
   }
 
-  // CHANGE NAME: the first rename is free, every one after costs Economy.getAccountNameChangeCost() coins - Economy
-  // itself is the source of truth for that (see setAccountName), this just shows the cost and surfaces the two ways it
-  // can fail (empty after sanitizing, or not enough coins).
-  function showEditName() {
-    const current = (typeof Economy !== "undefined" && Economy.getAccountName()) || "";
+  // CHANGE NAME: no explanatory text under the title - the price button IS the explanation. The first rename is free,
+  // but clicking it still warns that every rename AFTER this one costs Economy.accountNameChangeCost coins (so nobody
+  // spends their one free rename without knowing that); once that free one is used, the button already reads the real
+  // price and clicking it renames directly - nothing left to warn about, it costs the same every time from then on.
+  // `prefill` / `errorMsg` let CANCEL on the warning step return here with what was typed and, on a failed attempt,
+  // the reason - see attemptRename below.
+  function showEditName(prefill, errorMsg) {
+    const current = prefill !== undefined ? prefill : (typeof Economy !== "undefined" && Economy.getAccountName()) || "";
     const cost = typeof Economy !== "undefined" ? Economy.getAccountNameChangeCost() : 0;
     const max = 16;
-    const costText = cost > 0 ? `Costs ${formatBoardCoins(cost)} coins.` : "Free this first time.";
+    const priceLabel = cost > 0 ? `<i class="coin"></i>${formatBoardCoins(cost)}` : "FREE";
     const panel = openModal(
-      "ACCOUNT NAME",
-      `<div class="modal-text">Your name on the leaderboard and account card. Plain text only. ${costText}</div>` +
-        `<input class="modal-input" maxlength="${max}" value="${esc(current)}" spellcheck="false" />` +
-        `<div class="modal-status"></div>`,
+      "CHANGE NAME",
+      `<input class="modal-input" maxlength="${max}" value="${esc(current)}" spellcheck="false" />` + `<div class="modal-status${errorMsg ? " bad" : ""}">${esc(errorMsg || "")}</div>`,
       [
         {
-          label: "SAVE",
+          label: priceLabel,
+          html: true,
           onClick: (el) => {
-            const result = Economy.setAccountName(el.querySelector("input").value);
-            if (!result.ok) {
-              const status = panel.querySelector(".modal-status");
-              status.textContent = result.reason === "cant-afford" ? `Not enough coins - needs ${formatBoardCoins(cost)}.` : "Enter a name.";
-              status.classList.add("bad");
-              return false; // keep the popup open so the player can try again
-            }
-            if (typeof Cloud !== "undefined") Cloud.markDirty(); // picked up by the normal sync cadence, not sent instantly
-            refresh();
+            const value = el.querySelector("input").value;
+            if (cost > 0) attemptRename(value);
+            else showConfirmFirstRename(value); // free right now - but warn what the NEXT one costs before spending it
+            return false; // attemptRename/showConfirmFirstRename decide whether the popup closes
           },
         },
         { label: "CANCEL", cls: "ghost" },
       ]
     );
-    const input = panel.querySelector("input");
-    const status = panel.querySelector(".modal-status");
-    const show = () => {
-      status.classList.remove("bad");
-      status.textContent = `${input.value.length}/${max}`;
-    };
-    show();
-    input.addEventListener("input", show);
+    panel.querySelector("input").focus();
+  }
+
+  // The one-time warning shown only when THIS rename is free (see showEditName) - it's about the rename AFTER this one,
+  // not this one. YES spends the free rename; CANCEL goes back to the name editor with what was typed still there.
+  function showConfirmFirstRename(value) {
+    openModal(
+      "CHANGE NAME",
+      `<div class="modal-text">Next change ${Economy.accountNameChangeCost} coins. Proceed?</div>`,
+      [
+        {
+          label: "YES",
+          onClick: () => {
+            attemptRename(value); // closes (success) or reopens the editor with an error (failure) itself - either way, this modal must not also auto-close on top of that
+            return false;
+          },
+        },
+        {
+          label: "CANCEL",
+          cls: "ghost",
+          onClick: () => {
+            showEditName(value); // goes back to the editor (already opens its own fresh modal) - must not also auto-close on top of that
+            return false;
+          },
+        },
+      ]
+    );
+  }
+
+  // Shared by both the free and paid paths (see showEditName): does the actual rename, and either closes with a fresh
+  // OPTIONS render (success) or drops the player back into the name editor with the reason it failed (empty after
+  // sanitizing, or - only possible on the paid path - not enough coins).
+  function attemptRename(value) {
+    const result = Economy.setAccountName(value);
+    if (!result.ok) {
+      showEditName(value, result.reason === "cant-afford" ? `Not enough coins - needs ${formatBoardCoins(Economy.getAccountNameChangeCost())}.` : "Enter a name.");
+      return;
+    }
+    if (typeof Cloud !== "undefined") Cloud.markDirty(); // picked up by the normal sync cadence, not sent instantly
+    closeModal();
+    refresh();
   }
 
   // ---------- the OPTIONS list (ACCOUNT, VOLUME) ----------

@@ -1257,6 +1257,10 @@
 
     .save-icon-btn:active { background: #74491f; }
 
+    /* CHANGE NAME + CHANGE DESCRIPTION side by side instead of stacked, splitting the row evenly. */
+    .account-btn-row { flex: none; display: flex; gap: calc(var(--u) * 1); }
+    .account-btn-row .save-icon-btn { flex: 1; min-width: 0; }
+
     /* A leaderboard card: place | name ... coins. Ranks 2-3 get the same epic tint the buff cards use, rank 1 the same
        travelling rainbow + pulsing shine a legendary buff card gets (.rarity-wave / .buff-card-shine, shared keyframes) -
        a look fixed BY RANK, not by anything about the player, so no rarity/amount corner (they have none). Everyone past
@@ -1419,6 +1423,9 @@
     .modal-buttons { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); justify-content: flex-end; margin-top: calc(var(--u) * 1.4); }
 
     .modal-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: calc(var(--u) * 0.6);
       padding: calc(var(--u) * 1) calc(var(--u) * 1.6);
       background: #8b5a2b;
       border: 2px solid #4a2f14;
@@ -1435,6 +1442,18 @@
     /* CANCEL / CLOSE / BACK: a proper button in the popup's own colours (tan with dark text), less loud than the main action but clearly pressable. */
     .modal-btn.ghost { background: #dcc9a0; border-color: #7a5230; color: #3b2412; }
     .modal-btn.ghost:active { background: #cbb789; }
+
+    /* CHANGE NAME's price button (showEditName) - the button's OWN label is the price, so it needs the same little gold
+       coin circle the leaderboard/board-coins uses, not just a number. */
+    .modal-btn .coin {
+      display: inline-block;
+      width: calc(var(--u) * 1.1);
+      height: calc(var(--u) * 1.1);
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
 
     #coin-counter .coin {
       flex: none;
@@ -1489,8 +1508,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=241"></script>
-  <script src="src/economy.js?v=37"></script>
+  <script src="src/version.js?v=242"></script>
+  <script src="src/economy.js?v=38"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1522,7 +1541,7 @@
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=15"></script>
+  <script src="src/saves.js?v=16"></script>
   <script src="src/collection.js?v=72"></script>
   <script src="src/main.js?v=167"></script>
   <script>

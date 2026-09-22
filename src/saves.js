@@ -435,7 +435,10 @@ const Saves = (() => {
     const body = user
       ? `<div class="account-row"><span class="account-name">${esc(user.name)}</span><button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button></div>`
       : `<div class="account-row"><span class="account-hint">Sign in to join the leaderboard.</span><button type="button" class="save-icon-btn" data-act="signin">SIGN IN</button></div>`;
-    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${body}</div>`;
+    // The last sign-in failure (Cloud.signIn), if any - so what went wrong is readable in the game itself, no devtools needed.
+    const error = Cloud.getAuthError();
+    const errorLine = !user && error ? `<div class="account-error">Sign-in failed: ${esc(error)}</div>` : "";
+    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${body}${errorLine}</div>`;
   }
 
   // ---- LEADERBOARD: everyone's CURRENT coins, ranked - a public reading of Cloud's cache (see cloud.js and

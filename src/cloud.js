@@ -8,12 +8,12 @@
 // still a placeholder until a real Firebase project exists for this game - see docs/NOTES.md for the setup steps (the
 // owner's part) and what this file does once it is filled in.
 const FIREBASE_CONFIG = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME",
+  apiKey: "AIzaSyC9pnWLKw0yADf79MKMyR1JWOaOQetLGh0",
+  authDomain: "snowy-balls-5f7a5.firebaseapp.com",
+  projectId: "snowy-balls-5f7a5",
+  storageBucket: "snowy-balls-5f7a5.firebasestorage.app",
+  messagingSenderId: "555349371621",
+  appId: "1:555349371621:web:25810d924ee66ea305820c",
 };
 
 // WRITE TIMING (the owner's call, 2026-09-22): current coins go up AND down (buying something spends them), so - unlike a
@@ -79,11 +79,26 @@ const Cloud = (() => {
     window.addEventListener("pagehide", syncNow);
   }
 
+  let authError = null; // the last sign-in failure, as a short readable line - shown in the ACCOUNT section (see saves.js) so it's
+  // diagnosable without opening devtools; null once sign-in succeeds or the player just closed the popup themselves (not a real error)
+
+  function getAuthError() {
+    return authError;
+  }
+
   function signIn() {
     if (!ready) return;
-    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(() => {
-      /* the player closed the popup, or it was blocked - nothing to do, they can try again */
-    });
+    authError = null;
+    notifyAuth(); // clears any old error line immediately, before the new attempt resolves
+    auth
+      .signInWithPopup(new firebase.auth.GoogleAuthProvider())
+      .catch((e) => {
+        if (e && e.code === "auth/popup-closed-by-user") return; // the player closed it themselves - not a failure worth showing
+        // eslint-disable-next-line no-console
+        console.error("Cloud.signIn failed:", e);
+        authError = (e && e.code) || (e && e.message) || "sign-in failed";
+        notifyAuth();
+      });
   }
 
   function signOut() {
@@ -143,5 +158,5 @@ const Cloud = (() => {
       });
   }
 
-  return { init, isConfigured, onAuthChange, signIn, signOut, getUser, getLeaderboardCache, refreshLeaderboard };
+  return { init, isConfigured, onAuthChange, signIn, signOut, getUser, getAuthError, getLeaderboardCache, refreshLeaderboard };
 })();

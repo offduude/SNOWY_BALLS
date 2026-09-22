@@ -838,21 +838,21 @@
       text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
     }
 
-    /* BUFFS button: left of the mute button (top-right), same look as the other brown buttons. */
+    /* BUFFS button: under the projectile counter, same right-edge stack (LEADERBOARD 10-38, the counter 44-66, this 72-100). */
     #buffs-btn {
       position: absolute;
-      top: 10px;
+      top: 72px;
       right: 10px;
-      width: 96px; /* as wide as the projectile counter under it (the mute button that shared this row is gone) */
+      width: 96px; /* as wide as the projectile counter above it (the mute button that shared this row is gone) */
       height: 28px;
       z-index: 5;
       transition: opacity 0.25s ease;
     }
 
-    /* LEADERBOARD button: under the projectile counter, same right-edge stack (BUFFS 10-38, the counter 44-66, this 72-100). */
+    /* LEADERBOARD button: top of the right-edge stack, above the projectile counter and BUFFS. */
     #leaderboard-btn {
       position: absolute;
-      top: 72px;
+      top: 10px;
       right: 10px;
       width: 96px;
       height: 28px;
@@ -1515,7 +1515,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=246"></script>
+  <script src="src/version.js?v=247"></script>
   <script src="src/economy.js?v=39"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,

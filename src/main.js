@@ -399,6 +399,14 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
+    // The loading screen's percentage (index.html #loading-text): real progress from Phaser's own loader, counted by files
+    // done out of files queued (not bytes - a handful of the sound files are much bigger than the images, so this can jump
+    // unevenly, e.g. race to 90% then sit on one big file - normal for a file-count progress bar). The screen itself is
+    // already on screen before this ever runs (pure CSS, see index.html); it only fades out once create() below is done.
+    this.load.on("progress", (frac) => {
+      const el = document.getElementById("loading-text");
+      if (el) el.textContent = "Loading - " + Math.round(frac * 100) + "%";
+    });
     this.load.image("background", "assets/building/background.png?v=2");
     this.load.image("snowball", "assets/snowball/snowball.png");
     this.load.image("snowball_mark", "assets/snowball/snowball_mark.png");
@@ -575,6 +583,8 @@ class MainScene extends Phaser.Scene {
       window.calibrateSheet = () => this.showCalibrationSheet();
     }
     window.snowyBallsReady = true; // the game is up: the "grand cleansing" screen (index.html) may fade out now
+    const loadingEl = document.getElementById("loading-screen");
+    if (loadingEl) loadingEl.classList.add("hide"); // its job is done - no minimum hold time, unlike the cleansing screen
 
     // Mobile-only from here on - no keyboard control, tap is the only input.
     this.input.on("pointerdown", () => this.handleFreezeInput());

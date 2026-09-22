@@ -1049,6 +1049,34 @@
       transform: translateX(-50%);
     }
 
+    /* LOADING SCREEN: covers the black gap before anything else is on screen (the game's own scripts, then Phaser's asset preload -
+       character art, sounds, economy.json). Visible from the very first paint of the page - no script, font or image has to
+       finish first - because it needs nothing but this CSS. The percentage is filled in once Phaser's real loader starts
+       reporting progress (main.js); until then it just reads 0%, which is honest (nothing measurable has happened yet).
+       Faded out by main.js the moment the game is actually ready (create()'s window.snowyBallsReady). Sits right under the
+       cleansing screen (z-index 100) so the two never fight for which is on top - if cleansing also needs to show, it simply
+       covers this one; both are solid black, so there is no seam either way. */
+    #loading-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 99;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: #fff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 12px; /* the same size as #message's "TAP to AIM" - the loading text is styled to match it */
+      line-height: 1.8;
+      text-align: center;
+    }
+
+    #loading-screen.hide {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
     /* THE GRAND CLEANSING: shown once, on the first load after the grand reset (see Economy SAVE_EPOCH) - a completely black screen with
        white text, held for a moment, then faded out into the game. Never shown again. */
     #cleansing {
@@ -1325,6 +1353,7 @@
 </head>
 <body>
   <div id="game-container">
+    <div id="loading-screen"><span id="loading-text">Loading - 0%</span></div>
     <div id="cleansing"><span>The grand cleansing has struck.</span></div>
     <div id="message"></div>
     <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
@@ -1356,7 +1385,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=233"></script>
+  <script src="src/version.js?v=234"></script>
   <script src="src/economy.js?v=35"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1390,7 +1419,7 @@
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=8"></script>
   <script src="src/collection.js?v=70"></script>
-  <script src="src/main.js?v=164"></script>
+  <script src="src/main.js?v=165"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

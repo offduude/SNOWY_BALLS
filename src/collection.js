@@ -447,6 +447,8 @@ const Collection = (() => {
       scrollEl.scrollTop = 0;
       container.classList.add("list-open");
       buttons.projectile.classList.remove("active");
+      // A fresh read of the leaderboard, only now (opening it) - not every time the list happens to redraw (see cloud.js).
+      if (typeof Cloud !== "undefined") Cloud.refreshLeaderboard(() => Saves.refresh());
       return;
     }
     if (kind === "buff") {

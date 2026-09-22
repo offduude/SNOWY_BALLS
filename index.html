@@ -1275,6 +1275,81 @@
     .save-icon:active { background: #74491f; }
     .save-icon svg { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); }
 
+    /* ---- OPTIONS list: ACCOUNT (sign in with Google, src/cloud.js) and LEADERBOARD (everyone's current coins) ---- */
+    .account-row {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: calc(var(--u) * 1.2);
+      color: #ffffff;
+      font-size: calc(var(--u) * 1.2);
+    }
+
+    .account-hint { color: #e6cfa3; }
+
+    .save-icon-btn {
+      flex: none;
+      box-sizing: border-box;
+      padding: calc(var(--u) * 0.9) calc(var(--u) * 1.2);
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: calc(var(--u) * 1.1);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .save-icon-btn:active { background: #74491f; }
+
+    .board-row {
+      flex: none;
+      display: flex;
+      align-items: baseline;
+      gap: calc(var(--u) * 1.2);
+      color: #ffffff;
+      font-size: calc(var(--u) * 1.2);
+    }
+
+    .board-rank {
+      flex: none;
+      width: calc(var(--u) * 2.4);
+      color: #e6cfa3;
+    }
+
+    .board-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .board-coins {
+      flex: none;
+      display: flex;
+      align-items: baseline;
+      gap: calc(var(--u) * 0.6);
+    }
+
+    .board-coins .coin {
+      display: inline-block;
+      width: calc(var(--u) * 1.1);
+      height: calc(var(--u) * 1.1);
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
+
+    .board-empty {
+      flex: none;
+      color: #e6cfa3;
+      font-size: calc(var(--u) * 1.1);
+    }
+
     /* ---- popups (export / import / create / delete / load) ---- */
     #modal-layer {
       position: absolute;
@@ -1385,7 +1460,13 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="src/version.js?v=234"></script>
+  <!-- The leaderboard's backend (src/cloud.js). Loaded from Google's own CDN, same as the Google Fonts stylesheet above.
+       If this can't load (offline, blocked, or FIREBASE_CONFIG is still a placeholder - see cloud.js) the game is unaffected:
+       every Cloud.* call is a guarded no-op until both the scripts and the config are really there. -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="src/version.js?v=235"></script>
   <script src="src/economy.js?v=35"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1413,12 +1494,13 @@
       }, 100);
     })();
   </script>
+  <script src="src/cloud.js?v=1"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=8"></script>
-  <script src="src/collection.js?v=70"></script>
+  <script src="src/saves.js?v=9"></script>
+  <script src="src/collection.js?v=71"></script>
   <script src="src/main.js?v=165"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
@@ -1434,6 +1516,7 @@
     });
 
     Collection.init();
+    Cloud.init();
 
     // Live coin counter (above the SHOP/BACK button, visible in the game and in the shop).
     // From a million up the number is shortened so it always fits the box: 1M 2M ... 999M, then 1B 2B ... (rounded down).

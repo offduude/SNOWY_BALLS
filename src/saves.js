@@ -422,8 +422,47 @@ const Saves = (() => {
     el.innerHTML =
       `<div class="opt-section"><div class="opt-head">SAVES</div>${getSlots().map(slotHtml).join("")}</div>` +
       `<div class="opt-section"><div class="opt-head">VOLUME</div><div class="vol-row" data-vol="master"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Volume" /><span class="vol-value"></span></div>` +
-      `<div class="vol-name">Weather</div><div class="vol-row" data-vol="weather"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Weather" /><span class="vol-value"></span></div></div>`;
+      `<div class="vol-name">Weather</div><div class="vol-row" data-vol="weather"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Weather" /><span class="vol-value"></span></div></div>` +
+      accountSectionHtml() +
+      leaderboardSectionHtml();
     wireVolume(el);
+  }
+
+  // ---- ACCOUNT: sign in with Google (Cloud, src/cloud.js) - only what's needed to join the leaderboard. ----
+  function accountSectionHtml() {
+    if (typeof Cloud === "undefined" || !Cloud.isConfigured()) return ""; // no Firebase project set up yet: no dead button
+    const user = Cloud.getUser();
+    const body = user
+      ? `<div class="account-row"><span class="account-name">${esc(user.name)}</span><button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button></div>`
+      : `<div class="account-row"><span class="account-hint">Sign in to join the leaderboard.</span><button type="button" class="save-icon-btn" data-act="signin">SIGN IN</button></div>`;
+    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${body}</div>`;
+  }
+
+  // ---- LEADERBOARD: everyone's CURRENT coins, ranked - a public reading of Cloud's cache (see cloud.js and
+  // collection.js's open("options"), which is what actually triggers a fresh read - this only ever draws what is cached). ----
+  // Same shortening as the live coin counter (index.html): 1,234,000 -> "1M", so a leaderboard total never gets unreadable.
+  function formatBoardCoins(n) {
+    if (n >= 1e9) return Math.floor(n / 1e9) + "B";
+    if (n >= 1e6) return Math.floor(n / 1e6) + "M";
+    return String(n);
+  }
+
+  function leaderboardRowHtml(row, rank) {
+    return (
+      `<div class="board-row"><span class="board-rank">${rank}</span><span class="board-name">${esc(row.name)}</span>` +
+      `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span></div>`
+    );
+  }
+
+  function leaderboardSectionHtml() {
+    if (typeof Cloud === "undefined" || !Cloud.isConfigured()) return "";
+    const rows = Cloud.getLeaderboardCache();
+    const body = !rows
+      ? `<div class="board-empty">Loading...</div>`
+      : rows.length
+        ? rows.map((row, i) => leaderboardRowHtml(row, i + 1)).join("")
+        : `<div class="board-empty">No scores yet.</div>`;
+    return `<div class="opt-section"><div class="opt-head">LEADERBOARD</div>${body}</div>`;
   }
 
   // The VOLUME sliders: dragging one sets its volume live (Volume.set / Volume.setWeather remember it on the device). The first is the master volume, the
@@ -453,7 +492,14 @@ const Saves = (() => {
 
   function onClick(e) {
     const b = e.target.closest("[data-act]");
-    if (!b || !meta) return;
+    if (!b) return;
+    if (b.dataset.act === "signin" || b.dataset.act === "signout") {
+      // The ACCOUNT section's button (see renderOptions): no save slot involved, so this comes before the `!meta` / index guards below.
+      if (typeof playUiClick === "function") playUiClick();
+      if (typeof Cloud !== "undefined") Cloud[b.dataset.act === "signin" ? "signIn" : "signOut"]();
+      return;
+    }
+    if (!meta) return;
     const i = Number(b.dataset.i);
     if (typeof playUiClick === "function") playUiClick();
     if (b.dataset.act === "create") showCreate(i);
@@ -463,6 +509,9 @@ const Saves = (() => {
   }
 
   init();
+  // The ACCOUNT / LEADERBOARD sections follow whoever is signed in - see renderOptions. (Guarded: cloud.js loads before this
+  // file, but a page that somehow didn't load it must not crash the rest of OPTIONS.)
+  if (typeof Cloud !== "undefined") Cloud.onAuthChange(() => refresh());
 
-  return { renderOptions, onClick, getSlots, formatDate };
+  return { renderOptions, onClick, getSlots, formatDate, refresh };
 })();

@@ -89,18 +89,27 @@ const Saves = (() => {
   function accountSectionHtml() {
     if (typeof Cloud === "undefined" || !Cloud.isConfigured()) return ""; // no Firebase project set up yet: no dead button
     const user = Cloud.getUser();
-    const myCharacter = typeof Economy !== "undefined" ? Economy.getEquipped("character") : null;
-    const myDescription = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
-    const myName = (typeof Economy !== "undefined" && Economy.getAccountName()) || (user ? user.name : "");
     const action = user
       ? `<button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button>`
       : `<button type="button" class="save-icon-btn" data-act="signin">SIGN IN</button>`;
-    const card = accountCardHtml(user ? myName : "Not signed in", myCharacter, myDescription, action, boardTierClass(myRank()));
+    // Signed out: no picture, no description - there is no account to show yet, just "Not signed in" next to SIGN IN
+    // (the plain .pick-row/.pick-text/.pick-action pieces accountCardHtml also uses, without its picture or bio).
+    const card = user
+      ? accountCardHtml(
+          (typeof Economy !== "undefined" && Economy.getAccountName()) || user.name,
+          typeof Economy !== "undefined" ? Economy.getEquipped("character") : null,
+          typeof Economy !== "undefined" ? Economy.getAccountDescription() : "",
+          action,
+          boardTierClass(myRank())
+        )
+      : `<div class="pick-row buff-row account-card"><div class="pick-text"><div class="pick-name">Not signed in</div></div><div class="pick-action">${action}</div></div>`;
     const error = Cloud.getAuthError();
     const errorLine = error ? `<div class="account-error">${user ? "" : "Sign-in failed: "}${esc(error)}</div>` : "";
-    const nameBtn = `<button type="button" class="save-icon-btn" data-act="editname">CHANGE NAME</button>`;
-    const descBtn = `<button type="button" class="save-icon-btn" data-act="editdesc">CHANGE DESCRIPTION</button>`;
-    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${errorLine}<div class="account-btn-row">${nameBtn}${descBtn}</div></div>`;
+    // CHANGE NAME / CHANGE DESCRIPTION only mean anything once there's an account to attach them to.
+    const btnRow = user
+      ? `<div class="account-btn-row"><button type="button" class="save-icon-btn" data-act="editname">CHANGE NAME</button><button type="button" class="save-icon-btn" data-act="editdesc">CHANGE DESCRIPTION</button></div>`
+      : "";
+    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${errorLine}${btnRow}</div>`;
   }
 
   // CHANGE DESCRIPTION: edit the account's own bio line. Sanitized and capped the same way on save as everywhere else
@@ -109,10 +118,8 @@ const Saves = (() => {
     const current = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
     const max = 60;
     const panel = openModal(
-      "ACCOUNT DESCRIPTION",
-      `<div class="modal-text">A short line other players see on your account card. Plain text only.</div>` +
-        `<input class="modal-input" maxlength="${max}" value="${esc(current)}" spellcheck="false" />` +
-        `<div class="modal-status"></div>`,
+      "DESCRIPTION",
+      `<input class="modal-input" maxlength="${max}" value="${esc(current)}" spellcheck="false" />` + `<div class="modal-status"></div>`,
       [
         {
           label: "SAVE",
@@ -162,7 +169,15 @@ const Saves = (() => {
         { label: "CANCEL", cls: "ghost" },
       ]
     );
-    panel.querySelector("input").focus();
+    const input = panel.querySelector("input");
+    const status = panel.querySelector(".modal-status");
+    const showCount = () => {
+      status.classList.remove("bad");
+      status.textContent = `${input.value.length}/${max}`;
+    };
+    if (!errorMsg) showCount(); // an error stays showing until the player edits again, then it's back to the live counter
+    input.addEventListener("input", showCount);
+    input.focus();
   }
 
   // The one-time warning shown only when THIS rename is free (see showEditName) - it's about the rename AFTER this one,
@@ -297,9 +312,11 @@ const Saves = (() => {
   }
 
   function leaderboardCardHtml(row, rank) {
+    const me = typeof Cloud !== "undefined" && Cloud.getUser();
+    const place = me && me.uid === row.uid ? "YOU" : rank;
     return (
       `<div class="board-card${boardTierClass(rank)}" data-uid="${esc(row.uid)}">` +
-      `<span class="board-place">${rank}</span><span class="board-sep">|</span>` +
+      `<span class="board-place">${place}</span><span class="board-sep">|</span>` +
       `<span class="board-name">${esc(row.name)}</span>` +
       `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span></div>`
     );

@@ -311,7 +311,7 @@ const Saves = (() => {
   // ---------- LEADERBOARD: its own top-level screen (collection.js open("leaderboard")), ranked by CURRENT coins.
   // A "leaderboard card" per player: place, a "|", name, coins on the right. Rank 1 gets the legendary shine, 2-3 the
   // epic tint, the rest the plain card background - a fixed-by-RANK look, not each player's own rarity (they have none).
-  // Holding a card down inspects that player's account card (see wireLeaderboardHold) - the same card accountCardHtml
+  // Clicking a card inspects that player's account card (see wireLeaderboardClick) - the same card accountCardHtml
   // draws, showing their chosen character; the button there is SIGN IN/OUT only for the player's OWN card, everyone
   // else's shows their coins instead (there is nothing to press on somebody else's account). ----------
   let boardEl = null; // the leaderboard screen's own scroll area (set by renderLeaderboard)
@@ -340,26 +340,20 @@ const Saves = (() => {
       return;
     }
     const rows = Cloud.getLeaderboardCache();
-    el.innerHTML = !rows
-      ? `<div class="board-empty">Loading...</div>`
-      : rows.length
-        ? rows.map((row, i) => leaderboardCardHtml(row, i + 1)).join("")
-        : `<div class="board-empty">No scores yet.</div>`;
+    if (!rows) {
+      el.innerHTML = `<div class="board-empty">Loading...</div>`;
+      return;
+    }
+    if (!rows.length) {
+      el.innerHTML = `<div class="board-empty">No scores yet.</div>`;
+      return;
+    }
+    el.innerHTML = rows.map((row, i) => leaderboardCardHtml(row, i + 1)).join("") + `<div class="board-hint">TAP to INSPECT</div>`;
   }
 
-  // ---- hold to inspect a leaderboard card (the same interaction as the shop's - see shop.js) ----
-  const HOLD_MS = 450;
-  const HOLD_SLOP = 10;
-  let holdTimer = null;
-  let holdFrom = null;
-  let holdFired = false;
+  // ---- click a leaderboard card to inspect it ----
   let inspectEl = null;
   let inspectOpenedAt = 0;
-
-  function cancelHold() {
-    clearTimeout(holdTimer);
-    holdTimer = null;
-  }
 
   function closeInspect() {
     if (inspectEl) inspectEl.classList.remove("show");
@@ -391,33 +385,14 @@ const Saves = (() => {
     if (!e.target.closest(".pick-row")) closeInspect(); // outside the card
   }
 
-  function wireLeaderboardHold(root) {
+  function wireLeaderboardClick(root) {
     inspectEl = document.getElementById("board-inspect");
     if (!inspectEl || inspectEl.dataset.wired) return;
     inspectEl.dataset.wired = "1";
     inspectEl.addEventListener("click", onInspectClick);
-    root.addEventListener("pointerdown", (e) => {
-      holdFired = false;
-      const card = e.target.closest(".board-card[data-uid]");
-      cancelHold();
-      if (!card) return;
-      holdFrom = { x: e.clientX, y: e.clientY };
-      holdTimer = setTimeout(() => {
-        holdTimer = null;
-        holdFired = true;
-        openInspect(card.dataset.uid);
-      }, HOLD_MS);
-    });
-    root.addEventListener("pointermove", (e) => {
-      if (holdTimer && holdFrom && Math.hypot(e.clientX - holdFrom.x, e.clientY - holdFrom.y) > HOLD_SLOP) cancelHold();
-    });
-    ["pointerup", "pointercancel", "pointerleave"].forEach((t) => root.addEventListener(t, cancelHold));
-    [root, inspectEl].forEach((el) => el.addEventListener("contextmenu", (e) => e.preventDefault())); // no image-save menu on a long press
     root.addEventListener("click", (e) => {
-      if (holdFired) {
-        holdFired = false; // the click that ends a hold (the inspect popup opened): not a tap on the card
-        e.stopPropagation();
-      }
+      const card = e.target.closest(".board-card[data-uid]");
+      if (card) openInspect(card.dataset.uid);
     });
   }
 
@@ -426,5 +401,5 @@ const Saves = (() => {
     Cloud.setConfirmOverwrite(confirmCloudOverwrite);
   }
 
-  return { renderOptions, renderLeaderboard, wireLeaderboardHold, closeInspect, onClick, refresh };
+  return { renderOptions, renderLeaderboard, wireLeaderboardClick, closeInspect, onClick, refresh };
 })();

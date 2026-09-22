@@ -1364,7 +1364,18 @@
       font-size: calc(var(--u) * 1.1);
     }
 
-    /* The leaderboard's inspect popup (saves.js: holding a card down) - the same idea as the shop's #shop-inspect, but
+    /* Below the leaderboard's cards (saves.js renderLeaderboard) - same look as the in-game "TAP to AIM" prompt
+       (#message): white with a thin black outline, so it reads as an active instruction, not a muted hint like
+       .board-empty above. */
+    .board-hint {
+      flex: none;
+      color: #ffffff;
+      font-size: calc(var(--u) * 1.1);
+      text-align: center;
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
+    }
+
+    /* The leaderboard's inspect popup (saves.js: clicking a card) - the same idea as the shop's #shop-inspect, but
        lives over the LIST panel (list-open), not the shop. */
     #board-inspect {
       position: absolute;
@@ -1533,7 +1544,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=250"></script>
+  <script src="src/version.js?v=251"></script>
   <script src="src/economy.js?v=39"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1566,8 +1577,8 @@
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=19"></script>
-  <script src="src/collection.js?v=72"></script>
+  <script src="src/saves.js?v=20"></script>
+  <script src="src/collection.js?v=73"></script>
   <script src="src/main.js?v=167"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

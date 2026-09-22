@@ -1435,3 +1435,9 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 - **The account card's picture "wobbled" under the legendary background** - `buff-card-shine` (the animation `.account-card.legendary`/`.board-card.legendary` used) pulses `filter: brightness()`, and `filter` repaints EVERY descendant of the element it's set on as one flattened layer each frame - on a pixel-art image that reads as a visible wobble/shimmer. Switched to `ammo-shine` (already used by `#ammo-box`/`#leaderboard-btn` with no such complaint) - same travelling-rainbow background, but the pulse is box-shadow only, which doesn't touch how children are painted. Verified the computed `animation-name` is now `rarity-wave, ammo-shine`, not `buff-card-shine`.
 - **`.board-place` ("YOU" or a rank number) is centered now**, not right-aligned - a one-line CSS change (`text-align: center`), since "YOU" sat crowded against the "|" separator at the fixed column's right edge.
 - `cloud.js?v=12`.
+
+## Click (not hold) to inspect a leaderboard card, "TAP to INSPECT" hint (2026-09-22, still on branch `cloud-leaderboard`, NOT pushed)
+
+- **Inspecting a leaderboard card is now a plain click**, not a 450ms hold - `wireLeaderboardHold` (the timer/slop/hold-fired machinery, mirroring shop.js's own hold-to-inspect) replaced with `wireLeaderboardClick`, a plain click listener on `.board-card[data-uid]`. Renamed throughout (`collection.js`'s call site, the exports, comments) rather than keeping the old name on new behavior.
+- **A "TAP to INSPECT" line under the cards** (`.board-hint`, new), styled like the in-game "TAP to AIM" prompt (`#message`) - white text with the same thin black outline - rather than the muted tan `.board-empty` hint style, since this is meant to read as an active instruction. Only shown when there are cards to tap (not during "Loading..."/"No scores yet."/"Not set up yet.").
+- `saves.js?v=20`, `collection.js?v=73`.

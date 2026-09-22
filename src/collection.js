@@ -410,7 +410,7 @@ const Collection = (() => {
 
   function open(kind) {
     markSeen(); // switching straight from one list to another
-    Saves.closeInspect(); // ... and a leaderboard card held down must not linger over whatever list comes next either
+    Saves.closeInspect(); // ... and an inspected leaderboard card must not linger over whatever list comes next either
     openKind = kind;
     scrollEl.dataset.kind = kind; // (the OPTIONS list redraws itself after a change, see Saves.refresh)
     panelEl.classList.toggle("options-open", kind === "options"); // (the version tag is shown in the OPTIONS list only)
@@ -494,7 +494,7 @@ const Collection = (() => {
     buttons.leaderboard.classList.remove("active");
     buttons.skins.classList.remove("active");
     panelEl.classList.remove("nested");
-    Saves.closeInspect(); // a leaderboard card held down, then the whole panel closed: its popup must not linger
+    Saves.closeInspect(); // an inspected leaderboard card, then the whole panel closed: its popup must not linger
   }
 
   // The sound of drinking / using a buff (instead of the plain click).
@@ -592,7 +592,7 @@ const Collection = (() => {
       buttons.options.addEventListener("click", () => toggle("options"));
       buttons.leaderboard.addEventListener("click", () => toggle("leaderboard"));
       scrollEl.addEventListener("click", (e) => Saves.onClick(e)); // the ACCOUNT section's SIGN IN / SIGN OUT (the OPTIONS list's own onEquip handles the rest)
-      Saves.wireLeaderboardHold(scrollEl); // hold a leaderboard card down to inspect it (only ever matches while LEADERBOARD is the open list)
+      Saves.wireLeaderboardClick(scrollEl); // click a leaderboard card to inspect it (only ever matches while LEADERBOARD is the open list)
       buttons.buff.addEventListener("click", () => toggle("buff"));
       // Red dot on the PROJECTILES button (same dot as the shop's, but silent).
       dotEl = document.getElementById("projectiles-dot");

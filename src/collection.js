@@ -410,12 +410,14 @@ const Collection = (() => {
 
   function open(kind) {
     markSeen(); // switching straight from one list to another
+    Saves.closeInspect(); // ... and a leaderboard card held down must not linger over whatever list comes next either
     openKind = kind;
     scrollEl.dataset.kind = kind; // (the OPTIONS list redraws itself after a change, see Saves.refresh)
     panelEl.classList.toggle("options-open", kind === "options"); // (the version tag is shown in the OPTIONS list only)
     document.getElementById("version-tag").textContent = typeof GAME_VERSION_TEXT === "string" ? GAME_VERSION_TEXT : "";
     buttons.buff.classList.toggle("active", kind === "buff");
     buttons.options.classList.toggle("active", kind === "options");
+    buttons.leaderboard.classList.toggle("active", kind === "leaderboard");
     buttons.skins.classList.toggle("active", SKIN_KINDS.includes(kind));
     panelEl.classList.toggle("nested", SKIN_MENUS.includes(kind)); // (the BACK button of the skin menus)
     if (kind === "skins") {
@@ -447,8 +449,17 @@ const Collection = (() => {
       scrollEl.scrollTop = 0;
       container.classList.add("list-open");
       buttons.projectile.classList.remove("active");
-      // A fresh read of the leaderboard, only now (opening it) - not every time the list happens to redraw (see cloud.js).
-      if (typeof Cloud !== "undefined") Cloud.refreshLeaderboard(() => Saves.refresh());
+      return;
+    }
+    if (kind === "leaderboard") {
+      titleEl.textContent = "LEADERBOARD";
+      Saves.renderLeaderboard(scrollEl);
+      scrollEl.scrollTop = 0;
+      container.classList.add("list-open");
+      buttons.projectile.classList.remove("active");
+      // A fresh read, only now (opening it) - not every time the list happens to redraw (see cloud.js). Guarded so a
+      // fetch that resolves after the player already left this screen doesn't clobber whatever is open by then.
+      if (typeof Cloud !== "undefined") Cloud.refreshLeaderboard(() => openKind === "leaderboard" && Saves.refresh());
       return;
     }
     if (kind === "buff") {
@@ -480,8 +491,10 @@ const Collection = (() => {
     buttons.projectile.classList.remove("active");
     buttons.buff.classList.remove("active");
     buttons.options.classList.remove("active");
+    buttons.leaderboard.classList.remove("active");
     buttons.skins.classList.remove("active");
     panelEl.classList.remove("nested");
+    Saves.closeInspect(); // a leaderboard card held down, then the whole panel closed: its popup must not linger
   }
 
   // The sound of drinking / using a buff (instead of the plain click).
@@ -553,6 +566,7 @@ const Collection = (() => {
     isOpen: () => openKind !== null,
     shopCardHtml,
     projectileImage: (id) => ((CATALOG.projectile.items.find((i) => i.id === id) || {}).image) || "", // (the counter under the top-right buttons)
+    characterInfo: (id) => skinItems("character").find((c) => c.id === id) || null, // { id, name, description, image, ... } - the ACCOUNT card and the leaderboard's inspect popup (saves.js) use this for the picture + description
     close,
     setEconomy(economyJson) {
       eco = economyJson;
@@ -573,9 +587,12 @@ const Collection = (() => {
         skins: document.getElementById("skins-btn"),
         buff: document.getElementById("buffs-btn"),
         options: document.getElementById("options-btn"),
+        leaderboard: document.getElementById("leaderboard-btn"),
       };
       buttons.options.addEventListener("click", () => toggle("options"));
+      buttons.leaderboard.addEventListener("click", () => toggle("leaderboard"));
       scrollEl.addEventListener("click", (e) => Saves.onClick(e)); // the ACCOUNT section's SIGN IN / SIGN OUT (the OPTIONS list's own onEquip handles the rest)
+      Saves.wireLeaderboardHold(scrollEl); // hold a leaderboard card down to inspect it (only ever matches while LEADERBOARD is the open list)
       buttons.buff.addEventListener("click", () => toggle("buff"));
       // Red dot on the PROJECTILES button (same dot as the shop's, but silent).
       dotEl = document.getElementById("projectiles-dot");

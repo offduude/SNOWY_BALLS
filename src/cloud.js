@@ -1,12 +1,20 @@
-// The leaderboard: sign in with a Google account (Firebase Auth), then the player's CURRENT coin count is kept in one small
-// public document - collection "leaderboard", one doc per player, id = their Google account id, fields { name, coins,
-// updatedAt }. Nothing else about a save is ever sent anywhere: no projectiles, no buffs, no shop state, nothing private -
-// just the number already shown on screen (the coin counter) and the player's Google display name.
+// The account system: sign in with Google (Firebase Auth), and this device's save is linked to that account from then on.
+//
+// Two collections. "leaderboard/{uid}" is PUBLIC to read (anyone can see the standings) - just { name, coins, character,
+// updatedAt }, enough to show a card and rank people; a player may only ever write their own. "saves/{uid}" is PRIVATE (only
+// that uid can read or write it) - { data: <the whole save, JSON>, updatedAt } - the actual cloud save.
+//
+// THE DIRECTION (the owner's call, 2026-09-22, like a normal mobile game's account link - Clash Royale is the example
+// given): signing in is not a backup that quietly starts mirroring outward. If the Google account you sign into already has
+// a save, that save IS the account's save - signing in DOWNLOADS it and REPLACES whatever is on this device (a warning
+// names the existing save and asks first; declining signs back out, nothing is touched). If the account has never been
+// used before, there is nothing to download: THIS device's current save becomes its save instead (no warning needed -
+// nothing is lost). From then on this device keeps pushing its local changes up on the sync cadence below; nothing is ever
+// pulled down again until a FRESH interactive sign-in happens (a page reload that merely restores an already-signed-in
+// session never re-asks or re-downloads - see signIn() vs the plain onAuthStateChanged restore path).
 //
 // FIREBASE_CONFIG below is NOT a secret - Firebase's own docs say this web config is safe to ship in a public site; what
-// keeps the data safe is the Firestore security rules (see firestore.rules in the repo root), not hiding this object. It is
-// still a placeholder until a real Firebase project exists for this game - see docs/NOTES.md for the setup steps (the
-// owner's part) and what this file does once it is filled in.
+// keeps the data safe is the Firestore security rules (see firestore.rules in the repo root), not hiding this object.
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyC9pnWLKw0yADf79MKMyR1JWOaOQetLGh0",
   authDomain: "snowy-balls-5f7a5.firebaseapp.com",
@@ -16,15 +24,15 @@ const FIREBASE_CONFIG = {
   appId: "1:555349371621:web:25810d924ee66ea305820c",
 };
 
-// WRITE TIMING (the owner's call, 2026-09-22): current coins go up AND down (buying something spends them), so - unlike a
-// best-streak record - there is no "only write on a new high" shortcut; the leaderboard just mirrors whatever the local
-// coin count is, on this cadence. A sync writes only if the coins actually changed since the last successful write (so
-// sitting idle, or in the shop without buying, costs nothing) and never while Economy.isGod() (a god save's coins are not
-// a real number - see docs/NOTES.md). SYNC_INTERVAL_MS is the safety-net cadence while the tab stays open and active; the
-// tab being backgrounded/closed (visibilitychange, pagehide) also triggers one right away, since that is the reliable
-// signal here - not "the tab closing", which mobile browsers do not always report.
+// WRITE TIMING: a sync pushes the leaderboard card AND the full save together (one batched write - two documents, one round
+// trip) only if something actually changed since the last successful write, and never while Economy.isGod() (see
+// window.godMode in main.js - and note signIn()/godMode() each refuse to run while the other's state is active, so a god
+// save can never become, or overwrite, a real signed-in save). SYNC_INTERVAL_MS is the safety-net cadence while the tab
+// stays open and active; the tab being backgrounded/closed (visibilitychange, pagehide) also triggers one right away, since
+// that is the reliable signal here - not "the tab closing", which mobile browsers do not always report.
 const SYNC_INTERVAL_MS = 60 * 1000;
 const LEADERBOARD_SIZE = 20; // plenty for a 5-person group with room to grow
+const SAVES_COLLECTION = "saves";
 
 const Cloud = (() => {
   let app = null;
@@ -32,14 +40,16 @@ const Cloud = (() => {
   let db = null;
   let ready = false; // FIREBASE_CONFIG looks real and the SDK loaded - false leaves every call below a harmless no-op
   let user = null; // { uid, name } | null
-  let dirty = false; // coins changed locally since the last successful leaderboard write
+  let dirty = false; // something worth syncing changed locally since the last successful write
   let lastWrittenCoins = null;
+  let lastWrittenCharacter = null;
+  let lastWrittenSave = null; // the exact JSON string last written to saves/{uid} - cheap way to skip a no-op write
   let leaderboardRows = null; // cache of the last fetch: [{ name, coins }], newest first by coins; null = not fetched yet (or signed out)
   let leaderboardLoading = false;
   let signingIn = false; // true for the whole span of an interactive Cloud.signIn() call - tells onAuthStateChanged a fresh
-  // sign-in (which drives its own sync below, after the "already has a save" check) apart from a page reload that merely
-  // restores an already-signed-in session (which is synced right away too, but never asks that question again)
-  let confirmOverwrite = null; // set by saves.js: (existingLeaderboardDoc) => Promise<boolean> - see setConfirmOverwrite
+  // sign-in (which drives its own sync below, after the download-or-link decision) apart from a page reload that merely
+  // restores an already-signed-in session (which is synced right away too, but never asks anything or downloads anything)
+  let confirmOverwrite = null; // set by saves.js: (existingSave) => Promise<boolean> - see setConfirmOverwrite
   let authError = null; // the last sign-in failure, as a short readable line - shown in the ACCOUNT section (see saves.js) so it's
   // diagnosable without opening devtools; null once sign-in succeeds, restores a session, or the player just closed the popup themselves
   const authListeners = [];
@@ -64,26 +74,23 @@ const Cloud = (() => {
       db = firebase.firestore();
       ready = true;
     } catch (e) {
-      return; // a bad config, or the SDK failed some other way: the game carries on without the leaderboard
+      return; // a bad config, or the SDK failed some other way: the game carries on without the account system
     }
     auth.onAuthStateChanged((u) => {
       user = u ? { uid: u.uid, name: u.displayName || "Player" } : null;
       if (user) authError = null; // any stale failure from an earlier attempt is done being relevant once we're actually signed in
       notifyAuth();
       if (user && !signingIn) {
-        // A restored session (the page was reloaded while already signed in) - not a fresh interactive sign-in, which drives
-        // its own sync explicitly below (after the "already has a save" check). Still worth syncing promptly rather than
-        // waiting for the next scheduled trigger, and never needs to ask the overwrite question again.
+        // A restored session (the page was reloaded while already signed in) - not a fresh interactive sign-in, which
+        // drives its own sync explicitly below (after the download-or-link decision). Still worth syncing promptly
+        // rather than waiting for the next scheduled trigger; never downloads anything or asks the linking question again.
         dirty = true;
         lastWrittenCoins = null;
+        lastWrittenCharacter = null;
+        lastWrittenSave = null;
         syncNow();
       }
     });
-    if (typeof Economy !== "undefined") {
-      Economy.onCoinsChange(() => {
-        dirty = true;
-      });
-    }
     setInterval(syncNow, SYNC_INTERVAL_MS);
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) syncNow();
@@ -105,31 +112,61 @@ const Cloud = (() => {
 
   function signIn() {
     if (!ready || signingIn) return; // already mid-attempt: a second click must not fire a second popup (that is what produced auth/cancelled-popup-request)
+    if (typeof Economy !== "undefined" && Economy.isGod()) {
+      // The other half of the godMode()/signIn() mutual guard (see main.js): a god save's numbers must never reach a real
+      // account, in either direction - refused here just as plainly as godMode() refuses while signed in.
+      authError = "sign out of the test (god mode) save first";
+      notifyAuth();
+      return;
+    }
     signingIn = true;
     authError = null;
     notifyAuth(); // clears any old error line immediately, before the new attempt resolves
     auth
       .signInWithPopup(new firebase.auth.GoogleAuthProvider())
       .then(async (result) => {
-        // This account may already have a save on the leaderboard (another device, or an earlier test) - signing in here
-        // never downloads it, it only starts overwriting it with THIS device's numbers, so ask first. Only for a FRESH
-        // interactive sign-in (this function), never for onAuthStateChanged restoring an existing session on page load.
-        let existing = null;
+        const uid = result.user.uid;
+        let cloudSave = null;
         try {
-          const doc = await db.collection("leaderboard").doc(result.user.uid).get();
-          if (doc.exists) existing = doc.data();
+          const doc = await db.collection(SAVES_COLLECTION).doc(uid).get();
+          if (doc.exists) cloudSave = doc.data();
         } catch (e) {
-          /* couldn't check (offline, or not readable) - proceed rather than block sign-in over a read failure */
+          /* couldn't check (offline, or the rules aren't published yet) - treat as "nothing to download" rather than block sign-in */
         }
-        if (existing && confirmOverwrite) {
-          const proceed = await confirmOverwrite(existing);
+        if (cloudSave) {
+          const proceed = confirmOverwrite ? await confirmOverwrite(cloudSave) : true;
           if (!proceed) {
             await auth.signOut();
             return;
           }
+          // DOWNLOAD: this account's save replaces whatever is on this device. Validated the same way an imported save
+          // code used to be (Economy.sanitize) so a corrupted cloud document can't brick the next load.
+          let clean = null;
+          try {
+            clean = Economy.sanitize(JSON.parse(cloudSave.data));
+          } catch (e) {
+            /* not valid JSON at all */
+          }
+          if (!clean) {
+            authError = "the save on this account could not be read - nothing was changed";
+            notifyAuth();
+            await auth.signOut();
+            return;
+          }
+          Economy.lockSaves(); // nothing may write the old save back over this in the moment before the reload
+          try {
+            localStorage.setItem(Economy.storageKey, JSON.stringify(clean));
+          } catch (e) {
+            /* storage unavailable - the reload will just keep the local save as it was, no harm done */
+          }
+          location.reload();
+          return;
         }
-        dirty = true; // a fresh sign-in should show up right away, not wait for the next coin change
+        // First time this account has been used: nothing to download - THIS device's current save becomes its save.
+        dirty = true;
         lastWrittenCoins = null;
+        lastWrittenCharacter = null;
+        lastWrittenSave = null;
         syncNow();
       })
       .catch((e) => {
@@ -152,21 +189,29 @@ const Cloud = (() => {
     return user;
   }
 
-  // Writes the leaderboard doc if signed in, not in god mode, and the coins actually changed since the last successful
-  // write. Called on the timer and on the two "the player is leaving" signals above - never on every single coin change.
+  // Pushes the leaderboard card AND the full save together (one batched write) if signed in, not in god mode, and
+  // something actually changed since the last successful write. Called on the timer and on the two "the player is
+  // leaving" signals above - never on every single coin/character change.
   function syncNow() {
     if (!ready || !user || !dirty) return;
-    if (typeof Economy !== "undefined" && Economy.isGod()) return; // a god save's coins are not real - never published
+    if (typeof Economy !== "undefined" && Economy.isGod()) return; // a god save is never published, in either collection
     const coins = typeof Economy !== "undefined" ? Economy.getCoins() : 0;
-    if (coins === lastWrittenCoins) {
+    const character = typeof Economy !== "undefined" ? Economy.getEquipped("character") : null;
+    const saveJson = typeof Economy !== "undefined" ? Economy.snapshot() : null;
+    if (coins === lastWrittenCoins && character === lastWrittenCharacter && saveJson === lastWrittenSave) {
       dirty = false;
       return;
     }
-    db.collection("leaderboard")
-      .doc(user.uid)
-      .set({ name: user.name, coins, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+    batch.set(db.collection("leaderboard").doc(user.uid), { name: user.name, coins, character, updatedAt: now });
+    if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now });
+    batch
+      .commit()
       .then(() => {
         lastWrittenCoins = coins;
+        lastWrittenCharacter = character;
+        lastWrittenSave = saveJson;
         dirty = false;
       })
       .catch(() => {
@@ -174,15 +219,15 @@ const Cloud = (() => {
       });
   }
 
-  // The last-fetched rows, read-only, no network call: what the OPTIONS list actually renders every time it draws
-  // (opening it, dragging the volume slider, anything) - so redrawing never itself triggers another read.
+  // The last-fetched rows, read-only, no network call: what the leaderboard list actually renders every time it draws -
+  // so redrawing never itself triggers another read (see collection.js open("leaderboard"), the only thing that does).
   function getLeaderboardCache() {
     return leaderboardRows; // null = never fetched yet (or signed out / not configured)
   }
 
-  // Read-on-open, not a live listener (see docs/NOTES.md: cheap and predictable rather than real-time). Call this once when
-  // the player actually OPENS the leaderboard - never from inside the render itself, or every redraw would trigger another
-  // read. `onUpdated` fires once, only when a fresh read lands (not for an already-in-flight one this call reuses).
+  // Read-on-open, not a live listener (cheap and predictable rather than real-time). Call this once when the player
+  // actually OPENS the leaderboard. `onUpdated` fires once, only when a fresh read lands (not for an already-in-flight
+  // one this call reuses).
   function refreshLeaderboard(onUpdated) {
     if (!ready || leaderboardLoading) return;
     leaderboardLoading = true;
@@ -191,7 +236,7 @@ const Cloud = (() => {
       .limit(LEADERBOARD_SIZE)
       .get()
       .then((snap) => {
-        leaderboardRows = snap.docs.map((d) => ({ name: d.data().name, coins: d.data().coins }));
+        leaderboardRows = snap.docs.map((d) => ({ uid: d.id, name: d.data().name, coins: d.data().coins, character: d.data().character || null }));
         leaderboardLoading = false;
         if (onUpdated) onUpdated();
       })
@@ -200,5 +245,16 @@ const Cloud = (() => {
       });
   }
 
-  return { init, isConfigured, onAuthChange, signIn, signOut, getUser, getAuthError, setConfirmOverwrite, getLeaderboardCache, refreshLeaderboard };
+  return {
+    init,
+    isConfigured,
+    onAuthChange,
+    signIn,
+    signOut,
+    getUser,
+    getAuthError,
+    setConfirmOverwrite,
+    getLeaderboardCache,
+    refreshLeaderboard,
+  };
 })();

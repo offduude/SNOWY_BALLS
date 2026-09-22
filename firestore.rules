@@ -2,32 +2,46 @@ rules_version = '2';
 
 // Paste this into the Firebase console: Firestore Database -> Rules -> replace everything -> Publish.
 // (Not deployed automatically - Claude can't sign in to your Google account to do that part; see docs/NOTES.md "The
-// leaderboard" for the full setup checklist.)
+// leaderboard" for the full setup checklist. If you already published an earlier version of this file, you must re-publish
+// this one too - it adds the "saves" collection, without which linking an account does nothing but fail silently.)
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // The leaderboard is public to READ (anyone can see the standings, signed in or not) but a player may only ever write
     // THEIR OWN document (uid = their Google account id from Firebase Auth), and only with the shape src/cloud.js writes:
-    // { name, coins, updatedAt }. This is a light sanity check (right size of number, right shape, nobody else's doc,
-    // the server's own clock for the timestamp so it can't be backdated or left off) - not a full anti-cheat system. That
-    // is the deliberate choice for a 5-person, invite-only group (see docs/NOTES.md); it stops "opened devtools and typed
-    // a huge number" without needing a Cloud Function (which would need Firebase's paid plan - see the same notes).
+    // { name, coins, character, updatedAt }. This is a light sanity check (right size/shape of each field, nobody else's
+    // doc, the server's own clock for the timestamp so it can't be backdated or left off) - not a full anti-cheat system.
+    // That is the deliberate choice for a 5-person, invite-only group (see docs/NOTES.md); it stops "opened devtools and
+    // typed a huge number" without needing a Cloud Function (which would need Firebase's paid plan - see the same notes).
     match /leaderboard/{uid} {
       allow read: if true;
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.data.keys().hasOnly(['name', 'coins', 'updatedAt'])
+                   && request.resource.data.keys().hasOnly(['name', 'coins', 'character', 'updatedAt'])
                    && request.resource.data.name is string
                    && request.resource.data.name.size() > 0
                    && request.resource.data.name.size() <= 60
                    && request.resource.data.coins is number
                    && request.resource.data.coins >= 0
                    && request.resource.data.coins < 100000000000 // 100 billion - no real save gets anywhere near this; it only exists to block a garbage value
+                   && (request.resource.data.character == null || (request.resource.data.character is string && request.resource.data.character.size() <= 60))
                    && request.resource.data.updatedAt == request.time; // the server's clock, not a value the client can pick
     }
 
-    // Nothing else is stored in Firestore (no save data, no other collections) - deny everything else by default, so a
-    // later addition here can't accidentally leave something else world-writable.
+    // The actual cloud save - PRIVATE, unlike the leaderboard: only the owning account can read or write it (nobody else's
+    // uid, and no public read - this is not for showing off, it's the save itself). { data: <the whole save, as JSON>,
+    // updatedAt }. The size cap is generous - a real save is a few KB - and only exists to block a garbage-sized write.
+    match /saves/{uid} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid
+                         && request.resource.data.keys().hasOnly(['data', 'updatedAt'])
+                         && request.resource.data.data is string
+                         && request.resource.data.data.size() < 200000
+                         && request.resource.data.updatedAt == request.time;
+    }
+
+    // Nothing else is stored in Firestore - deny everything else by default, so a later addition here can't accidentally
+    // leave something else world-writable.
     match /{document=**} {
       allow read, write: if false;
     }

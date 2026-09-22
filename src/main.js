@@ -584,7 +584,14 @@ class MainScene extends Phaser.Scene {
       // God mode, for testing: was the "god mode" import code (SAVES section, removed 2026-09-22 - see docs/NOTES.md "The
       // leaderboard"); this is its replacement, a console-only dev tool. Builds the same save the old code did (a huge wallet,
       // 999 of every projectile / buff, flagged god so Economy never uses anything up or charges) and reloads into it.
+      // Refuses while signed in to a real account (the owner's rule, 2026-09-22 - "I'm a player too!"): a god save must
+      // never locally overwrite a real signed-in save. The other half of the same guard lives in cloud.js's signIn(),
+      // which refuses to sign in while a god save is active - so a god save can never reach an account in either direction.
       window.godMode = async () => {
+        if (typeof Cloud !== "undefined" && Cloud.getUser && Cloud.getUser()) {
+          console.warn("godMode: signed in to a real account - sign out first (OPTIONS > ACCOUNT), then try again.");
+          return;
+        }
         let eco;
         try {
           eco = await (await fetch("economy.json?t=" + Date.now())).json();

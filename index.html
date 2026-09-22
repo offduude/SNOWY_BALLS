@@ -836,6 +836,23 @@
       transition: opacity 0.25s ease;
     }
 
+    /* LEADERBOARD button: under the projectile counter, same right-edge stack (BUFFS 10-38, the counter 44-66, this 72-100). */
+    #leaderboard-btn {
+      position: absolute;
+      top: 72px;
+      right: 10px;
+      width: 96px;
+      height: 28px;
+      font-size: 7px; /* "LEADERBOARD" is a touch too wide for the stack's usual 8px */
+      z-index: 5;
+      transition: opacity 0.25s ease;
+    }
+
+    #game-container.shop-open #leaderboard-btn {
+      opacity: 0;
+      pointer-events: none;
+    }
+
     /* "OFFSET" / "STRENGTH" above the left end of the aim bar (bar: 20px from the left of the 432px canvas, its
        top 223px down of 243). Text starts where the bar does; no background, only a thin dark outline. */
     #aim-label {
@@ -1236,19 +1253,46 @@
 
     .save-icon-btn:active { background: #74491f; }
 
-    .board-row {
+    /* A leaderboard card: place | name ... coins. Ranks 2-3 get the same epic tint the buff cards use, rank 1 the same
+       travelling rainbow + pulsing shine a legendary buff card gets (.rarity-wave / .buff-card-shine, shared keyframes) -
+       a look fixed BY RANK, not by anything about the player, so no rarity/amount corner (they have none). Everyone past
+       3rd gets the plain card look every other list already uses. */
+    .board-card {
       flex: none;
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: calc(var(--u) * 1.2);
-      color: #ffffff;
-      font-size: calc(var(--u) * 1.2);
+      padding: calc(var(--u) * 1.2) calc(var(--u) * 1.4);
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+      color: #3b2412;
+      font-size: calc(var(--u) * 1.4);
+      cursor: pointer; /* holding it down inspects the player - see saves.js wireLeaderboardHold */
+      -webkit-tap-highlight-color: transparent;
     }
 
-    .board-rank {
+    .board-card.epic {
+      background-image: linear-gradient(rgba(162, 92, 255, 0.22), rgba(162, 92, 255, 0.22));
+    }
+
+    .board-card.legendary {
+      background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
+        rgba(77, 210, 255, 0.32), rgba(106, 107, 255, 0.32), rgba(193, 77, 255, 0.32), rgba(255, 77, 77, 0.32));
+      background-size: 200% 100%;
+      animation: rarity-wave 2.4s linear infinite, buff-card-shine 1.7s ease-in-out infinite;
+    }
+
+    .board-place {
       flex: none;
-      width: calc(var(--u) * 2.4);
-      color: #e6cfa3;
+      width: calc(var(--u) * 2.6);
+      text-align: right;
+      color: #8a6a44;
+    }
+
+    .board-sep {
+      flex: none;
+      color: #c9b48a;
     }
 
     .board-name {
@@ -1281,6 +1325,34 @@
       color: #e6cfa3;
       font-size: calc(var(--u) * 1.1);
     }
+
+    /* The leaderboard's inspect popup (saves.js: holding a card down) - the same idea as the shop's #shop-inspect, but
+       lives over the LIST panel (list-open), not the shop. */
+    #board-inspect {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 8; /* above the list panel (4) and its backdrop */
+    }
+
+    #game-container.list-open #board-inspect.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #board-inspect-card {
+      width: 60%;
+      font-family: "Press Start 2P", monospace;
+      color: #3b2412;
+    }
+
+    #board-inspect, .board-card { -webkit-touch-callout: none; }
 
     /* ---- popups (right now: only Cloud's "this account already has a save" sign-in confirm) ---- */
     #modal-layer {
@@ -1349,6 +1421,7 @@
     <div id="shop-items"></div>
     <div id="shop-hint">HOLD to INSPECT</div>
     <div id="shop-inspect"><div id="shop-inspect-card"></div></div>
+    <div id="board-inspect"><div id="board-inspect-card"></div></div>
     <div id="list-backdrop"></div>
     <div id="list-panel">
       <div id="list-title"></div>
@@ -1361,6 +1434,7 @@
     <button id="buffs-btn" class="side-btn" type="button">BUFFS</button>
     <span id="buffs-dot" class="notif-dot"></span>
     <div id="ammo-box" class="hud-stat"><img id="ammo-icon" alt="" draggable="false" /><span id="ammo-text">x0</span></div>
+    <button id="leaderboard-btn" class="side-btn" type="button">LEADERBOARD</button>
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
       <span id="projectiles-dot" class="notif-dot"></span>
@@ -1380,7 +1454,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=237"></script>
+  <script src="src/version.js?v=238"></script>
   <script src="src/economy.js?v=35"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1408,21 +1482,21 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=4"></script>
+  <script src="src/cloud.js?v=5"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=11"></script>
-  <script src="src/collection.js?v=71"></script>
-  <script src="src/main.js?v=166"></script>
+  <script src="src/saves.js?v=12"></script>
+  <script src="src/collection.js?v=72"></script>
+  <script src="src/main.js?v=167"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-inspect", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["shop-board", "shop-items", "shop-inspect", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

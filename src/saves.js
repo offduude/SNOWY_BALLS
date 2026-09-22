@@ -102,7 +102,7 @@ const Saves = (() => {
           action,
           boardTierClass(myRank())
         )
-      : `<div class="pick-row buff-row account-card"><div class="pick-text"><div class="pick-name">Not signed in</div></div><div class="pick-action">${action}</div></div>`;
+      : `<div class="pick-row buff-row account-card"><div class="pick-text center-self"><div class="pick-name">Not signed in.</div></div><div class="pick-action">${action}</div></div>`;
     const error = Cloud.getAuthError();
     const errorLine = error ? `<div class="account-error">${user ? "" : "Sign-in failed: "}${esc(error)}</div>` : "";
     // CHANGE NAME / CHANGE DESCRIPTION only mean anything once there's an account to attach them to.

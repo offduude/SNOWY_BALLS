@@ -333,9 +333,24 @@ const Cloud = (() => {
             /* storage unavailable - the reload will just keep the local save as it was, no harm done */
           }
           // Claim the session for THIS device, displacing whatever device (if any) held it before - taking over the
-          // account via a fresh sign-in is exactly the moment that should happen. The restored-session sync that runs
-          // right after reload pushes this token to saves/{uid} along with the rest, so no separate write is needed here.
+          // account via a fresh sign-in is exactly the moment that should happen.
           saveMySession(uid, newSessionToken());
+          // Push the claim to Firestore NOW, awaited, before reloading - not "whenever something is next genuinely
+          // dirty" (a real bug, reported: even past the active window, a phone that just got in could still get
+          // kicked). Without this, saves/{uid}.session keeps showing the PREVIOUS device's token for however long
+          // that takes; this device's own checkSession() heartbeat, running every SYNC_INTERVAL_MS, would read that
+          // stale remote value, see it doesn't match the token THIS device just claimed, and conclude - wrongly -
+          // that some OTHER device has since taken over, signing itself right back out. Writing it through
+          // immediately closes that window down to a single round trip instead of leaving it open indefinitely.
+          try {
+            await db.collection(SAVES_COLLECTION).doc(uid).update({
+              session: mySession.token,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+          } catch (e) {
+            // offline, or a transient failure - the normal sync cadence still pushes it as soon as something is
+            // genuinely dirty; this device's own heartbeat could misfire once in the meantime, but no worse than before
+          }
           location.reload();
           return;
         }

@@ -59,11 +59,13 @@ const Saves = (() => {
   // would need the SKINS menu, unrelated to this card). The card's BACKGROUND reflects the player's current LEADERBOARD
   // PLACE (boardTierClass, same rule as a leaderboard card) - for my own card that means whatever the last leaderboard
   // read (if any) said my rank was; unknown (never opened the leaderboard yet this session) reads as the plain look. ----
-  function accountCardHtml(name, characterId, description, actionHtml, tierClass) {
+  function accountCardHtml(name, characterId, description, actionHtml, tierClass, rank) {
     const charInfo = (typeof Collection !== "undefined" && Collection.characterInfo(characterId)) || { image: "" };
     const desc = description && description.trim() ? description : "No description yet.";
+    const corner = rank ? `<span class="pick-corner"><span class="pick-count">#${rank}</span></span>` : "";
     return (
       `<div class="pick-row buff-row account-card${tierClass || ""}">` +
+      corner +
       `<img class="pick-pic" src="${esc(charInfo.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(name)}</div><div class="pick-desc">${esc(desc)}</div></div>` +
       `<div class="pick-action">${actionHtml}</div>` +
@@ -196,7 +198,7 @@ const Saves = (() => {
         "THIS ACCOUNT HAS A SAVE",
         `<div class="modal-text">Signing in will <b>erase your current progress</b> and replace it with the save already linked to this account${esc(coinsText)}. This cannot be undone. Continue?</div>`,
         [
-          { label: "SIGN IN", cls: "danger", onClick: () => resolve(true) },
+          { label: "CONTINUE", cls: "danger", onClick: () => resolve(true) },
           { label: "CANCEL", cls: "ghost", onClick: () => resolve(false) },
         ]
       );
@@ -269,7 +271,7 @@ const Saves = (() => {
       ? `<button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button>`
       : `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span>`;
     inspectOpenedAt = Date.now();
-    inspectEl.querySelector("#board-inspect-card").innerHTML = accountCardHtml(row.name, row.character, row.description, action, boardTierClass(i + 1));
+    inspectEl.querySelector("#board-inspect-card").innerHTML = accountCardHtml(row.name, row.character, row.description, action, boardTierClass(i + 1), i + 1);
     inspectEl.classList.add("show");
   }
 

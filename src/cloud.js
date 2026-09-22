@@ -96,6 +96,13 @@ const Cloud = (() => {
       if (document.hidden) syncNow();
     });
     window.addEventListener("pagehide", syncNow);
+    // Fetch the standings once right away, not only the first time the LEADERBOARD screen is opened - otherwise the
+    // account card's own rank-tier background stays "unranked" for a whole session until that screen gets visited.
+    // The leaderboard is public to read, so this needs no signed-in user; Saves.refresh() is a safe no-op if nothing
+    // that shows a rank (OPTIONS/LEADERBOARD) has rendered yet.
+    refreshLeaderboard(() => {
+      if (typeof Saves !== "undefined") Saves.refresh();
+    });
   }
 
   function getAuthError() {

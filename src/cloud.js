@@ -39,7 +39,10 @@ const SYNC_INTERVAL_MS = 30 * 1000;
 const LEADERBOARD_SIZE = 20; // plenty for a 5-person group with room to grow
 const SAVES_COLLECTION = "saves";
 const SESSION_KEY = "snowyBallsSession"; // this device's own remembered { uid, token } - separate from Economy's save data (see resetLocalSave/claimSession)
-const SESSION_ACTIVE_WINDOW_MS = SYNC_INTERVAL_MS * 3; // how recently saves/{uid} must have been touched to count as "someone is actively playing on it right now" (see signIn())
+// How recently saves/{uid} must have been touched to count as "someone is actively playing on it right now" (see
+// signIn()). Set explicitly to "just over a minute" (not tied to SYNC_INTERVAL_MS by a multiplier) - the game already
+// syncs at least every SYNC_INTERVAL_MS while genuinely in use, so a save older than this really has gone quiet.
+const SESSION_ACTIVE_WINDOW_MS = 65 * 1000;
 
 const Cloud = (() => {
   let app = null;

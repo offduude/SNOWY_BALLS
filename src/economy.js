@@ -227,14 +227,23 @@ const Economy = (() => {
     saveListeners.push(fn);
   }
 
-  function save() {
+  // Writes to localStorage without telling onSave listeners - used ONLY by syncRegen (see below) for a PURE regen
+  // tick, so a tab just sitting open (nobody actually playing) doesn't look like real activity to Cloud. Regen state
+  // is timestamp-based (state.regen[id].next), so a tick that never reached the cloud in real time still comes out
+  // exactly right the moment anything DOES sync - nothing is lost by staying quiet here, only a false "still active"
+  // signal is avoided.
+  function saveQuiet() {
     if (locked) return;
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
     } catch (e) {
       // localStorage unavailable (private mode, quota) - progress just won't persist this session
     }
-    saveListeners.forEach((fn) => fn());
+  }
+
+  function save() {
+    saveQuiet();
+    if (!locked) saveListeners.forEach((fn) => fn());
   }
 
   // Listeners are told the new balance whenever it changes (the on-screen coin counter).
@@ -345,7 +354,13 @@ const Economy = (() => {
       }
     }
     if (changed) {
-      save();
+      // saveQuiet, not save: a projectile refilling on its own (the snowball regenerates every 30s - see economy.json)
+      // is not the player DOING anything - it happens just from a tab sitting open, so it must not tell Cloud the
+      // account is being actively played (that was a real bug: it kept re-marking the save cloud-dirty every 30s
+      // forever, refreshing saves/{uid}.updatedAt with no real activity behind it - which meant a device's session
+      // never went stale, blocking a genuine sign-in elsewhere, and could repeatedly out-claim a different device
+      // that WAS actually being played). projectilesChanged() still fires - the HUD updates normally either way.
+      saveQuiet();
       projectilesChanged();
     }
     return changed;

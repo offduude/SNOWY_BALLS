@@ -36,20 +36,27 @@ service cloud.firestore {
 
     // The actual cloud save - PRIVATE, unlike the leaderboard: only the owning account can read or write it (nobody else's
     // uid, and no public read - this is not for showing off, it's the save itself). { data: <the whole save, as JSON>,
-    // updatedAt }. The size cap is generous - a real save is a few KB - and only exists to block a garbage-sized write.
+    // updatedAt, session }. The size cap is generous - a real save is a few KB - and only exists to block a garbage-sized write.
     //
     // read and write are separate rules on purpose (a bug fixed 2026-09-22): `request.resource` is only defined for a
     // WRITE (it's the incoming document being written) - it does not exist on a read, so a single combined
     // `allow read, write: if ... request.resource.data ...` rule fails EVERY read with a rules error, indistinguishable
     // from permission-denied, even once published. That is what was actually breaking Cloud.signIn()'s "does this
     // account already have a save" check - not just an unpublished rules file.
+    //
+    // `session` (added 2026-09-22): a short random token src/cloud.js writes on every save write, so the same account
+    // signed in on two devices at once can't silently overwrite each other - see that file's header comment for the
+    // full mechanism. Required on every write (never optional) since the client always sends one from here on.
     match /saves/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.data.keys().hasOnly(['data', 'updatedAt'])
+                   && request.resource.data.keys().hasOnly(['data', 'updatedAt', 'session'])
                    && request.resource.data.data is string
                    && request.resource.data.data.size() < 200000
+                   && request.resource.data.session is string
+                   && request.resource.data.session.size() > 0
+                   && request.resource.data.session.size() <= 100
                    && request.resource.data.updatedAt == request.time;
     }
 

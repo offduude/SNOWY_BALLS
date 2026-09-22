@@ -2,7 +2,12 @@
 //
 // Two collections. "leaderboard/{uid}" is PUBLIC to read (anyone can see the standings) - just { name, coins, character,
 // updatedAt }, enough to show a card and rank people; a player may only ever write their own. "saves/{uid}" is PRIVATE (only
-// that uid can read or write it) - { data: <the whole save, JSON>, updatedAt } - the actual cloud save.
+// that uid can read or write it) - { data: <the whole save, JSON>, updatedAt, session } - the actual cloud save, plus a
+// SESSION TOKEN (2026-09-22) that stops the same account being played on two devices at once from clobbering each other:
+// whichever device most recently claimed the account (a fresh sign-in) owns the current token; every other device notices
+// the mismatch on its own next check (see checkSession) and signs itself out rather than keep writing over a save it's no
+// longer the source of truth for. Detection is bounded by SYNC_INTERVAL_MS, not instant - a genuinely simultaneous couple
+// of seconds on two devices could still race, but sustained double-play cannot.
 //
 // THE DIRECTION (the owner's call, 2026-09-22, like a normal mobile game's account link - Clash Royale is the example
 // given): signing in is not a backup that quietly starts mirroring outward. If the Google account you sign into already has
@@ -33,6 +38,7 @@ const FIREBASE_CONFIG = {
 const SYNC_INTERVAL_MS = 60 * 1000;
 const LEADERBOARD_SIZE = 20; // plenty for a 5-person group with room to grow
 const SAVES_COLLECTION = "saves";
+const SESSION_KEY = "snowyBallsSession"; // this device's own remembered { uid, token } - separate from Economy's save data (see resetLocalSave/claimSession)
 
 const Cloud = (() => {
   let app = null;
@@ -53,6 +59,7 @@ const Cloud = (() => {
   let signingIn = false; // true for the whole span of an interactive Cloud.signIn() call - tells onAuthStateChanged a fresh
   // sign-in (which drives its own sync below, after the download-or-link decision) apart from a page reload that merely
   // restores an already-signed-in session (which is synced right away too, but never asks anything or downloads anything)
+  let mySession = null; // { uid, token } | null - this device's own claim on the currently signed-in account (see checkSession)
   let confirmOverwrite = null; // set by saves.js: (existingSave) => Promise<boolean> - see setConfirmOverwrite
   let authError = null; // the last sign-in failure, as a short readable line - shown in the ACCOUNT section (see saves.js) so it's
   // diagnosable without opening devtools; null once sign-in succeeds, restores a session, or the player just closed the popup themselves
@@ -84,6 +91,7 @@ const Cloud = (() => {
     } catch (e) {
       return; // a bad config, or the SDK failed some other way: the game carries on without the account system
     }
+    mySession = loadMySession();
     auth.onAuthStateChanged((u) => {
       const wasSignedIn = !!user;
       // The Google display name has no length limit of its own (unlike a custom account name - see Economy.accountNameMax)
@@ -114,9 +122,13 @@ const Cloud = (() => {
         syncNow();
       }
     });
-    setInterval(syncNow, SYNC_INTERVAL_MS);
+    // checkSession first, syncNow only if it didn't just start signing this device out - a displaced device must not
+    // also push a write in the same tick it discovers it's no longer the account's active session.
+    const heartbeat = () => checkSession().then((displaced) => { if (!displaced) syncNow(); });
+    setInterval(heartbeat, SYNC_INTERVAL_MS);
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) syncNow();
+      else heartbeat(); // returning to the tab: don't wait up to a minute to notice another device took over while it was away
     });
     window.addEventListener("pagehide", syncNow);
     // Fetch the standings once right away, not only the first time the LEADERBOARD screen is opened - otherwise the
@@ -139,8 +151,10 @@ const Cloud = (() => {
   // Resets THIS DEVICE's local save to a brand-new game - never the account itself (the cloud save under a uid is
   // untouched). Used whenever an auth session ends (see onAuthStateChanged above and signOut() below) so a save can
   // never ride along to a different account: without this, signing out with real progress and signing into a
-  // different (or brand-new) account would upload/duplicate that progress there too.
+  // different (or brand-new) account would upload/duplicate that progress there too. Also drops this device's own
+  // session claim (see below) - it is no longer signed into anything, so it has no business still "owning" one.
   function resetLocalSave() {
+    clearMySession();
     if (typeof Economy === "undefined") return;
     Economy.lockSaves(); // nothing may write the old save back over this in the moment before the reload
     try {
@@ -148,6 +162,65 @@ const Cloud = (() => {
     } catch (e) {
       /* storage unavailable - the reload will just keep whatever was there, no harm done */
     }
+  }
+
+  // ---- session tokens: which device is the current, active owner of a signed-in account (see the file header) ----
+  function loadMySession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed.uid === "string" && typeof parsed.token === "string" ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveMySession(uid, token) {
+    mySession = { uid, token };
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(mySession));
+    } catch (e) {
+      /* storage unavailable - this device just can't reliably detect being displaced; sync itself still works */
+    }
+  }
+
+  function clearMySession() {
+    mySession = null;
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (e) {
+      /* storage unavailable - nothing to clear */
+    }
+  }
+
+  function newSessionToken() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`; // any browser old enough to lack randomUUID
+  }
+
+  // Claiming happens by simply writing a new token into the next real save (see syncNow) - reading it back and
+  // finding it changed is how every OTHER device notices it has been displaced. Called on the timer/visibility cadence
+  // (not only when dirty - a device with nothing new to sync still needs to notice it's been kicked). Returns a
+  // promise resolving to true if this device was displaced (and has already started signing itself out).
+  function checkSession() {
+    if (!ready || !user || !mySession || mySession.uid !== user.uid) return Promise.resolve(false);
+    return db
+      .collection(SAVES_COLLECTION)
+      .doc(user.uid)
+      .get()
+      .then((doc) => {
+        const remoteSession = doc.exists ? doc.data().session : null;
+        if (remoteSession && remoteSession !== mySession.token) {
+          // A different device signed into this account more recently and is now its active session - this device
+          // must stop syncing (it would just fight over the save) rather than silently keep overwriting the newer
+          // one. Signing out routes through the usual onAuthStateChanged cleanup (resetLocalSave + reload).
+          console.warn("Cloud: this account is signed in on another device now - signing out here.");
+          auth.signOut();
+          return true;
+        }
+        return false;
+      })
+      .catch(() => false); // offline, or a transient read failure - try again next cycle rather than treat it as a real displacement
   }
 
   function setConfirmOverwrite(fn) {
@@ -217,6 +290,10 @@ const Cloud = (() => {
           } catch (e) {
             /* storage unavailable - the reload will just keep the local save as it was, no harm done */
           }
+          // Claim the session for THIS device, displacing whatever device (if any) held it before - taking over the
+          // account via a fresh sign-in is exactly the moment that should happen. The restored-session sync that runs
+          // right after reload pushes this token to saves/{uid} along with the rest, so no separate write is needed here.
+          saveMySession(uid, newSessionToken());
           location.reload();
           return;
         }
@@ -278,6 +355,10 @@ const Cloud = (() => {
   function syncNow() {
     if (!ready || !user || !dirty) return Promise.resolve();
     if (typeof Economy !== "undefined" && Economy.isGod()) return Promise.resolve(); // a god save is never published, in either collection
+    // Claim a session for this account if this device doesn't already have one - the normal case right after a
+    // first-time sign-in (see signIn()); the download path claims its own token earlier, before the reload that leads
+    // here (see signIn()'s DOWNLOAD branch) - either way, syncNow() is what actually gets it onto saves/{uid}.
+    if (!mySession || mySession.uid !== user.uid) saveMySession(user.uid, newSessionToken());
     const coins = typeof Economy !== "undefined" ? Economy.getCoins() : 0;
     const character = typeof Economy !== "undefined" ? Economy.getEquipped("character") : null;
     const saveJson = typeof Economy !== "undefined" ? Economy.snapshot() : null;
@@ -292,7 +373,7 @@ const Cloud = (() => {
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
     batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, updatedAt: now });
-    if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now });
+    if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now, session: mySession.token });
     return batch
       .commit()
       .then(() => {
@@ -344,5 +425,6 @@ const Cloud = (() => {
     setConfirmOverwrite,
     getLeaderboardCache,
     refreshLeaderboard,
+    checkSession, // exposed mainly for testing - the timer/visibility cadence already calls this itself
   };
 })();

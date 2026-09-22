@@ -329,12 +329,15 @@ const Cloud = (() => {
 
   function signOut() {
     if (!ready) return;
-    // Reset immediately (snappy, and certain regardless of exactly when auth.signOut()'s promise settles relative to
-    // onAuthStateChanged firing) - the listener's own signed-in-to-signed-out branch does the same reset as a safety
-    // net for every OTHER way a session can end, so this is never the only thing standing between an account and a
-    // duplicated save (see resetLocalSave() and onAuthStateChanged above).
-    resetLocalSave();
-    auth.signOut().finally(() => location.reload());
+    // Flush first (a real bug: a name/description edit, or the last few seconds of coins, made right before clicking
+    // SIGN OUT could still be `dirty` and not yet synced - resetLocalSave() would silently wipe it before it ever
+    // reached the account). Only the explicit button does this: a PASSIVE sign-out (checkSession() finding this
+    // device has been displaced by another one, or any other cause routed through onAuthStateChanged below) must NOT
+    // flush - that would overwrite whatever the account's current, more-authoritative source of truth already has.
+    syncNow().finally(() => {
+      resetLocalSave();
+      auth.signOut().finally(() => location.reload());
+    });
   }
 
   function getUser() {

@@ -61,7 +61,7 @@ const Saves = (() => {
   // read (if any) said my rank was; unknown (never opened the leaderboard yet this session) reads as the plain look. ----
   function accountCardHtml(name, characterId, description, actionHtml, tierClass, rank) {
     const charInfo = (typeof Collection !== "undefined" && Collection.characterInfo(characterId)) || { image: "" };
-    const desc = description && description.trim() ? description : "No description yet.";
+    const desc = description && description.trim() ? description : "No description.";
     const corner = rank ? `<span class="pick-corner"><span class="pick-count">#${rank}</span></span>` : "";
     return (
       `<div class="pick-row buff-row account-card${tierClass || ""}">` +
@@ -89,18 +89,19 @@ const Saves = (() => {
     const user = Cloud.getUser();
     const myCharacter = typeof Economy !== "undefined" ? Economy.getEquipped("character") : null;
     const myDescription = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
+    const myName = (typeof Economy !== "undefined" && Economy.getAccountName()) || (user ? user.name : "");
     const action = user
       ? `<button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button>`
       : `<button type="button" class="save-icon-btn" data-act="signin">SIGN IN</button>`;
-    const card = accountCardHtml(user ? user.name : "Not signed in", myCharacter, myDescription, action, boardTierClass(myRank()));
-    const hint = !user ? `<div class="account-hint">Signing in links this save to a Google account and joins the leaderboard.</div>` : "";
+    const card = accountCardHtml(user ? myName : "Not signed in", myCharacter, myDescription, action, boardTierClass(myRank()));
     const error = Cloud.getAuthError();
     const errorLine = error ? `<div class="account-error">${user ? "" : "Sign-in failed: "}${esc(error)}</div>` : "";
-    const changeBtn = `<button type="button" class="save-icon-btn" data-act="editdesc">CHANGE</button>`;
-    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${hint}${errorLine}${changeBtn}</div>`;
+    const nameBtn = `<button type="button" class="save-icon-btn" data-act="editname">CHANGE NAME</button>`;
+    const descBtn = `<button type="button" class="save-icon-btn" data-act="editdesc">CHANGE DESCRIPTION</button>`;
+    return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${errorLine}${nameBtn}${descBtn}</div>`;
   }
 
-  // The CHANGE button: edit the account's own bio line. Sanitized and capped the same way on save as everywhere else
+  // CHANGE DESCRIPTION: edit the account's own bio line. Sanitized and capped the same way on save as everywhere else
   // (Economy.setAccountDescription does its own cleaning too - this is just for the live counter/preview here).
   function showEditDescription() {
     const current = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
@@ -125,6 +126,47 @@ const Saves = (() => {
     const input = panel.querySelector("input");
     const status = panel.querySelector(".modal-status");
     const show = () => {
+      status.textContent = `${input.value.length}/${max}`;
+    };
+    show();
+    input.addEventListener("input", show);
+  }
+
+  // CHANGE NAME: the first rename is free, every one after costs Economy.getAccountNameChangeCost() coins - Economy
+  // itself is the source of truth for that (see setAccountName), this just shows the cost and surfaces the two ways it
+  // can fail (empty after sanitizing, or not enough coins).
+  function showEditName() {
+    const current = (typeof Economy !== "undefined" && Economy.getAccountName()) || "";
+    const cost = typeof Economy !== "undefined" ? Economy.getAccountNameChangeCost() : 0;
+    const max = 16;
+    const costText = cost > 0 ? `Costs ${formatBoardCoins(cost)} coins.` : "Free this first time.";
+    const panel = openModal(
+      "ACCOUNT NAME",
+      `<div class="modal-text">Your name on the leaderboard and account card. Plain text only. ${costText}</div>` +
+        `<input class="modal-input" maxlength="${max}" value="${esc(current)}" spellcheck="false" />` +
+        `<div class="modal-status"></div>`,
+      [
+        {
+          label: "SAVE",
+          onClick: (el) => {
+            const result = Economy.setAccountName(el.querySelector("input").value);
+            if (!result.ok) {
+              const status = panel.querySelector(".modal-status");
+              status.textContent = result.reason === "cant-afford" ? `Not enough coins - needs ${formatBoardCoins(cost)}.` : "Enter a name.";
+              status.classList.add("bad");
+              return false; // keep the popup open so the player can try again
+            }
+            if (typeof Cloud !== "undefined") Cloud.markDirty(); // picked up by the normal sync cadence, not sent instantly
+            refresh();
+          },
+        },
+        { label: "CANCEL", cls: "ghost" },
+      ]
+    );
+    const input = panel.querySelector("input");
+    const status = panel.querySelector(".modal-status");
+    const show = () => {
+      status.classList.remove("bad");
       status.textContent = `${input.value.length}/${max}`;
     };
     show();
@@ -178,6 +220,9 @@ const Saves = (() => {
     } else if (b.dataset.act === "editdesc") {
       if (typeof playUiClick === "function") playUiClick();
       showEditDescription();
+    } else if (b.dataset.act === "editname") {
+      if (typeof playUiClick === "function") playUiClick();
+      showEditName();
     }
   }
 

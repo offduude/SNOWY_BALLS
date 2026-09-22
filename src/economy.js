@@ -24,6 +24,8 @@ const Economy = (() => {
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
       accountDescription: "", // the player's own short bio line on their ACCOUNT card (see sanitizeAccountDescription) - NOT a character's description
+      accountName: "", // a custom display name for the ACCOUNT card / leaderboard, overriding the Google account name - "" means "use the Google name" (see getAccountName)
+      accountNameChanges: 0, // how many times the name has been changed - the first is free, every one after costs ACCOUNT_NAME_CHANGE_COST (see setAccountName)
       newBuffs: [], // ids of the buffs that are NEW in the BUFFS tab: each card shows a red dot until the tab is closed
       newProjectiles: [], // same for the PROJECTILES list
       newSkins: [], // skins that were UNLOCKED and not dealt with yet: { kind, id, entered, displayed } - see the skin dots below
@@ -84,6 +86,18 @@ const Economy = (() => {
       .slice(0, ACCOUNT_DESC_MAX);
   }
 
+  // The account's own display name (ACCOUNT card + leaderboard), same allow-list as the bio above (plain text only, no
+  // script-injection surface) but much shorter - short enough that it can't stick out of the leaderboard's name column.
+  const ACCOUNT_NAME_MAX = 16;
+  const ACCOUNT_NAME_CHANGE_COST = 10000;
+  function sanitizeAccountName(text) {
+    return String(text || "")
+      .replace(/[^\p{L}\p{N}\s.,!?'"():;\-]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, ACCOUNT_NAME_MAX);
+  }
+
   function cleanRegen(obj) {
     const out = {};
     if (obj && typeof obj === "object") {
@@ -112,6 +126,8 @@ const Economy = (() => {
       lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
       bestStreak: p.bestStreak || 0,
       accountDescription: sanitizeAccountDescription(p.accountDescription), // re-cleaned on every load too - a downloaded cloud save is untrusted input like any other
+      accountName: sanitizeAccountName(p.accountName),
+      accountNameChanges: Number.isInteger(p.accountNameChanges) && p.accountNameChanges >= 0 ? p.accountNameChanges : 0,
       streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
       god: p.god === true,
       lastUsedBuff: typeof p.lastUsedBuff === "string" ? rn(p.lastUsedBuff) : null,
@@ -518,6 +534,30 @@ const Economy = (() => {
     save();
   }
 
+  function getAccountName() {
+    return state.accountName;
+  }
+
+  // What the NEXT rename would cost - 0 (free) before the first one has ever been used, ACCOUNT_NAME_CHANGE_COST after.
+  function getAccountNameChangeCost() {
+    return state.accountNameChanges > 0 ? ACCOUNT_NAME_CHANGE_COST : 0;
+  }
+
+  // Renames the account (the ACCOUNT card / leaderboard display name - not a character, not the Google name it defaults
+  // to before this is ever set). The coin spend happens HERE, atomically with the change and the counter, so a caller can
+  // never charge without renaming or rename without charging. Returns { ok: true, cost } on success, or { ok: false,
+  // reason: "empty" | "cant-afford" } - "cant-afford" only ever happens after the first (free) rename.
+  function setAccountName(text) {
+    const clean = sanitizeAccountName(text);
+    if (!clean) return { ok: false, reason: "empty" };
+    const cost = getAccountNameChangeCost();
+    if (cost > 0 && !spendCoins(cost)) return { ok: false, reason: "cant-afford" };
+    state.accountName = clean;
+    state.accountNameChanges++;
+    save();
+    return { ok: true, cost };
+  }
+
   const skinListeners = [];
   function onSkinsChange(fn) {
     skinListeners.push(fn);
@@ -602,6 +642,9 @@ const Economy = (() => {
     getBestStreak,
     getAccountDescription,
     setAccountDescription,
+    getAccountName,
+    setAccountName,
+    getAccountNameChangeCost,
     getStreak,
     setStreak,
     wasAiming,

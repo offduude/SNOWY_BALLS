@@ -1235,8 +1235,6 @@
       font-size: calc(var(--u) * 1.2);
     }
 
-    .account-hint { color: #e6cfa3; }
-
     .account-error {
       flex: none;
       color: #ff8a80;
@@ -1401,8 +1399,8 @@
     .modal-title { font-size: calc(var(--u) * 1.8); margin-bottom: calc(var(--u) * 1.2); }
     .modal-text { font-size: calc(var(--u) * 1.1); line-height: 1.7; color: #6b4a2a; margin-bottom: calc(var(--u) * 1.2); }
 
-    /* The account-description edit box (saves.js showEditDescription) - the only text input left once SAVES (named
-       slots, import codes) was removed. */
+    /* The account description/name edit boxes (saves.js showEditDescription / showEditName) - the only text inputs left
+       once SAVES (named slots, import codes) was removed. */
     .modal-input {
       display: block;
       width: 100%;
@@ -1416,6 +1414,7 @@
     }
 
     .modal-status { min-height: calc(var(--u) * 2.6); margin-top: calc(var(--u) * 0.8); font-size: calc(var(--u) * 1); line-height: 1.6; color: #8a6a44; }
+    .modal-status.bad { color: #a3261c; } /* CHANGE NAME's two failure cases - empty, or not enough coins */
 
     .modal-buttons { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); justify-content: flex-end; margin-top: calc(var(--u) * 1.4); }
 
@@ -1490,8 +1489,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=240"></script>
-  <script src="src/economy.js?v=36"></script>
+  <script src="src/version.js?v=241"></script>
+  <script src="src/economy.js?v=37"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1518,12 +1517,12 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=7"></script>
+  <script src="src/cloud.js?v=8"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=14"></script>
+  <script src="src/saves.js?v=15"></script>
   <script src="src/collection.js?v=72"></script>
   <script src="src/main.js?v=167"></script>
   <script>

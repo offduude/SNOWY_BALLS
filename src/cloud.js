@@ -216,9 +216,12 @@ const Cloud = (() => {
       return;
     }
     const description = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
+    // A custom name (set via CHANGE NAME) overrides the Google account name everywhere the leaderboard shows it; "" means
+    // it was never set, so the Google name is still what publishes.
+    const name = (typeof Economy !== "undefined" && Economy.getAccountName()) || user.name;
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
-    batch.set(db.collection("leaderboard").doc(user.uid), { name: user.name, coins, character, description, updatedAt: now });
+    batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, updatedAt: now });
     if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now });
     batch
       .commit()

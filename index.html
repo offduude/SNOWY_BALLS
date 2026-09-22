@@ -866,6 +866,21 @@
       pointer-events: none;
     }
 
+    /* The LEADERBOARD button's own background reflects the signed-in player's CURRENT LEADERBOARD PLACE (saves.js
+       updateLeaderboardButton/myRank), the same rank-tier rule as a leaderboard/account card - just tuned brighter
+       (like #ammo-box's rarity tint) since this button's base colour is dark brown, not cream. No rank (signed out, or
+       just not on the board): plain #side-btn brown, no override needed. */
+    #leaderboard-btn.epic {
+      background-image: linear-gradient(rgba(162, 92, 255, 0.5), rgba(162, 92, 255, 0.5));
+    }
+
+    #leaderboard-btn.legendary {
+      background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.65), rgba(255, 168, 77, 0.65), rgba(255, 240, 77, 0.65), rgba(91, 255, 110, 0.65),
+        rgba(77, 210, 255, 0.65), rgba(106, 107, 255, 0.65), rgba(193, 77, 255, 0.65), rgba(255, 77, 77, 0.65));
+      background-size: 200% 100%;
+      animation: rarity-wave 2.4s linear infinite, ammo-shine 1.7s ease-in-out infinite;
+    }
+
     /* "OFFSET" / "STRENGTH" above the left end of the aim bar (bar: 20px from the left of the 432px canvas, its
        top 223px down of 243). Text starts where the bar does; no background, only a thin dark outline. */
     #aim-label {
@@ -1515,7 +1530,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=248"></script>
+  <script src="src/version.js?v=249"></script>
   <script src="src/economy.js?v=39"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1543,12 +1558,12 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=10"></script>
+  <script src="src/cloud.js?v=11"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=18"></script>
+  <script src="src/saves.js?v=19"></script>
   <script src="src/collection.js?v=72"></script>
   <script src="src/main.js?v=167"></script>
   <script>

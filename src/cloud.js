@@ -40,6 +40,10 @@ const Cloud = (() => {
   let db = null;
   let ready = false; // FIREBASE_CONFIG looks real and the SDK loaded - false leaves every call below a harmless no-op
   let user = null; // { uid, name } | null
+  let revealUser = true; // false only while a fresh interactive signIn() is still deciding upload vs download - see
+  // getUser()/notifyAuth() below: while false, the account looks signed OUT everywhere, even though Firebase itself
+  // already completed the popup sign-in, so nothing (the ACCOUNT card, the mutual god-mode guard, anything else reading
+  // Cloud.getUser()) can show "signed in" before the overwrite question has actually been answered.
   let dirty = false; // something worth syncing changed locally since the last successful write
   let lastWrittenCoins = null;
   let lastWrittenCharacter = null;
@@ -58,12 +62,16 @@ const Cloud = (() => {
     return Object.values(FIREBASE_CONFIG).every((v) => typeof v === "string" && v && !v.includes("REPLACE_ME"));
   }
 
+  function visibleUser() {
+    return revealUser ? user : null;
+  }
+
   function onAuthChange(fn) {
     authListeners.push(fn);
-    fn(user);
+    fn(visibleUser());
   }
   function notifyAuth() {
-    authListeners.forEach((fn) => fn(user));
+    authListeners.forEach((fn) => fn(visibleUser()));
   }
 
   function init() {
@@ -130,6 +138,7 @@ const Cloud = (() => {
       return;
     }
     signingIn = true;
+    revealUser = false; // hidden until we know this is either a fresh account (nothing to ask) or the overwrite question has been answered
     authError = null;
     notifyAuth(); // clears any old error line immediately, before the new attempt resolves
     auth
@@ -185,7 +194,10 @@ const Cloud = (() => {
           location.reload();
           return;
         }
-        // First time this account has been used: nothing to download - THIS device's current save becomes its save.
+        // First time this account has been used: nothing to download, nothing to ask - safe to reveal immediately. THIS
+        // device's current save becomes its save.
+        revealUser = true;
+        notifyAuth();
         dirty = true;
         lastWrittenCoins = null;
         lastWrittenCharacter = null;
@@ -203,6 +215,12 @@ const Cloud = (() => {
       })
       .finally(() => {
         signingIn = false;
+        // Safety net: whatever path was taken above already revealed (or left null) the right thing - this just makes
+        // sure a future normal auth event can never stay stuck hidden because of some path here that didn't.
+        if (!revealUser) {
+          revealUser = true;
+          notifyAuth();
+        }
       });
   }
 
@@ -212,7 +230,7 @@ const Cloud = (() => {
   }
 
   function getUser() {
-    return user;
+    return visibleUser();
   }
 
   // Something worth syncing changed that Economy has no change-listener for (the account description - see saves.js's

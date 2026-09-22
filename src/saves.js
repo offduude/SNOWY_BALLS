@@ -253,9 +253,20 @@ const Saves = (() => {
     });
   }
 
+  // The LEADERBOARD side button's own background follows the signed-in player's current rank-tier, same rule as the
+  // account/leaderboard cards - no rank (signed out, or not on the board yet) just leaves it the plain button colour.
+  function updateLeaderboardButton() {
+    const btn = document.getElementById("leaderboard-btn");
+    if (!btn) return;
+    btn.classList.remove("epic", "legendary");
+    const tier = boardTierClass(myRank()).trim();
+    if (tier) btn.classList.add(tier);
+  }
+
   function refresh() {
     if (listEl && listEl.dataset.kind === "options") renderOptions(listEl);
     if (boardEl && boardEl.dataset.kind === "leaderboard") renderLeaderboard(boardEl);
+    updateLeaderboardButton();
   }
 
   function onClick(e) {

@@ -447,6 +447,23 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_aiming_chestnut", "assets/character/character1_aiming_chestnut.png");
     // Timestamp so an edited economy.json is never served from a stale browser/CDN cache.
     this.load.json("economy", "economy.json?t=" + Date.now());
+    // Every character/scenery/weather thumbnail, queued reactively the moment economy.json itself has arrived (still
+    // mid-batch - the loader hasn't reached "complete" yet, since other files are still in flight) so they finish
+    // loading under THIS same loading screen instead of popping in the first time SKINS or an account card needs one.
+    // These are plain <img src> tags elsewhere (collection.js), not Phaser textures - loading them here still puts
+    // them in the browser's own HTTP cache under their exact URL, so that later <img> reference is instant.
+    this.load.on("filecomplete-json-economy", (key, type, data) => {
+      const seen = new Set();
+      let n = 0;
+      ["characters", "sceneries", "weathers"].forEach((listKey) => {
+        (data[listKey] || []).forEach((item) => {
+          if (item.image && !seen.has(item.image)) {
+            seen.add(item.image);
+            this.load.image("skin_preload_" + n++, item.image);
+          }
+        });
+      });
+    });
     this.load.audio("theme", "assets/audio/theme.mp3?v=2");
     this.load.audio("event_banana_face", "assets/audio/event_banana_face.mp3");
     this.load.audio("throw_whoosh", "assets/audio/throw_whoosh.mp3");

@@ -118,14 +118,39 @@ const Cloud = (() => {
       }
       notifyAuth();
       if (user && !signingIn) {
-        // A restored session (the page was reloaded while already signed in) - not a fresh interactive sign-in, which
-        // drives its own sync explicitly below (after the download-or-link decision). Still worth syncing promptly
-        // rather than waiting for the next scheduled trigger; never downloads anything or asks the linking question again.
-        dirty = true;
-        lastWrittenCoins = null;
-        lastWrittenCharacter = null;
-        lastWrittenSave = null;
-        syncNow();
+        // A restored session (the game was loaded while already signed in) - READ the account's current cloud save
+        // and adopt it if it differs from what's sitting in localStorage, rather than trusting local and pushing it
+        // up. We already flush on close (pagehide/visibilitychange below) - there's nothing that needs pushing right
+        // at load, only something that might need pulling (another device wrote more recently, or this one was just
+        // stale) - reading (never writing) here is what keeps a reload from ever showing stale, inconsistent numbers.
+        // Never shows the "this account has a save" warning - that's for a FRESH interactive sign-in deciding whether
+        // to LINK a new account; this is just refreshing the account THIS device is already linked to.
+        db.collection(SAVES_COLLECTION)
+          .doc(user.uid)
+          .get()
+          .then((doc) => {
+            if (!doc.exists) return; // nothing published yet - carry on with the local save as normal
+            let clean = null;
+            try {
+              clean = Economy.sanitize(JSON.parse(doc.data().data));
+            } catch (e) {
+              /* not valid JSON - ignore rather than risk bricking the load on a corrupted cloud document */
+            }
+            if (!clean) return;
+            const cloudJson = JSON.stringify(clean);
+            if (cloudJson === Economy.snapshot()) return; // already in sync - no reload needed
+            Economy.lockSaves(); // nothing may write the old save back over this in the moment before the reload
+            try {
+              localStorage.setItem(Economy.storageKey, cloudJson);
+            } catch (e) {
+              /* storage unavailable - carry on with the local save this load, no harm done */
+            }
+            location.reload();
+          })
+          .catch(() => {
+            /* offline, or a transient read failure - carry on with the local save this load; the normal sync cadence
+               still covers pushing anything new from here once something actually changes */
+          });
       }
     });
     // checkSession first, syncNow only if it didn't just start signing this device out - a displaced device must not

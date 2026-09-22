@@ -1303,12 +1303,16 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* The same two rules apply to an ACCOUNT card (OPTIONS, or a leaderboard card held down) - its background reflects
+    /* The same rule applies to an ACCOUNT card (OPTIONS, or a leaderboard card held down) - its background reflects
        the player's CURRENT LEADERBOARD PLACE too (saves.js accountCardHtml / myRank), the same rule as a leaderboard
        card's own background, just on a cream .pick-row instead of a .board-card. */
-    .board-card.epic,
-    .account-card.epic {
+    .board-card.epic {
       background-image: linear-gradient(rgba(162, 92, 255, 0.22), rgba(162, 92, 255, 0.22));
+    }
+
+    /* Same purple as #leaderboard-btn.epic exactly (not the softer .board-card shade above) - the owner's request. */
+    .account-card.epic {
+      background-image: linear-gradient(rgba(162, 92, 255, 0.5), rgba(162, 92, 255, 0.5));
     }
 
     .board-card.legendary,
@@ -1545,7 +1549,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=257"></script>
+  <script src="src/version.js?v=258"></script>
   <script src="src/economy.js?v=40"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1573,14 +1577,14 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=17"></script>
+  <script src="src/cloud.js?v=18"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=28"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=20"></script>
   <script src="src/collection.js?v=73"></script>
-  <script src="src/main.js?v=167"></script>
+  <script src="src/main.js?v=168"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

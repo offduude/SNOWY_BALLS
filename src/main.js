@@ -113,10 +113,9 @@ const AIM_COLOR_ANGLE = 0x6fb1ff; // the offset marker - and the "OFFSET" label 
 const AIM_COLOR_POWER = 0xff6f6f; // the strength marker - and the "STRENGTH" label
 const AIM_COLOR_ANGLE_CSS = "#6fb1ff";
 const AIM_COLOR_POWER_CSS = "#ff6f6f";
-const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's dot on the aim bars
-const EVENT_COLOR_DISCO = 0xb04dff; // the disco event's face: a purple dot on the aim bars
-const EVENT_COLOR_GUITAR = 0xff8a3d; // the guitar event's face: an orange dot on the aim bars
-const EVENT_DOT_RADIUS = 6; // px, drawn on the aim bars (smaller than the hit range, so a marker on the dot always hits)
+const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's hitzone on the aim bars
+const EVENT_COLOR_DISCO = 0xb04dff; // the disco event's face: a purple hitzone on the aim bars
+const EVENT_COLOR_GUITAR = 0xff8a3d; // the guitar event's face: an orange hitzone on the aim bars
 
 // ---------------------------------------------------------------------------------------------------------
 // WEIGHT is a TIER (very light ... very heavy, economy.json weightTiers), not a number.
@@ -419,7 +418,12 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("onion", "assets/snowball/onion.png");
-    this.load.image("weather_snow", "assets/weather/snowflake.png"); // the default weather's particle (another weather's is loaded when it is first used)
+    // Keyed by its OWN PATH, not "weather_snow" - a real bug found and fixed 2026-09-22: Blizzard's particle happens to
+    // be this exact same file, and applyWeather() used to key it "weather_blizzard" instead - loading the SAME URL
+    // under a SECOND key while the first was already loaded reproducibly hung Phaser's loader forever (progress stuck
+    // partway, "complete" never fires, the game never finishes booting - not just a cosmetic flash). Keying every
+    // weather's texture by its particle path (see applyWeather) means two weathers sharing a file always share a key.
+    this.load.image("assets/weather/snowflake.png", "assets/weather/snowflake.png");
     this.load.image("drone", "assets/snowball/drone.png");
     this.load.image("potato", "assets/snowball/potato.png");
     this.load.image("pinecone", "assets/snowball/pine_cone.png?v=2");
@@ -452,6 +456,15 @@ class MainScene extends Phaser.Scene {
     // loading under THIS same loading screen instead of popping in the first time SKINS or an account card needs one.
     // These are plain <img src> tags elsewhere (collection.js), not Phaser textures - loading them here still puts
     // them in the browser's own HTTP cache under their exact URL, so that later <img> reference is instant.
+    //
+    // NOTE (2026-09-22): also tried preloading the player's ACTUALLY EQUIPPED scenery/weather here (their real
+    // in-game asset, to stop a brief flash of the default one before applyScenery()/applyWeather()'s own lazy load
+    // catches up) - reverted. Queuing that extra file (via this exact same reactive pattern, and separately via a
+    // synchronous XHR read of economy.json before the loader even starts) both reproducibly stalled Phaser's loader
+    // completely - totalToLoad/totalComplete mismatched with nothing in-flight and nothing failed, stuck well short
+    // of 100%, "complete" never fires, the game never boots. Root cause not pinned down with confidence; shipping it
+    // would break the game for anyone with a non-default scenery/weather equipped, which is far worse than the
+    // flash it was meant to fix. Left as a known limitation - see docs/NOTES.md.
     this.load.on("filecomplete-json-economy", (key, type, data) => {
       const seen = new Set();
       let n = 0;
@@ -680,7 +693,7 @@ class MainScene extends Phaser.Scene {
       guideLines: b.guideLines > 0, // the green guarantee lines are only drawn while a buff (Orange Skyr) gives them
       miracleId: b.miracle > 0 ? b.miracleBy : null, // the Diamond Cross that helps THIS throw (used up when the throw reaches its apex)
       centerLine: b.centerLine > 0, // one green line at the middle of the hit zone on each slider (Blue Skyr)
-      eventDot: b.eventDot > 0, // the dot that marks an event's face on the sliders is only drawn with a buff that shows it (the epic Skyr)
+      eventHitzone: b.eventHitzone > 0, // the hitzone that marks an event's face on the sliders is only drawn with a buff that shows it (the epic Skyr)
       saveProjectile: b.saveProjectile, // chance (0-1) that this throw does not use up its projectile (Water Bottle) - the best running buff's
       saveProjectileBy: b.saveProjectileBy, // ... and which buff that is (its icon is shown when it saves one)
     };
@@ -853,6 +866,16 @@ class MainScene extends Phaser.Scene {
     const n = parseInt(m[1], 16);
     box.style.setProperty("--tint", `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.6)`);
     box.classList.add("tinted");
+  }
+
+  // A projectile was saved this throw (Water Bottle/etc. - see this.savedBy): the counter's outline flashes bright
+  // white once, alongside its "Saved Projectile" message. Restarts cleanly even if the previous flash hasn't finished.
+  flashAmmoSaved() {
+    const box = document.getElementById("ammo-box");
+    if (!box) return;
+    box.classList.remove("saved-flash");
+    void box.offsetWidth; // restart the CSS animation from frame 0 rather than no-op if it's already mid-flash
+    box.classList.add("saved-flash");
   }
 
   updateStreakHud() {
@@ -1316,7 +1339,10 @@ class MainScene extends Phaser.Scene {
       const speed = ((this.eco.weatherSpeeds || {})[def.fallSpeed]) || { from: 50, to: 75 };
       const onScreen = ((this.eco.weatherDensities || {})[def.density]) ?? 15;
       const angle = ((def.angle || 0) * Math.PI) / 180;
-      w = { id: def.id, def, key: "weather_" + def.id, onScreen, from: speed.from, to: speed.to, sin: Math.sin(angle), cos: Math.cos(angle), accTop: 0, accSide: 0, particles: [], age: 0 };
+      // Keyed by the PARTICLE'S OWN PATH, not the weather's id - see the static preload's snowflake.png comment: two
+      // weathers sharing the same file (Blizzard reuses Snow's) must share the same texture key, or loading that URL
+      // under a second key while the first is already loaded hangs Phaser's loader completely.
+      w = { id: def.id, def, key: def.particle, onScreen, from: speed.from, to: speed.to, sin: Math.sin(angle), cos: Math.cos(angle), accTop: 0, accSide: 0, particles: [], age: 0 };
       const mean = (speed.from + speed.to) / 2;
       w.left = INITIAL_SCROLL_X - WEATHER_MARGIN; // the sides of the sky the particles live in (a little wider than the picture)
       w.right = INITIAL_SCROLL_X + GAME_WIDTH + WEATHER_MARGIN;
@@ -1328,7 +1354,8 @@ class MainScene extends Phaser.Scene {
     }
     this.weather = w;
     // What the weather needs is loaded the first time it is used (its particle picture, its sound): both are queued before ONE start, then the weather starts.
-    const soundKey = "weather_sound_" + def.id;
+    // Keyed by its own path too (see the particle key above) - the same fix, in case two weathers ever share a sound file.
+    const soundKey = def.sound;
     const needPicture = !!def.particle && !this.textures.exists(w.key);
     const needSound = !!def.sound && !this.cache.audio.exists(soundKey);
     const start = () => {
@@ -1924,6 +1951,8 @@ class MainScene extends Phaser.Scene {
       this.updateStreakHud();
       this.showMessage("MISS" + (this.savedBy ? "\nSaved Projectile" : ""));
     }
+
+    if (this.savedBy) this.flashAmmoSaved(); // the counter's outline flashes bright white once, alongside the "Saved Projectile" message
 
     this.maybeStartRandomEvent();
 
@@ -2534,14 +2563,12 @@ class MainScene extends Phaser.Scene {
     return powerForApexOf(this.proj, apex);
   }
 
-  // `hitWidthPx` = how wide (on the bar) the range that really hits is. The dot never sticks out of it - it is
-  // shrunk to fit when that range gets narrow (e.g. an offset near the edge of what can still hit) - so a
-  // marker overlapping the dot is always a hit.
-  drawEventDot(g, x, y, color, hitWidthPx) {
-    if (hitWidthPx < 2) return; // a sliver too thin to aim at: no dot rather than a dot that overhangs it
-    const radius = Math.min(EVENT_DOT_RADIUS, hitWidthPx / 2);
-    g.fillStyle(color, 1);
-    g.fillCircle(Math.round(x), y, radius);
+  // `hitWidthPx` = how wide (on the bar) the range that really hits is - the hitzone spans it exactly (no longer a
+  // smaller "safe" dot that only ever undersold the true range), so a marker anywhere inside the zone is a hit.
+  drawEventHitzone(g, x, y, color, hitWidthPx, height) {
+    if (hitWidthPx < 2) return; // a sliver too thin to show meaningfully: no zone rather than one narrower than a pixel
+    g.fillStyle(color, 0.55); // semi-transparent so the aim marker stays visible on top of it
+    g.fillRect(Math.round(x - hitWidthPx / 2), Math.round(y - height / 2), Math.round(hitWidthPx), Math.round(height));
   }
 
   // The text above the left end of the aim bar: OFFSET during the offset phase, STRENGTH during the strength phase,
@@ -2596,13 +2623,13 @@ class MainScene extends Phaser.Scene {
       // Blue Skyr: ONE line in the middle of that zone (the middle of the bar).
       if (this.aim.centerLine) lineAt(0, 0x5cff5c, 1, 2, 5);
 
-      const target = this.aim.eventDot ? this.activeEventTarget() : null; // (no dot without the buff)
+      const target = this.aim.eventHitzone ? this.activeEventTarget() : null; // (no hitzone without the buff)
       if (target) {
         const swing = (target.swingFrom + target.swingTo) / 2;
         const dotPos = center + swing / 2 / range;
         if (dotPos > 0 && dotPos < 1) {
           const x = barX + dotPos * barW;
-          this.drawEventDot(g, x, barY + barH / 2, target.color, ((target.swingTo - target.swingFrom) / 2 / range) * barW);
+          this.drawEventHitzone(g, x, barY + barH / 2, target.color, ((target.swingTo - target.swingFrom) / 2 / range) * barW, barH);
         }
       }
     } else {
@@ -2635,15 +2662,15 @@ class MainScene extends Phaser.Scene {
       }
       if (band && this.aim.centerLine) lineAtPower((lo + hi) / 2, 0x5cff5c, 1, 2, 5); // Blue Skyr: the middle of the strength band
 
-      const target = this.aim.eventDot ? this.activeEventTarget(swingNow) : null; // (no dot without the buff)
+      const target = this.aim.eventHitzone ? this.activeEventTarget(swingNow) : null; // (no hitzone without the buff)
       if (target && target.powerFrom !== null) {
         // The hit band can stick out past the ends of the bar (a heavy projectile's band ends beyond the tip):
-        // aim the dot at the part that is on the bar.
+        // show only the part that is on the bar.
         const from = Math.max(target.powerFrom, pLo);
         const to = Math.min(target.powerTo, pLo + pRange);
         if (from < to) {
           const hitWidthPx = ((to - from) / pRange) * barW;
-          this.drawEventDot(g, barX + barPos((from + to) / 2) * barW, barY + barH / 2, target.color, hitWidthPx);
+          this.drawEventHitzone(g, barX + barPos((from + to) / 2) * barW, barY + barH / 2, target.color, hitWidthPx, barH);
         }
       }
     }

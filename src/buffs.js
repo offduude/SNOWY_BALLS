@@ -13,15 +13,15 @@
 //                          that throw. A "charge" buff (`charge: true` on the item, no `duration`): no timer, its card shows "+1" instead
 //   centerLine       1     draws ONE green line on each slider, at the middle of the hit zone (the middle of the offset bar; the middle of the
 //                          strength band that hits W20 from the chosen offset) - Blue Skyr. Any active source turns it on; it works with or without guideLines
-//   eventDot         1     shows the DOT that marks the running event's face on both sliders (yellow for the banana face, purple for the disco, orange for the guitar);
-//                          without a buff with this effect no dot is drawn - the epic Skyr. Any active source turns it on
+//   eventHitzone     1     shows the HITZONE that marks the running event's face on both sliders (yellow for the banana face, purple for the disco, orange for the guitar) -
+//                          the actual full width/band that hits it, not a smaller "safe" marker; without a buff with this effect nothing is drawn - the epic Skyr. Any active source turns it on
 //   precision        x     offset (angle) slider: its hit zone gets x times bigger (x1.2 = 20% bigger, e.g. 25% of the bar -> 30%, never over
 //                          100%), so the bar's range shrinks to 1/x and the same marker movement is finer
 //   strengthControl  x     strength (power) slider: same, its range shrinks to 1/x (around the middle)
 //   coinMultiplier   x     multiplies the coins of a hit (whole coins are paid, the fraction is carried to the next payout). Buffs STACK:
 //                          they multiply each other (1.1 x 1.2 = 1.32), no cap
 //   offsetCenter     c     the OFFSET slider's hit zone is centered at c of the bar (0.5 = the middle, the normal; the Blizzard weather: 0.25); the
-//                          green lines, the centre line and the event dot follow it. Not a buff: only a skin's effect (see below)
+//                          green lines, the centre line and the event hitzone follow it. Not a buff: only a skin's effect (see below)
 //   offsetSpeed      x     the OFFSET slider's marker moves at x times its speed (0.8 = 20% slower, steadier); the strength slider is not
 //                          affected. Buffs STACK: they multiply (0.9 x 0.8 = 0.72), no floor
 //   saveProjectile   p     chance (0-1) that a throw does NOT use up its projectile. Buffs STACK as INDEPENDENT ROLLS: each has its own chance,
@@ -116,7 +116,7 @@ const Buffs = (() => {
   function modifiers() {
     let notSaved = 1; // the chance that no running buff saves the projectile
     let bestSave = 0;
-    const m = { guideLines: 0, centerLine: 0, eventDot: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1, offsetCenter: 0.5, miracle: 0, miracleBy: null };
+    const m = { guideLines: 0, centerLine: 0, eventHitzone: 0, precision: 1, strengthControl: 1, coinMultiplier: 1, saveProjectile: 0, saveProjectileBy: null, offsetSpeed: 1, offsetCenter: 0.5, miracle: 0, miracleBy: null };
     // the running buffs, then the equipped skins (an always-on source with no id)
     const sources = [...active().map((b) => ({ id: b.id, effects: b.item.effects || [] })), { id: null, effects: Economy.skinEffects(eco) }];
     for (const b of sources) {
@@ -126,7 +126,7 @@ const Buffs = (() => {
           m.miracle += e.value;
           m.miracleBy = b.id;
         } else if (e.type === "offsetCenter") m.offsetCenter = e.value; // (only a skin has it)
-        else if (e.type === "guideLines" || e.type === "centerLine" || e.type === "eventDot") m[e.type] += e.value; // a switch: any active source turns it on
+        else if (e.type === "guideLines" || e.type === "centerLine" || e.type === "eventHitzone") m[e.type] += e.value; // a switch: any active source turns it on
         else if (e.type === "saveProjectile") {
           notSaved *= 1 - e.value; // independent rolls: the projectile is used up only if EVERY buff's roll fails
           if (e.value > bestSave) {

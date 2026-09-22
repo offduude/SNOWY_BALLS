@@ -265,9 +265,9 @@
         "ignorePriceOverride": true,
         "duration": { "seconds": 180 },
         "image": "assets/items/skyr.png",
-        "effects": [{ "type": "eventDot", "value": 1 }],
+        "effects": [{ "type": "eventHitzone", "value": 1 }],
         "description": "Improves brain function.",
-        "detail": "Shows event dot."
+        "detail": "Shows event hitzone."
       },
       {
         "id": "water_bottle",

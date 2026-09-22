@@ -39,6 +39,7 @@ const SYNC_INTERVAL_MS = 60 * 1000;
 const LEADERBOARD_SIZE = 20; // plenty for a 5-person group with room to grow
 const SAVES_COLLECTION = "saves";
 const SESSION_KEY = "snowyBallsSession"; // this device's own remembered { uid, token } - separate from Economy's save data (see resetLocalSave/claimSession)
+const SESSION_ACTIVE_WINDOW_MS = SYNC_INTERVAL_MS * 3; // how recently saves/{uid} must have been touched to count as "someone is actively playing on it right now" (see signIn())
 
 const Cloud = (() => {
   let app = null;
@@ -151,10 +152,11 @@ const Cloud = (() => {
   // Resets THIS DEVICE's local save to a brand-new game - never the account itself (the cloud save under a uid is
   // untouched). Used whenever an auth session ends (see onAuthStateChanged above and signOut() below) so a save can
   // never ride along to a different account: without this, signing out with real progress and signing into a
-  // different (or brand-new) account would upload/duplicate that progress there too. Also drops this device's own
-  // session claim (see below) - it is no longer signed into anything, so it has no business still "owning" one.
+  // different (or brand-new) account would upload/duplicate that progress there too. Deliberately does NOT clear
+  // mySession (see below) - this device still needs to remember the last token it held for this account so a quick
+  // sign-out/sign-back-in on the SAME device isn't mistaken, by signIn()'s "someone else is actively playing this
+  // right now" guard, for a different device trying to hijack an active session.
   function resetLocalSave() {
-    clearMySession();
     if (typeof Economy === "undefined") return;
     Economy.lockSaves(); // nothing may write the old save back over this in the moment before the reload
     try {
@@ -181,15 +183,6 @@ const Cloud = (() => {
       localStorage.setItem(SESSION_KEY, JSON.stringify(mySession));
     } catch (e) {
       /* storage unavailable - this device just can't reliably detect being displaced; sync itself still works */
-    }
-  }
-
-  function clearMySession() {
-    mySession = null;
-    try {
-      localStorage.removeItem(SESSION_KEY);
-    } catch (e) {
-      /* storage unavailable - nothing to clear */
     }
   }
 
@@ -265,6 +258,22 @@ const Cloud = (() => {
           return;
         }
         if (cloudSave) {
+          // CRITICAL: the CURRENTLY ACTIVE session must win, never a fresh sign-in elsewhere - otherwise a player could
+          // sign into a second device mid-session to hijack/reset the first one, then sign back in there to download
+          // the last-synced (pre-hijack) save: re-attempting a hard shot or a shop reroll by discarding whatever
+          // hadn't synced yet on the original device. Only refuse when it's genuinely a DIFFERENT device: this same
+          // device reconnecting to an account it already held the session for (mySession still remembers that exact
+          // token - sign-out no longer clears it, see resetLocalSave) is always allowed through immediately.
+          const sameDevice = mySession && mySession.uid === uid && cloudSave.session && mySession.token === cloudSave.session;
+          if (!sameDevice && cloudSave.session) {
+            const updatedMs = cloudSave.updatedAt && cloudSave.updatedAt.toMillis ? cloudSave.updatedAt.toMillis() : 0;
+            if (Date.now() - updatedMs < SESSION_ACTIVE_WINDOW_MS) {
+              authError = "this account is being played on another device right now - try again in a few minutes";
+              notifyAuth();
+              await auth.signOut();
+              return;
+            }
+          }
           const proceed = confirmOverwrite ? await confirmOverwrite(cloudSave) : true;
           if (!proceed) {
             await auth.signOut();

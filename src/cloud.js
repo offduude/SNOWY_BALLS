@@ -189,6 +189,12 @@ const Cloud = (() => {
     return user;
   }
 
+  // Something worth syncing changed that Economy has no change-listener for (the account description - see saves.js's
+  // edit dialog). Just flips the same flag a coin change would; the next trigger (timer / backgrounding) picks it up.
+  function markDirty() {
+    dirty = true;
+  }
+
   // Pushes the leaderboard card AND the full save together (one batched write) if signed in, not in god mode, and
   // something actually changed since the last successful write. Called on the timer and on the two "the player is
   // leaving" signals above - never on every single coin/character change.
@@ -202,9 +208,10 @@ const Cloud = (() => {
       dirty = false;
       return;
     }
+    const description = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
-    batch.set(db.collection("leaderboard").doc(user.uid), { name: user.name, coins, character, updatedAt: now });
+    batch.set(db.collection("leaderboard").doc(user.uid), { name: user.name, coins, character, description, updatedAt: now });
     if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now });
     batch
       .commit()
@@ -236,7 +243,7 @@ const Cloud = (() => {
       .limit(LEADERBOARD_SIZE)
       .get()
       .then((snap) => {
-        leaderboardRows = snap.docs.map((d) => ({ uid: d.id, name: d.data().name, coins: d.data().coins, character: d.data().character || null }));
+        leaderboardRows = snap.docs.map((d) => ({ uid: d.id, name: d.data().name, coins: d.data().coins, character: d.data().character || null, description: d.data().description || "" }));
         leaderboardLoading = false;
         if (onUpdated) onUpdated();
       })
@@ -252,6 +259,7 @@ const Cloud = (() => {
     signIn,
     signOut,
     getUser,
+    markDirty,
     getAuthError,
     setConfirmOverwrite,
     getLeaderboardCache,

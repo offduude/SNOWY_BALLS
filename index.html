@@ -717,6 +717,12 @@
       color: #6b4a2a;
     }
 
+    /* An account's bio (the only player-typed text on a card) is length-capped (Economy.sanitizeAccountDescription), but
+       one long unbroken "word" could still be wider than the card - break it mid-word rather than let it push out. */
+    .account-card .pick-desc {
+      overflow-wrap: anywhere;
+    }
+
     /* The EQUIP button in its own box, so a line of text can hang under it (the snowball's "+1 in 00:27") without
        moving the button - it stays at the same height on every card. */
     .pick-action {
@@ -1272,11 +1278,16 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    .board-card.epic {
+    /* The same two rules apply to an ACCOUNT card (OPTIONS, or a leaderboard card held down) - its background reflects
+       the player's CURRENT LEADERBOARD PLACE too (saves.js accountCardHtml / myRank), the same rule as a leaderboard
+       card's own background, just on a cream .pick-row instead of a .board-card. */
+    .board-card.epic,
+    .account-card.epic {
       background-image: linear-gradient(rgba(162, 92, 255, 0.22), rgba(162, 92, 255, 0.22));
     }
 
-    .board-card.legendary {
+    .board-card.legendary,
+    .account-card.legendary {
       background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
         rgba(77, 210, 255, 0.32), rgba(106, 107, 255, 0.32), rgba(193, 77, 255, 0.32), rgba(255, 77, 77, 0.32));
       background-size: 200% 100%;
@@ -1352,6 +1363,15 @@
       color: #3b2412;
     }
 
+    /* A fixed height (as tall as a full 60-character bio ever needs, wrapped) - a safety net alongside the length cap and
+       the word-break above, not the thing doing the capping: the card clips rather than grows if it's ever exceeded. */
+    #board-inspect-card .pick-row {
+      box-sizing: border-box;
+      height: calc(var(--u) * 14);
+      min-height: 0;
+      overflow: hidden;
+    }
+
     #board-inspect, .board-card { -webkit-touch-callout: none; }
 
     /* ---- popups (right now: only Cloud's "this account already has a save" sign-in confirm) ---- */
@@ -1380,6 +1400,22 @@
 
     .modal-title { font-size: calc(var(--u) * 1.8); margin-bottom: calc(var(--u) * 1.2); }
     .modal-text { font-size: calc(var(--u) * 1.1); line-height: 1.7; color: #6b4a2a; margin-bottom: calc(var(--u) * 1.2); }
+
+    /* The account-description edit box (saves.js showEditDescription) - the only text input left once SAVES (named
+       slots, import codes) was removed. */
+    .modal-input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: calc(var(--u) * 1);
+      background: #fff8e6;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+      color: #3b2412;
+      font: calc(var(--u) * 1.4) "Press Start 2P", monospace;
+    }
+
+    .modal-status { min-height: calc(var(--u) * 2.6); margin-top: calc(var(--u) * 0.8); font-size: calc(var(--u) * 1); line-height: 1.6; color: #8a6a44; }
 
     .modal-buttons { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); justify-content: flex-end; margin-top: calc(var(--u) * 1.4); }
 
@@ -1454,8 +1490,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=238"></script>
-  <script src="src/economy.js?v=35"></script>
+  <script src="src/version.js?v=239"></script>
+  <script src="src/economy.js?v=36"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1482,12 +1518,12 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=5"></script>
+  <script src="src/cloud.js?v=6"></script>
   <script src="src/rarity.js?v=2"></script>
   <script src="src/buffs.js?v=30"></script>
   <script src="src/shop.js?v=27"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=12"></script>
+  <script src="src/saves.js?v=13"></script>
   <script src="src/collection.js?v=72"></script>
   <script src="src/main.js?v=167"></script>
   <script>

@@ -51,39 +51,82 @@ const Saves = (() => {
   }
 
   // ---------- ACCOUNT: an item card (picture, name, description, an action where EQUIP would be) - no rarity, no amount,
-  // it isn't that kind of item. The picture + description are the CHARACTER's own (Collection.characterInfo), because
-  // that is the one piece of "self" a save carries a picture of; changing it is the CHANGE button below the card. ----
-  function characterCardInfo(characterId) {
-    const info = typeof Collection !== "undefined" ? Collection.characterInfo(characterId) : null;
-    return info || { image: "", description: "" };
-  }
-
-  function accountCardHtml(name, characterId, actionHtml) {
-    const info = characterCardInfo(characterId);
+  // it isn't that kind of item. The PICTURE is the equipped CHARACTER's face (Collection.characterInfo) - "myself" is
+  // currently represented by which character is picked, and that rides along on the normal sync cadence (the `character`
+  // field on leaderboard/{uid}). The DESCRIPTION is a completely separate thing: the player's OWN short bio
+  // (Economy.getAccountDescription - plain text, sanitized, capped - see economy.js), never the character's built-in
+  // description. CHANGE (below the card) edits that bio, via showEditDescription - it does NOT open CHARACTERS (that
+  // would need the SKINS menu, unrelated to this card). The card's BACKGROUND reflects the player's current LEADERBOARD
+  // PLACE (boardTierClass, same rule as a leaderboard card) - for my own card that means whatever the last leaderboard
+  // read (if any) said my rank was; unknown (never opened the leaderboard yet this session) reads as the plain look. ----
+  function accountCardHtml(name, characterId, description, actionHtml, tierClass) {
+    const charInfo = (typeof Collection !== "undefined" && Collection.characterInfo(characterId)) || { image: "" };
+    const desc = description && description.trim() ? description : "No description yet.";
     return (
-      `<div class="pick-row buff-row account-card">` +
-      `<img class="pick-pic" src="${esc(info.image || "")}" alt="" draggable="false" />` +
-      `<div class="pick-text"><div class="pick-name">${esc(name)}</div><div class="pick-desc">${esc(info.description || "")}</div></div>` +
+      `<div class="pick-row buff-row account-card${tierClass || ""}">` +
+      `<img class="pick-pic" src="${esc(charInfo.image || "")}" alt="" draggable="false" />` +
+      `<div class="pick-text"><div class="pick-name">${esc(name)}</div><div class="pick-desc">${esc(desc)}</div></div>` +
       `<div class="pick-action">${actionHtml}</div>` +
       `</div>`
     );
+  }
+
+  // My own current rank, if it happens to be known (only ever set by actually opening the LEADERBOARD screen this
+  // session - this never triggers a read of its own, see docs/NOTES.md "read-on-open, not a live listener"). null if
+  // unknown (never opened it yet, or signed out) - the card just uses the plain background in that case.
+  function myRank() {
+    const user = typeof Cloud !== "undefined" && Cloud.getUser();
+    const rows = user && Cloud.getLeaderboardCache();
+    if (!rows) return null;
+    const i = rows.findIndex((r) => r.uid === user.uid);
+    return i < 0 ? null : i + 1;
   }
 
   function accountSectionHtml() {
     if (typeof Cloud === "undefined" || !Cloud.isConfigured()) return ""; // no Firebase project set up yet: no dead button
     const user = Cloud.getUser();
     const myCharacter = typeof Economy !== "undefined" ? Economy.getEquipped("character") : null;
+    const myDescription = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
     const action = user
       ? `<button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button>`
       : `<button type="button" class="save-icon-btn" data-act="signin">SIGN IN</button>`;
-    const card = accountCardHtml(user ? user.name : "Not signed in", myCharacter, action);
+    const card = accountCardHtml(user ? user.name : "Not signed in", myCharacter, myDescription, action, boardTierClass(myRank()));
     const hint = !user ? `<div class="account-hint">Signing in links this save to a Google account and joins the leaderboard.</div>` : "";
     const error = Cloud.getAuthError();
     const errorLine = error ? `<div class="account-error">${user ? "" : "Sign-in failed: "}${esc(error)}</div>` : "";
-    // The same CHANGE button the SKINS menu's category cards use (.skins-change data-skins="character") - collection.js's
-    // existing click handling already opens CHARACTERS for it, nothing new to wire.
-    const changeBtn = `<button type="button" class="save-icon-btn skins-change" data-skins="character">CHANGE</button>`;
+    const changeBtn = `<button type="button" class="save-icon-btn" data-act="editdesc">CHANGE</button>`;
     return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${hint}${errorLine}${changeBtn}</div>`;
+  }
+
+  // The CHANGE button: edit the account's own bio line. Sanitized and capped the same way on save as everywhere else
+  // (Economy.setAccountDescription does its own cleaning too - this is just for the live counter/preview here).
+  function showEditDescription() {
+    const current = typeof Economy !== "undefined" ? Economy.getAccountDescription() : "";
+    const max = 60;
+    const panel = openModal(
+      "ACCOUNT DESCRIPTION",
+      `<div class="modal-text">A short line other players see on your account card. Plain text only.</div>` +
+        `<input class="modal-input" maxlength="${max}" value="${esc(current)}" spellcheck="false" />` +
+        `<div class="modal-status"></div>`,
+      [
+        {
+          label: "SAVE",
+          onClick: (el) => {
+            Economy.setAccountDescription(el.querySelector("input").value);
+            if (typeof Cloud !== "undefined") Cloud.markDirty(); // picked up by the normal sync cadence, not sent instantly
+            refresh();
+          },
+        },
+        { label: "CANCEL", cls: "ghost" },
+      ]
+    );
+    const input = panel.querySelector("input");
+    const status = panel.querySelector(".modal-status");
+    const show = () => {
+      status.textContent = `${input.value.length}/${max}`;
+    };
+    show();
+    input.addEventListener("input", show);
   }
 
   // ---------- the OPTIONS list (ACCOUNT, VOLUME) ----------
@@ -130,6 +173,9 @@ const Saves = (() => {
     if (b.dataset.act === "signin" || b.dataset.act === "signout") {
       if (typeof playUiClick === "function") playUiClick();
       if (typeof Cloud !== "undefined") Cloud[b.dataset.act === "signin" ? "signIn" : "signOut"]();
+    } else if (b.dataset.act === "editdesc") {
+      if (typeof playUiClick === "function") playUiClick();
+      showEditDescription();
     }
   }
 
@@ -167,7 +213,7 @@ const Saves = (() => {
 
   function boardTierClass(rank) {
     if (rank === 1) return " legendary";
-    if (rank <= 3) return " epic";
+    if (rank >= 2 && rank <= 3) return " epic"; // NOT just "rank <= 3" - null <= 3 is true in JS, which quietly gave an unranked player the epic tier
     return "";
   }
 
@@ -214,15 +260,16 @@ const Saves = (() => {
 
   function openInspect(uid) {
     const rows = Cloud.getLeaderboardCache() || [];
-    const row = rows.find((r) => r.uid === uid);
-    if (!row || !inspectEl) return;
+    const i = rows.findIndex((r) => r.uid === uid);
+    if (i < 0 || !inspectEl) return;
+    const row = rows[i];
     const me = Cloud.getUser();
     const isMe = me && me.uid === uid;
     const action = isMe
       ? `<button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button>`
       : `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span>`;
     inspectOpenedAt = Date.now();
-    inspectEl.querySelector("#board-inspect-card").innerHTML = accountCardHtml(row.name, row.character, action);
+    inspectEl.querySelector("#board-inspect-card").innerHTML = accountCardHtml(row.name, row.character, row.description, action, boardTierClass(i + 1));
     inspectEl.classList.add("show");
   }
 

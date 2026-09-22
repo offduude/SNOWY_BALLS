@@ -23,6 +23,7 @@ const Economy = (() => {
       coins: 0,
       lifetimeCoins: 0, // total ever EARNED (never goes down when spending) - gates shop tiers
       bestStreak: 0,
+      accountDescription: "", // the player's own short bio line on their ACCOUNT card (see sanitizeAccountDescription) - NOT a character's description
       newBuffs: [], // ids of the buffs that are NEW in the BUFFS tab: each card shows a red dot until the tab is closed
       newProjectiles: [], // same for the PROJECTILES list
       newSkins: [], // skins that were UNLOCKED and not dealt with yet: { kind, id, entered, displayed } - see the skin dots below
@@ -67,6 +68,22 @@ const Economy = (() => {
     return Array.isArray(list) ? [...new Set(list.filter((x) => typeof x === "string"))] : [];
   }
 
+  // The player's own short bio line on their ACCOUNT card (Cloud publishes it, so other players' devices render it too -
+  // untrusted input the moment it leaves this device). PLAIN TEXT ONLY: letters (any script - this isn't English-only),
+  // numbers, spaces and a small set of everyday punctuation; nothing else survives - no `<`, `>`, backticks, braces,
+  // backslashes, control characters or line breaks, so there is no "looks like code" or multi-line trick to render, and
+  // nothing to escape wrong. Capped at ACCOUNT_DESC_MAX characters so it can never grow past what the card was sized for
+  // (see also .pick-desc's overflow-wrap in index.html, for the one single very long "word" a length cap alone can't stop
+  // from needing to break mid-word rather than push the card wider).
+  const ACCOUNT_DESC_MAX = 60;
+  function sanitizeAccountDescription(text) {
+    return String(text || "")
+      .replace(/[^\p{L}\p{N}\s.,!?'"():;\-]/gu, "") // allow-list, not a block-list: only these survive
+      .replace(/\s+/g, " ") // no newlines/tabs/runs of spaces - one line, collapses cleanly
+      .trim()
+      .slice(0, ACCOUNT_DESC_MAX);
+  }
+
   function cleanRegen(obj) {
     const out = {};
     if (obj && typeof obj === "object") {
@@ -94,6 +111,7 @@ const Economy = (() => {
       // Saves from before lifetimeCoins existed: the best honest guess is what they hold now.
       lifetimeCoins: p.lifetimeCoins != null ? p.lifetimeCoins : p.coins || 0,
       bestStreak: p.bestStreak || 0,
+      accountDescription: sanitizeAccountDescription(p.accountDescription), // re-cleaned on every load too - a downloaded cloud save is untrusted input like any other
       streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
       god: p.god === true,
       lastUsedBuff: typeof p.lastUsedBuff === "string" ? rn(p.lastUsedBuff) : null,
@@ -491,6 +509,15 @@ const Economy = (() => {
     return state.bestStreak;
   }
 
+  function getAccountDescription() {
+    return state.accountDescription;
+  }
+
+  function setAccountDescription(text) {
+    state.accountDescription = sanitizeAccountDescription(text); // re-cleaned here too, not just trusted from the caller
+    save();
+  }
+
   const skinListeners = [];
   function onSkinsChange(fn) {
     skinListeners.push(fn);
@@ -573,6 +600,8 @@ const Economy = (() => {
     getLifetimeCoins,
     reportStreak,
     getBestStreak,
+    getAccountDescription,
+    setAccountDescription,
     getStreak,
     setStreak,
     wasAiming,

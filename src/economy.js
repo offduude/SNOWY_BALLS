@@ -34,7 +34,7 @@ const Economy = (() => {
       projectiles: {}, // how many of each consumable projectile the player has (not the snowball - see regen)
       regen: {}, // projectiles that refill over time (the snowball): id -> { count, next } - `next` is the Date.now() timestamp (device clock) at which the next one arrives, null while the stock is full
       projectilesUnseen: false, // a NEW kind of projectile arrived and the player hasn't opened the list yet (red dot)
-      event: null, // the event that is running: { name, startedAt } (startedAt on the device clock) - it goes on while the app is closed, like the shop timers
+      event: null, // the event that is running: { name, startedAt, applauseAt } (both on the device clock; applauseAt null until the applause phase actually starts - see main.js "THE CLOCK") - it goes on while the app is closed, like the shop timers
       lastUsedBuff: null, // the id of the buff the player used last (the BUFFS list opens on it)
       god: false, // GOD MODE (the import code "god mode", see saves.js): nothing is ever used up or paid for - coins, projectiles and buffs are infinite
       coinCarry: 0, // the fraction of a coin left over from a payout with a coin multiplier (0 <= x < 1), added to the next payout
@@ -131,7 +131,10 @@ const Economy = (() => {
       streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
       god: p.god === true,
       lastUsedBuff: typeof p.lastUsedBuff === "string" ? rn(p.lastUsedBuff) : null,
-      event: p.event && typeof p.event === "object" && typeof p.event.name === "string" && typeof p.event.startedAt === "number" ? { name: p.event.name, startedAt: p.event.startedAt } : null,
+      event:
+        p.event && typeof p.event === "object" && typeof p.event.name === "string" && typeof p.event.startedAt === "number"
+          ? { name: p.event.name, startedAt: p.event.startedAt, applauseAt: typeof p.event.applauseAt === "number" ? p.event.applauseAt : null }
+          : null,
       coinCarry: typeof p.coinCarry === "number" && p.coinCarry >= 0 && p.coinCarry < 1 ? p.coinCarry : 0,
       aiming: p.aiming === true,
       projectiles: cleanCounts(p.projectiles),

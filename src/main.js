@@ -2166,6 +2166,13 @@ class MainScene extends Phaser.Scene {
           // timeout already uses (song phase -> applause phase, singer fades, roses start) - reused as-is, just
           // triggered early instead of waiting for the clock.
           coins *= this.songConfig().faceMultiplier;
+          // FIX (2026-09-23, "the event timers not ending with the event"): syncSummonBuff() sets the summon
+          // buff's own countdown to the song's FULL natural length (it has to, not knowing in advance whether the
+          // face will be hit) - so a song ended early here left its buff's card still counting down toward that
+          // original, now-wrong end time. Cancel it explicitly, the same way triggerBananaHit already does for
+          // Tomato Juice: the payout just happened, the buff's job is done.
+          const summonedBy = Buffs.eventBuff(this.activeEvent);
+          if (summonedBy) Buffs.cancel(summonedBy.id);
           this.onSongEnd();
         } else {
           this.bananaHitTriggered = true;
@@ -2239,9 +2246,15 @@ class MainScene extends Phaser.Scene {
   //  2. "applause": when the song is over W20 goes back to normal, applause.mp3 plays (21 s) and roses fall from the top of the picture to below
   //     the bottom edge of the default view for as long as it plays (spawned so the last one has left the picture when it ends).
   //  3. When the applause is over everything is normal again (the theme fades back in).
-  // THE CLOCK: like the shop timers the event runs on the device clock. It is saved with the game as { name, startedAt } (Economy.getEvent), and
-  // where it is (which phase, which face, where the audio is) is always worked out from Date.now() - startedAt - never from the audio or the
-  // game's own timers. So it goes on while the tab is hidden or the app is closed: coming back finds it where it would be (in the song, in the
+  // THE CLOCK: like the shop timers the event runs on the device clock. It is saved with the game as { name, startedAt, applauseAt } (Economy.getEvent),
+  // and where it is (which phase, which face, where the audio is) is always worked out from Date.now() against one of those two timestamps - never
+  // from the audio or the game's own timers. applauseAt is null for as long as the song itself is still playing; set once, to the real moment the
+  // applause actually began (onSongEnd), whether that was the song's own clock running out OR a face hit ending it early (2026-09-23: "so each pays
+  // out only once" - see finishThrow). FIX (2026-09-23): applause timing used to be derived as startedAt + the song's FULL natural length, which
+  // silently assumed the song always played to the end - the moment a face hit could end it early, that arithmetic (Date.now() - startedAt - songMs)
+  // went deeply negative, and the applause phase would not actually finish until the clock caught all the way up to the ORIGINAL, un-shortened song
+  // length - a "the applause runs forever" bug. applauseAt is what fixes it: once it is set, applause timing is worked out from IT, not from songMs.
+  // So it goes on while the tab is hidden or the app is closed: coming back finds it where it would be (in the song, in the
   // applause - the audio is started at the right place - or over). The audio is only followed to the clock (syncSongAudio).
   // The music (theme) is ducked for the whole event. Like every event it never changes phase while a throw is being aimed or is in the air
   // (heldEventStep). While the song plays no other event can start and no event buff can be used (Buffs.eventBlocked); during the APPLAUSE
@@ -2271,13 +2284,14 @@ class MainScene extends Phaser.Scene {
   startSongEvent(name) {
     if (this.eventBlocksStart()) return;
     this.cutApplause();
-    this.beginSong({ name, startedAt: Date.now() }, 0, true);
+    this.beginSong({ name, startedAt: Date.now(), applauseAt: null }, true);
   }
 
-  // Starts (or, after a reload, resumes) a song event (rec.name: "disco" or "guitar") at `elapsedMs` into it.
-  beginSong(rec, elapsedMs, fresh) {
+  // Starts (or, after a reload, resumes) a song event. rec: { name, startedAt, applauseAt } - applauseAt null means
+  // the song itself is still playing (worked out from Date.now() - startedAt); once set (onSongEnd), the applause
+  // phase is worked out from IT instead - see the note on THE CLOCK above for why that split matters.
+  beginSong(rec, fresh) {
     const def = SONG_EVENTS[rec.name];
-    const { songMs } = this.songTimes(rec.name);
     Economy.setEvent(rec);
     this.songEvent = rec;
     this.activeEvent = rec.name;
@@ -2286,7 +2300,8 @@ class MainScene extends Phaser.Scene {
     this.heldEventStep = null;
     this.fadeMarksOnW20();
     this.duckMusic();
-    if (elapsedMs < songMs) {
+    if (!rec.applauseAt) {
+      const elapsedMs = Date.now() - rec.startedAt;
       this.songPhase = "song";
       this.bananaOverlay.setTexture(def.frames[Math.floor(elapsedMs / this.songConfig().beatMs) % def.frames.length]);
       this.bananaOverlay.setVisible(true);
@@ -2297,7 +2312,7 @@ class MainScene extends Phaser.Scene {
       this.songPhase = "applause";
       this.roseAcc = 0;
       this.roseAccSide = 0;
-      this.playSongTrack(this.applauseSound, elapsedMs - songMs, APPLAUSE_VOLUME);
+      this.playSongTrack(this.applauseSound, Date.now() - rec.applauseAt, APPLAUSE_VOLUME);
     }
   }
 
@@ -2312,8 +2327,8 @@ class MainScene extends Phaser.Scene {
     const rec = this.songEvent;
     if (this.songPhase && rec) {
       const { songMs, applauseMs } = this.songTimes();
-      const el = Math.max(0, Date.now() - rec.startedAt); // (a device clock set back: it just waits)
       if (this.songPhase === "song") {
+        const el = Math.max(0, Date.now() - rec.startedAt); // (a device clock set back: it just waits)
         const def = this.songDef();
         const f = Math.floor(el / this.songConfig().beatMs) % def.frames.length;
         if (f !== this.songFrame) {
@@ -2323,7 +2338,9 @@ class MainScene extends Phaser.Scene {
         this.syncSongAudio(this.songSounds[rec.name], el, songMs);
         if (el >= songMs && !this.heldEventStep) this.onSongEnd();
       } else if (this.songPhase === "applause") {
-        const ap = el - songMs;
+        // Timed from applauseAt, NOT startedAt + songMs (see THE CLOCK note above) - a face hit can end the song
+        // at any point, so the applause's own start is no longer reliably songMs after the song's.
+        const ap = Math.max(0, Date.now() - rec.applauseAt);
         if (ap < applauseMs - this.roseFallMs()) {
           // The number of roses in the picture stays the same whatever they fall like (see eventFallMotion): over the top, and - for a slanted fall - over the side the wind blows in from.
           const m = this.roseMotion();
@@ -2365,8 +2382,12 @@ class MainScene extends Phaser.Scene {
       this.heldEventStep = () => this.onSongEnd(); // a throw is being aimed / is in the air: the face stays until it is over
       return;
     }
-    const { songMs } = this.songTimes();
     this.songPhase = "applause";
+    // The real fix (2026-09-23) for "the applause runs forever / plays wrong" once a face hit could end a song
+    // early: record the moment applause ACTUALLY began, and persist it - everything applause-timed (updateSong,
+    // resumeSavedEvent) reads from this now, never from startedAt + the song's full natural length again.
+    this.songEvent.applauseAt = Date.now();
+    Economy.setEvent(this.songEvent);
     this.fadeMarksOnW20();
     const song = this.songSounds[this.songEvent.name];
     if (song.isPlaying) song.stop();
@@ -2381,7 +2402,7 @@ class MainScene extends Phaser.Scene {
     this.roseAcc = 0;
     this.roseAccSide = 0;
     this.songAudioCheck = 0;
-    this.playSongTrack(this.applauseSound, Date.now() - this.songEvent.startedAt - songMs, APPLAUSE_VOLUME);
+    this.playSongTrack(this.applauseSound, 0, APPLAUSE_VOLUME); // this call IS the start of applause now - always a fresh seek
   }
 
   endSongEvent() {
@@ -2430,11 +2451,28 @@ class MainScene extends Phaser.Scene {
     if (!ev) return;
     if (SONG_EVENTS[ev.name]) {
       const { songMs, applauseMs } = this.songTimes(ev.name);
-      const el = Date.now() - ev.startedAt;
-      if (el >= 0 && el < songMs + applauseMs) {
-        this.beginSong({ name: ev.name, startedAt: ev.startedAt }, el, false);
-        if (this.theme) this.theme.setVolume(0); // silent from the first moment
-        return;
+      if (ev.applauseAt) {
+        // A face hit (or the song's own clock) had already moved it into applause before the app closed.
+        if (Date.now() - ev.applauseAt < applauseMs) {
+          this.beginSong(ev, false);
+          if (this.theme) this.theme.setVolume(0); // silent from the first moment
+          return;
+        }
+      } else {
+        const el = Date.now() - ev.startedAt;
+        if (el >= 0 && el < songMs) {
+          this.beginSong(ev, false);
+          if (this.theme) this.theme.setVolume(0);
+          return;
+        }
+        // The song's own clock ran out while the app was closed, with no face hit recorded - resume into applause
+        // as if onSongEnd() had fired right at the natural boundary (the only case applauseAt still needs deriving
+        // rather than just reading back).
+        if (el >= songMs && el < songMs + applauseMs) {
+          this.beginSong({ ...ev, applauseAt: ev.startedAt + songMs }, false);
+          if (this.theme) this.theme.setVolume(0);
+          return;
+        }
       }
     }
     Economy.setEvent(null);

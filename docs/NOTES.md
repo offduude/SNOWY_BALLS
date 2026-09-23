@@ -1999,3 +1999,38 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 | Guitar Pick | epic | 192 | 1440 | 525.8 | **474-578** | 196-1411 |
 | Disco Ticket | legendary | 1680 | 8400 | 3756.6 | **3381-4132** | 1714-8232 |
 | Heavy Pick | legendary | 1680 | 8400 | 3756.6 | **3381-4132** | 1714-8232 |
+
+## Fixed: event summon-buff timers not ending with the event; fixed the applause (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Reported directly**: "fix the event timers not ending with the event, fix the applause." Both bugs trace back
+  to the "songs end on a face hit" change (a few entries up) - the timing/state code underneath still assumed a
+  song always ran its full natural length.
+- **Bug 1, the buff timer**: `syncSummonBuff()` sets a summon buff's own countdown (`Buffs.setBuffEnd`) to the
+  song's FULL natural length - it has to, since it can't know in advance whether the face will be hit. Ending the
+  song early via a face hit never told the BUFF about it, so its card kept counting down toward the original,
+  now-wrong end time instead of disappearing the moment its payout was claimed. **Fixed**: `finishThrow()`'s
+  song-event face-hit branch now looks up the buff that started the event (`Buffs.eventBuff(this.activeEvent)`)
+  and cancels it immediately (`Buffs.cancel`), the same way `triggerBananaHit` already does for Tomato Juice.
+- **Bug 2, the applause**: applause timing (`ap`, in `updateSong`) used to be derived as `Date.now() - startedAt -
+  songMs` - correct ONLY if the song always ran its full natural length before applause began. The moment a face
+  hit could end the song early, that arithmetic went deeply negative (a song ending at 5s into a 42.67s song left
+  `ap` around -37s), which meant: the applause's own end condition (`ap >= applauseMs`) would not become true
+  until the clock caught all the way up to the ORIGINAL, un-shortened song length PLUS the full applause on top -
+  so the applause effectively ran for far longer than its real ~21 seconds; the buggy negative offset could also
+  get passed to `sound.seek`, a genuinely invalid value. **Fixed**: introduced a real `applauseAt` timestamp,
+  recorded the moment applause actually begins (`onSongEnd`, whether triggered early or naturally) and persisted
+  with the event (`Economy.setEvent`) - `updateSong`'s applause branch, `beginSong`, and `resumeSavedEvent` (the
+  reload-resume path) all now time the applause phase from `applauseAt` directly, never by subtracting a fixed
+  `songMs` from `startedAt` again. `resumeSavedEvent` synthesizes `applauseAt = startedAt + songMs` only for the
+  one case that still needs it: the song's own clock genuinely ran out while the app was closed, with no early
+  end recorded. `economy.js`'s save sanitizer updated to preserve `applauseAt` through a save/reload (it used to
+  silently strip any field beyond `name`/`startedAt`, which would have dropped it on the very next reload).
+- Verified live (test origin): granted a Heavy Pick, used it, let `syncSummonBuff` start the event for real (buff
+  showed a ~42s countdown, matching the full song) - simulated the exact new face-hit code path and confirmed the
+  buff's card was gone immediately (`buffStillActive: false`) and `applauseAt` was stamped to the real "now", not
+  derived from the song's full length. Confirmed `ap` (computed from `applauseAt`) exactly matched the applause
+  sound's own real playback position (`applauseSeek`) a second later - genuinely in sync, not deeply negative.
+  Left it running and confirmed the applause phase ended ON ITS OWN within its real ~21-second window (not the
+  tens of seconds longer the bug would have needed) - `songEvent`/`activeEvent`/the saved event all cleanly null,
+  a different event could start right after. No console errors throughout.
+- `main.js?v=182`, `economy.js?v=42`.

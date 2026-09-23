@@ -1751,3 +1751,25 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   past the end again - clean teardown (`activeEvent` null, smoke/lasers empty, `smokeAcc` reset to `[0, 0]`, a new
   event could start). No console errors.
 - `main.js?v=178`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.
+
+## Concert effects, round 3: more vertical lasers, dense half-height smoke (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Asked directly, two changes**: (1) the lasers were too often tilted far enough over that they sat mostly below/
+  off the visible screen instead of rising through it - make them more vertical; (2) smoke should only rise to
+  about half the screen, but be very dense.
+- **Lasers**: max deviation from straight up cut roughly in half - the centre beam's amplitude 0.65 -> 0.28 rad, the
+  outer two's base splay 0.42-0.43 -> a fixed 0.18 with amplitude 0.5 -> 0.22. Verified live: max deviation from
+  vertical is now 16.0-22.9 degrees per beam (was up to ~53 degrees before) - confirmed both by the numbers and a
+  screenshot (both visible beams now read as clearly near-vertical, not diagonal).
+- **Smoke**: `SMOKE_RATE` 2.2 -> 7 puffs/second PER spawn point (very dense - ~10 concurrent puffs per column
+  confirmed live within under a second of the song starting), `SMOKE_MAX_SIZE` 120 -> 150 (bigger, more overlap),
+  `SMOKE_MAX_ALPHA` 0.85 -> 0.9. `SMOKE_LIFE_MS` shortened 1900 -> 950 so a puff's fade-out lands it around
+  GAME_HEIGHT/2 (121.5 units) at the existing rise speed, rather than covering most of the picture's height -
+  confirmed live: a puff's rise 800ms into its 950ms life was already at 81-93 units, tracking towards ~half the
+  screen by the time it fully fades. The existing "cull once above the top of the view" safety net is now
+  essentially never triggered at this height, but left in place in case the speed constants are raised again later.
+- Verified live (test origin, a fresh tab this time - a previous tab's leftover DOM-destroying test script had left
+  stale state behind, caught and worked around rather than mistaken for a real regression): a real screenshot shows
+  two dense, clearly-visible dark smoke columns confined to the lower half of the picture, and two laser beams
+  reading as close to vertical. Fast-forwarded past the end - clean teardown as before, no console errors.
+- `main.js?v=179`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.

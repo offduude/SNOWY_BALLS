@@ -245,15 +245,19 @@ const ROSE_ON_SCREEN = (ROSE_RATE * GAME_HEIGHT) / ROSE_MEAN_SPEED; // how many 
 // it would fight the roses for attention, and the crowd's gone quiet by then) - purely decorative, no gameplay
 // effect, both textures generated once at runtime (the same idea as makeMiracleGlowTexture) rather than shipped as
 // image files. See updateConcertEffects.
-const SMOKE_RATE = 2.2; // puffs a second, PER spawn point (see SMOKE_X_FRACTIONS - two fountains, not one)
+const SMOKE_RATE = 7; // puffs a second, PER spawn point - "very dense" (was 2.2; up again from an initial 2.2, 2026-09-23)
 // Exactly two smoke machines, symmetric about the player: the midpoint of each screen HALF (25% and 75% across),
 // not a random x - "two places total at an equal distance from the player" (the owner's call, 2026-09-23).
 const SMOKE_X_FRACTIONS = [0.25, 0.75];
 const SMOKE_RISE_SPEED_MIN = 110; // px/s upward - fast, "for the maximum effect" (was 16-30: a lazy drift, not a blast)
 const SMOKE_RISE_SPEED_MAX = 160;
-const SMOKE_LIFE_MS = 1900; // shortened to match the faster rise (at ~135px/s average this still covers most of the picture's height); a puff that outruns its own fade is also culled once it clears the top of the view, see updateConcertSmoke
-const SMOKE_MAX_ALPHA = 0.85; // higher contrast (was 0.6, itself already raised once from an initial 0.4)
-const SMOKE_MAX_SIZE = 120; // px, at the peak of its growth (see updateConcertEffects: it grows as it rises, like real smoke spreading)
+// Rises to about half the picture's height, not the whole way up (the owner's call, 2026-09-23) - at this speed
+// (average ~135px/s) a puff covers roughly GAME_HEIGHT/2 over its life, so its fade-out lands it there rather than
+// at the top; the "cull once above the top of the view" safety net in updateConcertSmoke is now essentially never
+// hit at this height, but stays as a harmless net in case the speed constants above are ever raised again.
+const SMOKE_LIFE_MS = 950;
+const SMOKE_MAX_ALPHA = 0.9; // higher contrast still (was 0.85, itself already raised twice from an initial 0.4)
+const SMOKE_MAX_SIZE = 150; // px, at the peak of its growth - bigger blobs, more overlap, a denser-looking cloud (was 120)
 const LASER_COLORS = [0xff2e4d, 0x2ecbff, 0xb04dff]; // red, cyan, purple - a few stage-light colours, cycled one per beam
 const LASER_LENGTH = 340;
 const LASER_WIDTH = 5;
@@ -1881,9 +1885,12 @@ class MainScene extends Phaser.Scene {
     // extends towards +y - i.e. "down" - when unrotated; Math.PI flips that to "up"), the same fan of angles the
     // beams used to sweep around when they hung from the top and pointed down, just mirrored to point up instead.
     const anchors = [
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.12, base: Math.PI - 1.15, amp: 0.5 },
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.5, base: Math.PI - 1.57, amp: 0.65 }, // straight up at the centre of its sweep
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.88, base: Math.PI - 2.0, amp: 0.5 },
+      // Kept close to straight up (the owner's call, 2026-09-23: the wider swing before spent most of its time
+      // tilted far enough over that the beam sat mostly below the screen instead of rising through it) - a small
+      // splay per beam plus a small sweep, never straying far from vertical.
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.12, base: Math.PI - 1.57 - 0.18, amp: 0.22 },
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.5, base: Math.PI - 1.57, amp: 0.28 }, // straight up at the centre of its sweep
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.88, base: Math.PI - 1.57 + 0.18, amp: 0.22 },
     ];
     const y = INITIAL_SCROLL_Y + GAME_HEIGHT + 4; // just below the default view - the fixture itself is never seen, only its beam
     const speed = (2 * Math.PI) / LASER_CYCLE_S; // shared by all three - one full sweep every LASER_CYCLE_S

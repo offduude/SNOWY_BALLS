@@ -191,8 +191,9 @@ const Collection = (() => {
 
   function rowHtml(kind, item) {
     const stats = statsHtml(kind, item);
+    const rarityId = kind === "projectile" && eco && eco.projectiles && eco.projectiles[item.id] ? eco.projectiles[item.id].rarity : undefined;
     return (
-      `<div class="pick-row${stats ? " has-stats" : ""}" data-id="${esc(item.id)}">` +
+      `<div class="pick-row${stats ? " has-stats" : ""}${Rarity.cardClass(rarityId)}" data-id="${esc(item.id)}">` +
       (kind === "projectile" && Economy.isNewProjectile(item.id) ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(item.image)}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
@@ -220,7 +221,7 @@ const Collection = (() => {
   function skinRowHtml(item, action, extraClass, dot) {
     const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
     return (
-      `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}" data-id="${esc(item.id)}">` +
+      `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}${Rarity.cardClass(item.rarity)}" data-id="${esc(item.id)}">` +
       (dot ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
@@ -251,7 +252,7 @@ const Collection = (() => {
       const stats = statsHtml("projectile", cat);
       const p = eco && eco.projectiles && eco.projectiles[item.id];
       return (
-        `<div class="pick-row${stats ? " has-stats" : ""}" data-id="${esc(item.id)}">` +
+        `<div class="pick-row${stats ? " has-stats" : ""}${Rarity.cardClass(p && p.rarity)}" data-id="${esc(item.id)}">` +
         `<img class="pick-pic" src="${esc(cat.image || "")}" alt="" draggable="false" />` +
         `<div class="pick-text"><div class="pick-name">${esc(cat.name)}</div><div class="pick-desc">${esc(cat.description || "")}</div></div>` +
         `<div class="pick-action">${action}</div>` +
@@ -265,7 +266,7 @@ const Collection = (() => {
       const maxText = len ? clock(len) : Buffs.isCharge(item) ? "+1" : clock(Buffs.durationMs(item)); // (how long it lasts, under the button like in the BUFFS list)
       const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
       return (
-        `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}" data-id="${esc(item.id)}">` +
+        `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${Rarity.cardClass(Rarity.ofItem(item))}" data-id="${esc(item.id)}">` +
         `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
         `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div><div class="pick-desc">${esc(item.description || "")}</div></div>` +
         `<div class="pick-action">${action}<div class="pick-regen"><span>${maxText}</span></div></div>` +
@@ -299,7 +300,7 @@ const Collection = (() => {
     const maxTime = `<div class="pick-regen"><span>${maxText}</span>${amount}</div>`;
     const detail = b.item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(b.item.detail)}</span></div>` : "";
     return (
-      `<div class="pick-row buff-row${b.item.detail ? " buff-detail" : ""}" data-id="${esc(b.id)}">` +
+      `<div class="pick-row buff-row${b.item.detail ? " buff-detail" : ""}${Rarity.cardClass(Rarity.ofItem(b.item))}" data-id="${esc(b.id)}">` +
       (Economy.isNewBuff(b.id) ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(b.item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(b.item.name)}</div>` +

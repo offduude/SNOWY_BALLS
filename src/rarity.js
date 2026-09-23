@@ -48,5 +48,15 @@ const Rarity = (() => {
         ? `<span class="${cls} rarity-rainbow">${text}</span>`
         : `<span class="${cls}" style="color:${r.color}">${text}</span>`;
     },
+
+    // The class to add to a CARD's own element (not the rarity label) when this rarity is the rainbow one - the
+    // same travelling-wave background every other legendary thing already gets (a leaderboard/account card today -
+    // see .board-card.legendary in index.html). "" for every other rarity, or no rarity at all (the owner's call,
+    // 2026-09-23: "all legendary item cards ... apply in the shop too" - every card that shows an item's rarity,
+    // not just the leaderboard). Always with a leading space, ready to concatenate straight into a class attribute.
+    cardClass(id) {
+      const r = list.find((x) => x.id === id);
+      return r && r.color === "rainbow" ? " legendary" : "";
+    },
   };
 })();

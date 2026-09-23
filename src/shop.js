@@ -414,7 +414,7 @@ const Shop = (() => {
     // Bottom row: the price at the left, the amount of a stack ("x14") at the right (a single item has no amount).
     const amountHtml = offer && offer.amount ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
     return (
-      `<button class="shop-card ${afford ? "" : "cant"}" data-slot="${slot}" type="button">` +
+      `<button class="shop-card ${afford ? "" : "cant"}${Rarity.cardClass(Rarity.ofItem(item))}" data-slot="${slot}" type="button">` +
       `<span class="shop-top"><span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>${Rarity.labelHtml(Rarity.ofItem(item), "shop-rarity", true)}</span>` +
       `<span class="shop-pic">${availHtml(slot)}${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
       `<span class="shop-name">${esc(item.name)}</span>` +

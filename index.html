@@ -1310,15 +1310,36 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    /* Every card with a cream/light background that can carry a rarity - the leaderboard/account card (rank 1 only),
+       and (2026-09-23: "all legendary item cards, no matter if its a skin, projectile, buff... apply in the shop
+       too") every .pick-row (PROJECTILES, BUFFS, a SKINS menu, the shop's own inspect popup - see Rarity.cardClass,
+       collection.js) and .shop-card (the shop's 6 slots, shop.js) - gets the exact same rainbow once its rarity is
+       the legendary one. One rule, one look, everywhere a rarity shows up. */
     .board-card.legendary,
-    .account-card.legendary {
+    .account-card.legendary,
+    .pick-row.legendary,
+    .shop-card.legendary {
       background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
         rgba(77, 210, 255, 0.32), rgba(106, 107, 255, 0.32), rgba(193, 77, 255, 0.32), rgba(255, 77, 77, 0.32));
       background-size: 200% 100%;
       /* ammo-shine, not buff-card-shine: that one also pulses `filter: brightness()`, which repaints every descendant
-         (including the account card's picture) each frame - on a pixelated image that reads as a visible "wobble".
+         (including the card's own picture) each frame - on a pixelated image that reads as a visible "wobble".
          ammo-shine (already used by #ammo-box/#leaderboard-btn with no such complaint) only pulses box-shadow. */
       animation: rarity-wave 2.4s linear infinite, ammo-shine 1.7s ease-in-out infinite;
+    }
+
+    /* Overrides the shine above for .shop-card specifically: unlike the other three, a shop card already has its
+       own static pin-shadow (.shop-card's box-shadow: 2px 3px 0 ...) for the "pinned to corkboard" look - ammo-shine
+       animates box-shadow too, and an element can only ever run ONE box-shadow animation, so it would silently
+       replace that pin-shadow with just the glow for as long as the card stays legendary. This keyframe carries the
+       pin-shadow as a second, unanimated layer alongside the same pulsing glow instead. */
+    .shop-card.legendary {
+      animation: rarity-wave 2.4s linear infinite, shop-card-shine 1.7s ease-in-out infinite;
+    }
+
+    @keyframes shop-card-shine {
+      0%, 100% { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35), 0 0 1px rgba(255, 255, 255, 0.15); }
+      50% { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35), 0 0 8px rgba(255, 255, 255, 0.85); }
     }
 
     .board-place {
@@ -1562,7 +1583,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=269"></script>
+  <script src="src/version.js?v=270"></script>
   <script src="src/economy.js?v=41"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1591,12 +1612,12 @@
     })();
   </script>
   <script src="src/cloud.js?v=24"></script>
-  <script src="src/rarity.js?v=2"></script>
+  <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=31"></script>
-  <script src="src/shop.js?v=29"></script>
+  <script src="src/shop.js?v=30"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=22"></script>
-  <script src="src/collection.js?v=73"></script>
+  <script src="src/collection.js?v=74"></script>
   <script src="src/main.js?v=175"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

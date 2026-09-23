@@ -311,6 +311,7 @@ const Buffs = (() => {
     isCharge,
     timeText,
     consumeCharge: cancel, // a charge buff is used up: its card goes
+    isEventBuff: (id) => hasTrigger(itemById(id)), // true for a summon buff (Tomato Juice, the Disco Ticket) - see collection.js onEquip
     canCancel,
     owned,
     use,

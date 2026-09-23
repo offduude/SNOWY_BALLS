@@ -527,7 +527,11 @@ const Collection = (() => {
     if (use) {
       Economy.clearNewBuff(use.dataset.id); // using a new buff takes its red dot away (the list redraws without it)
       if (use.classList.contains("off")) return; // dimmed: an event is running
-      if (Buffs.use(use.dataset.id)) playBuffUse(); // takes one from the inventory and starts it; the list redraws itself (Buffs.onChange)
+      const summons = Buffs.isEventBuff(use.dataset.id); // Tomato Juice, the Disco Ticket: using it IS the event about to start
+      if (Buffs.use(use.dataset.id)) {
+        playBuffUse(); // takes one from the inventory and starts it; the list redraws itself (Buffs.onChange)
+        if (summons) close(); // the owner's call, 2026-09-23: get the menu out of the way of the event it just summoned
+      }
       return;
     }
     const btn = e.target.closest(".pick-equip");

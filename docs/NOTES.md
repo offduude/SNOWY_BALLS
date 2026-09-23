@@ -1625,3 +1625,17 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 - **Caught and fixed before shipping**: `.shop-card` (unlike the other three) already has its own static pin-shadow (`box-shadow: 2px 3px 0 ...`, the "pinned to the corkboard" look) - `ammo-shine`'s box-shadow keyframe would have silently REPLACED it with just the glow for as long as a card stayed legendary (an element can only run one box-shadow animation). New `shop-card-shine` keyframe layers the same pulsing glow as a SECOND box-shadow alongside the unanimated pin-shadow instead, used only for `.shop-card.legendary`.
 - Verified live (test origin): forced the shop's 3 top slots to Drone/Diamond Cross/Banan (all legendary, one of each category) - all three show the travelling rainbow with the pin-shadow intact (checked `getComputedStyle(...).boxShadow` directly: both layers present). Granted a Drone and a Diamond Cross locally and confirmed the same rainbow in the PROJECTILES list, the BUFFS tab, and the SKINS overview card for Banan. No console errors anywhere in the pass.
 - `rarity.js?v=3`, `collection.js?v=74`, `shop.js?v=30`.
+
+## Using an event-summoning buff now closes the BUFFS menu (2026-09-23, PUSHED to main)
+
+- **Asked directly**: "make it that using a event-summoning buff causes the buff menu to close."
+- New `Buffs.isEventBuff(id)` (buffs.js) - a thin export over the existing private `hasTrigger`/`itemById`, true only for
+  a buff whose effect is `triggerEvent` (Tomato Juice, the Disco Ticket) - never Diamond Cross (its effect is `miracle`,
+  not an event).
+- `onEquip()`'s `.pick-use` branch (collection.js) checks this before calling `Buffs.use()`; if it was an event buff
+  and the use succeeded, it calls `close()` (the same function the BACK button and re-tapping BUFFS already use)
+  right after the use sound plays.
+- Verified live (test origin): granted a Disco Ticket and a Blue Skyr. Using Blue Skyr (not an event buff) started
+  its timer and left the BUFFS menu open, as before. Using the Disco Ticket started its 2:44 countdown (visible in
+  the top-left buff HUD) AND closed the menu immediately, landing back on the main screen. No console errors.
+- `buffs.js?v=32`, `collection.js?v=75`.

@@ -1839,3 +1839,35 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 | Guitar Pick | guitar | epic | 38.64s song | 7 | 1120 (rare) | 8400 (epic) | 245-405 | **1232-7560** |
 | Disco Ticket | disco | legendary | 164.42s song | 32 | 38400 (epic) | 192000 (legendary) | 5100-8550 | **42240-172800** |
 | Heavy Pick | heavy_guitar | legendary | 42.67s song | 8 | 9600 (epic) | 48000 (legendary) | 5000-8000 | **10560-43200** |
+
+## Repriced event-summon buffs again, v2: matched to peer accessory prices via multipliers (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Redirected**: the v1 pure-earning-power formula (previous entry) fixed Guitar Pick being underpriced but pushed
+  the legendary items (Disco Ticket especially, a 164-second song) far past every other item in the shop. Asked
+  instead: "i want the prices to match other accessories' prices in each corresponding rarity, so why dont you just
+  calculate new multipliers."
+- **v2 method** (also rewritten into `_eventSummonPricingNote`): 1) `baseline(rarity)` = the average priceRange of
+  every OTHER consumable already at that rarity (excludes the 4 event-summon items) - epic ~561-932 (mints_epic,
+  skyr, triangles_chilli, burger), legendary ~2925-4875 (diamond_cross, daniels_coin). 2) `score` = hits x the
+  event's faceMultiplier (same hits definition as v1: 1 for the face window, `floor(songSeconds/5)` for a song
+  event). 3) `multiplier` = score / (the average score of every event AT THAT SAME RARITY) - so each rarity tier's
+  multipliers average to 1 and the tier's prices average back to its baseline, while an event worth more hits than
+  its rarity-mate still costs proportionally more. 4) `priceRange = baseline x multiplier`.
+- **Scores**: face/Tomato Juice 1x2=2, guitar/Guitar Pick 7x1.25=8.75 (epic average 5.375, multipliers 0.372/1.628);
+  disco/Disco Ticket 32x1.25=40, heavy_guitar/Heavy Pick 8x1.25=10 (legendary average 25, multipliers 1.6/0.4).
+- **Said plainly, not buried**: v2 no longer guarantees "unprofitable below the event's own rarity" by construction
+  the way v1 did - Heavy Pick, now priced BELOW its tier's average (it scores lower than Disco Ticket), is
+  comfortably profitable even with epic-rarity ammo. That guarantee was v1's whole design; this round's priority
+  was matching the shop's existing price scale instead, which is what was asked for.
+- Verified live (test origin): all four items' `priceRange` read back correctly from a fresh load, no console or
+  JSON errors.
+- `economy.json` only (cache-busted by `?t=` already, no version query on it).
+
+### Table
+
+| Item | Event | Rarity | Score (hits x FM) | Rarity avg score | Multiplier | Peer baseline | New price | v1 price (rejected) |
+|---|---|---|---|---|---|---|---|---|
+| Tomato Juice | face | epic | 1x2=2 | 5.375 | 0.372 | 561-932 | **209-347** | 282-1728 |
+| Guitar Pick | guitar | epic | 7x1.25=8.75 | 5.375 | 1.628 | 561-932 | **914-1518** | 1232-7560 |
+| Disco Ticket | disco | legendary | 32x1.25=40 | 25 | 1.6 | 2925-4875 | **4680-7800** | 42240-172800 |
+| Heavy Pick | heavy_guitar | legendary | 8x1.25=10 | 25 | 0.4 | 2925-4875 | **1170-1950** | 10560-43200 |

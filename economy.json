@@ -46,6 +46,15 @@
       "character": "pryk",
       "rarity": "common",
       "detail": ""
+    },
+    {
+      "id": "banan",
+      "name": "Banan",
+      "description": "So he's joined us now?",
+      "image": "assets/character/banan_face.png",
+      "character": "banan",
+      "rarity": "legendary",
+      "detail": ""
     }
   ],
   "sceneries": [
@@ -540,6 +549,16 @@
         "ignorePriceOverride": true,
         "image": "assets/character/pryk_face.png",
         "description": "Isn't as old as you might think!"
+      },
+      {
+        "id": "banan",
+        "name": "Banan",
+        "category": "character",
+        "rarity": "legendary",
+        "priceRange": { "min": 5000, "max": 8000 },
+        "ignorePriceOverride": true,
+        "image": "assets/character/banan_face.png",
+        "description": "So he's joined us now?"
       },
       {
         "id": "frosty_night",

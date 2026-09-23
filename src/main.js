@@ -349,6 +349,14 @@ const CHARACTERS = {
       aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
     },
   },
+  // Banan (2026-09-23): same hand position too (the owner's call, "same as other characters").
+  banan: {
+    sprites: { idle: "banan_idle", aiming: "banan_aiming", throwing: "banan_throwing" },
+    hands: {
+      idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
+      aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
+    },
+  },
 };
 const DEFAULT_CHARACTER = "character1";
 const DEFAULT_BACKGROUND = "assets/building/background.png"; // the wall picture that is loaded at the start (the key "background"); the default scenery Frosty uses it
@@ -433,6 +441,11 @@ class MainScene extends Phaser.Scene {
     this.load.image("pryk_idle", "assets/character/pryk_idle.png");
     this.load.image("pryk_aiming", "assets/character/pryk_aiming.png");
     this.load.image("pryk_throwing", "assets/character/pryk_throwing.png");
+    // Banan (2026-09-23): the third character, NOT to be confused with the banana FACE event (BANANA_FACE_BOX etc,
+    // events.faceWindow) - an unrelated coincidence of names, no shared code.
+    this.load.image("banan_idle", "assets/character/banan_idle.png");
+    this.load.image("banan_aiming", "assets/character/banan_aiming.png");
+    this.load.image("banan_throwing", "assets/character/banan_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("onion", "assets/snowball/onion.png");
     // Keyed by its OWN PATH, not "weather_snow" - a real bug found and fixed 2026-09-22: Blizzard's particle happens to

@@ -1595,3 +1595,23 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 - **Cause**: `.board-name`'s default ("normal") line-height left too little headroom above this pixel font's cap-height - fine for plain names (no text-shadow), but `.board-you`'s outline reaches 1px above the glyphs themselves, and `.board-name`'s own `overflow: hidden` (there for the ellipsis on long real names) clipped that sliver off.
 - **Fixed**: `.board-name` now sets `line-height: 1.5` explicitly, giving enough room regardless of content; harmless for ordinary names (still one line, still ellipsizes). Colour changed from teal (`#2bd6d6`) to light grey (`#c7c7c7`).
 - Verified live (test origin): faked `Cloud.getUser()` against a leaderboard row and re-rendered - "YOU" now shows in full, light grey, not clipped.
+
+## Added a third character: Banan (2026-09-23, PUSHED to main)
+
+- Legendary rarity, 5000-8000 coins in the shop (scaling up from Pryk's common 350-600 and the existing rare/epic
+  skins - Frosty Night 900-1500, Blizzard 2200-3600 - in line with the other legendary shop items, e.g. Disco Ticket
+  5100-8550).
+- Not to be confused with the banana FACE event (`BANANA_FACE_BOX`, `events.faceWindow`) - an unrelated coincidence
+  of names, no shared code; said so directly in a main.js comment next to its preload calls so it doesn't read as a
+  mistake later.
+- Same hand position as `character1`/`pryk` (the owner's call): `CHARACTERS.banan` reuses the same `hands.idle` /
+  `hands.aiming` numbers verbatim. Still ran the calibration check live per docs/CALIBRATION.md rather than skip it
+  on the owner's own expectation that it wasn't needed - `await calibrateHeld()`: all 24 of Banan's rows `ok: true`;
+  `calibrateSheet()` looked at by eye - the idle/aiming holds sit at the same place as the other two characters', no
+  `hold` override needed either.
+- Sprite files (dropped at the project root) moved into `assets/character/` and renamed to match convention:
+  `banan_idle.png` / `banan_aiming.png` / `banan_throwing.png` (64x64) and `banan_face.png` (32x32, from `banan.png`).
+- Unlocked on the owner's own real localhost save (`Economy.unlock("character", "banan")`, not equipped - left for
+  them to pick from SKINS) so they can test it directly, per their request - left everything else about that save
+  untouched.
+- `economy.json` (cache-busted by `?t=` already, no version query), `main.js?v=175`.

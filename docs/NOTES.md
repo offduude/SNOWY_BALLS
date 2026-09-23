@@ -2061,3 +2061,20 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   console errors.
 - `economy.json`, `index.html`, `src/collection.js?v=76`, `src/economy.js?v=43`, `src/saves.js?v=23`,
   `src/shop.js?v=31`.
+
+## Sign-in dot moved to the SIGN IN button; new epic save% item, Stanczak Mayo (2026-09-23, PUSHED to main)
+
+- **Moved the sign-in reminder dot** off the account card's own corner and onto the SIGN IN button's top-right
+  corner instead - the button's own markup now carries `<span class="notif-dot signin-dot show">` (baked in, same
+  persistent-not-dismissible approach as before, gone the instant SIGN OUT takes its place). New `.signin-dot` CSS
+  rule (index.html) positions it there, reusing `.pick-action` as the positioning parent (already used for
+  `.pick-regen` hanging under EQUIP) rather than the wider card.
+- **New item: Stanczak Mayo** - a second epic-tier `saveProjectile` item alongside the existing Mints (epic, 50%
+  save chance) - same effect value (0.5), same duration (120s) and price range (675-1125) as Mints, since it does
+  exactly the same thing power-wise; just a different flavour/skin of the same tier, matching this session's usual
+  pattern of adding alternates rather than replacements. `"I think this one's expired."` as the description,
+  `"Save chance: 50%."` as the detail (the exact phrasing convention every other saveProjectile item already uses).
+- Verified live (test origin): the dot renders correctly on the SIGN IN button (not the card) with no console
+  errors; forced Stanczak Mayo into a shop slot and confirmed it renders correctly - EPIC label, the jar icon,
+  price within its range.
+- `economy.json`, `index.html`, `src/saves.js?v=24`.

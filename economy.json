@@ -280,6 +280,19 @@
         "detail": "Save chance: 50%."
       },
       {
+        "id": "stanczak_mayo",
+        "name": "Stanczak Mayo",
+        "category": "consumable",
+        "rarity": "epic",
+        "priceRange": { "min": 675, "max": 1125 },
+        "ignorePriceOverride": true,
+        "duration": { "seconds": 120 },
+        "image": "assets/items/stanczak_mayo.png",
+        "effects": [{ "type": "saveProjectile", "value": 0.5 }],
+        "description": "I think this one's expired.",
+        "detail": "Save chance: 50%."
+      },
+      {
         "id": "skyr",
         "name": "Skyr",
         "category": "consumable",

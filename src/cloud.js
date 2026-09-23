@@ -102,36 +102,25 @@ const Cloud = (() => {
     // is the one place that can't miss a kind of change.
     if (typeof Economy !== "undefined" && Economy.onSave) Economy.onSave(() => { dirty = true; });
     auth.onAuthStateChanged((u) => {
-      const wasSignedIn = !!user;
       // The Google display name has no length limit of its own (unlike a custom account name - see Economy.accountNameMax)
       // - truncated here, once, at the source, so it can never stick out of the card or the leaderboard's name column.
       const nameMax = (typeof Economy !== "undefined" && Economy.accountNameMax) || 16;
       user = u ? { uid: u.uid, name: (u.displayName || "Player").slice(0, nameMax) } : null;
       if (user) authError = null; // any stale failure from an earlier attempt is done being relevant once we're actually signed in
-      if (wasSignedIn && !user) {
-        if (signingIn) {
-          // CRITICAL FIX (real bug, reported: signing in on a phone reset real progress to 0): Firebase's own auth
-          // state goes "signed in" the instant the Google popup succeeds - BEFORE signIn()'s own checks run. Every
-          // ordinary refusal after that point (checkFailed, the "active elsewhere" guard, a declined overwrite, a
-          // corrupted cloud save) signs back out on purpose, and every one of those paths says "nothing was changed"
-          // - but this branch used to fire anyway on that sign-out, wiping the local save to a brand-new game even
-          // though nothing was ever linked, downloaded, or touched. A signOut() that happens WHILE an interactive
-          // signIn() attempt is still running is that attempt aborting itself, not a real "this device stops using
-          // the account" transition - must not reset anything. signIn()'s own .finally() still clears signingIn, and
-          // the normal notifyAuth() below still runs so the UI correctly shows "not signed in".
-          notifyAuth();
-          return;
-        }
-        // Signed out for ANY reason - the SIGN OUT button (which already resets this itself, see signOut()), a revoked
-        // or expired session, another tab signing out, the browser clearing site data, Firebase simply failing to
-        // restore the session on this load - not just the button. This device's local save must never keep carrying
-        // that account's progress once its auth session is gone: the next sign-in (this account or a different one)
-        // must not upload/duplicate it. Reloading keeps the running game (Economy's in-memory state) from carrying on
-        // with numbers that no longer match what was just written to localStorage.
-        resetLocalSave();
-        location.reload();
-        return;
-      }
+      // NOTE (2026-09-23, a second real bug in the same area): this used to reset the local save reactively, here,
+      // on ANY signed-in-to-signed-out transition - "wasSignedIn && !user". The problem: Firebase's auth state goes
+      // "signed in" the INSTANT the Google popup succeeds, before signIn()'s own checks run, so this branch fired
+      // for every ORDINARY refusal too (checkFailed, the "active elsewhere" guard, a declined overwrite, a corrupted
+      // save) - each of which explicitly says "nothing was changed" - wiping real progress anyway. A first attempt
+      // tried to guard it with a `signingIn` check, but that relies on onAuthStateChanged firing at a specific point
+      // RELATIVE TO an `await auth.signOut()` call elsewhere resolving - an ordering Firebase's public API does not
+      // actually promise, and reportedly did NOT hold ("it still resets my progress to 0" - the guard didn't help).
+      // Reacting to auth state changes is inherently the wrong tool for "was this a genuine loss of access" - a
+      // timing-independent design does the reset EXPLICITLY, only at the two places that genuinely need it: the SIGN
+      // OUT button (signOut(), below) and checkSession() displacing a stale device (also below) - never reactively
+      // here. The "first time, nothing to download" branch of signIn() (further down) also checks whether the local
+      // save even belongs to the account being signed into before ever uploading it, closing the original
+      // duplication concern from a different angle that does not depend on this listener at all.
       notifyAuth();
       if (user && !signingIn) {
         // A restored session (the game was loaded while already signed in) - READ the account's current cloud save
@@ -252,9 +241,11 @@ const Cloud = (() => {
         if (remoteSession && remoteSession !== mySession.token) {
           // A different device signed into this account more recently and is now its active session - this device
           // must stop syncing (it would just fight over the save) rather than silently keep overwriting the newer
-          // one. Signing out routes through the usual onAuthStateChanged cleanup (resetLocalSave + reload).
+          // one. This IS a genuine loss of access (unlike signIn()'s own abort paths - see the long note in
+          // onAuthStateChanged above), so it resets explicitly, here, rather than relying on a reactive listener.
           console.warn("Cloud: this account is signed in on another device now - signing out here.");
-          auth.signOut();
+          resetLocalSave();
+          auth.signOut().finally(() => location.reload());
           return true;
         }
         return false;
@@ -368,7 +359,17 @@ const Cloud = (() => {
           return;
         }
         // First time this account has been used: nothing to download, nothing to ask - safe to reveal immediately. THIS
-        // device's current save becomes its save.
+        // device's current save becomes its save - UNLESS it's evidently leftover from a DIFFERENT account (mySession
+        // remembers a different uid: a revoked session, or any other passive sign-out that never got a chance to
+        // clean up - see the note in onAuthStateChanged above, which no longer resets reactively). Uploading it as if
+        // it belonged to this brand-new account would duplicate the old account's progress onto it - the actual
+        // problem the old reactive reset was trying to prevent. Reset and reload instead; the player signs in again
+        // onto a genuinely clean slate.
+        if (mySession && mySession.uid !== uid) {
+          resetLocalSave();
+          location.reload();
+          return;
+        }
         revealUser = true;
         notifyAuth();
         dirty = true;

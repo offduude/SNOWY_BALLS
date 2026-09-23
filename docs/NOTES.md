@@ -2078,3 +2078,25 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   errors; forced Stanczak Mayo into a shop slot and confirmed it renders correctly - EPIC label, the jar icon,
   price within its range.
 - `economy.json`, `index.html`, `src/saves.js?v=24`.
+
+## Fixed: owned skins could still sit on sale in the shop (2026-09-23, PUSHED to main)
+
+- **Asked directly**: "is it possible for skins that are already bought to appear in the shop? if so, make it
+  impossible... theyre just wasting slots." Yes - `eligible()` already excludes owned skins from fresh rolls, but
+  nothing re-checked an ALREADY-STOCKED slot once its item became owned. `isMaxed()`'s own comment even said as
+  much: "a card still on sale after it was bought in another slot cannot be bought" - it blocked the double-buy,
+  but left the stale, unbuyable card sitting there taking up a slot.
+- **Two fixes, one instant and one a general safety net**:
+  - `buy()`: the instant one, for the case that can happen inside a single shop visit - the same skin on sale in
+    several slots at once. The moment a skin is bought anywhere, every OTHER slot currently showing that same
+    skin is cleared right then too (SOLD OUT, same restock timer as the bought slot) - not left to wait for its
+    own timer.
+  - `ensureStock()`'s stock-validation step (already treated a removed/invalid item id as an empty slot) now also
+    treats an ALREADY-OWNED skin the same way - the general net for any OTHER way a skin could become owned while
+    still stocked. Runs every time the shop opens (`onOpen`) as well as on its own timers.
+- Verified live (test origin): forced two slots to both show Pryk (unowned), bought it from one via a real click -
+  BOTH slots showed SOLD OUT immediately, only one purchase was actually charged, both recorded the same restock
+  timer. Separately, forced a slot to show Pryk again after it was already owned (simulating some other unlock
+  path) and confirmed leaving and reopening the shop replaced it with a fresh roll automatically, with no manual
+  intervention. No console errors either time.
+- `src/shop.js?v=32`.

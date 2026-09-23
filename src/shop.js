@@ -224,8 +224,12 @@ const Shop = (() => {
     const expires = Array.isArray(st.expires) ? st.expires.slice(0, slots) : [];
     while (expires.length < slots) expires.push(null);
 
-    // Invalid entries (item removed from economy.json, duplicate unique item) become empty slots.
-    stock = stock.map((id) => (id && itemById(id) ? id : null));
+    // Invalid entries (item removed from economy.json, duplicate unique item, or a skin that got bought/unlocked
+    // some other way while it was still sitting on sale - see ownedSkin) become empty slots. This is the general
+    // safety net; buy() below also clears a skin's OTHER slots the instant it's bought, so this mostly only ever
+    // has to catch a skin unlocked by some other means (the owner's report, 2026-09-23: "wasting slots" - an
+    // owned skin must never sit on sale, however it became owned).
+    stock = stock.map((id) => (id && itemById(id) && !ownedSkin(itemById(id)) ? id : null));
 
     for (let i = 0; i < slots; i++) {
       if (stock[i] !== null) {
@@ -298,6 +302,18 @@ const Shop = (() => {
       Economy.addProjectiles(item.id, offer ? offer.amount : 1);
     } else if (SKIN_CATEGORIES.includes(item.category)) {
       Economy.unlock(item.category, item.id); // a character / scenery / weather is unlocked: it shows up in its SKINS menu, equipped from there
+      // The same skin can be on sale in several slots at once - every OTHER one showing it is stale the instant
+      // it's bought anywhere, so clear it right now too (ensureStock's own stock-validation step is the general
+      // safety net for every other way a skin can become owned while stocked; this is the immediate path for the
+      // one that can happen inside a single shop visit - the owner's report, 2026-09-23: "wasting slots").
+      st.stock.forEach((otherId, i) => {
+        if (i !== slot && otherId === item.id) {
+          st.stock[i] = null;
+          st.offers[i] = null;
+          if (st.expires) st.expires[i] = null;
+          st.restock[i] = { at: shopNow() + restockMs(), prev: item.id };
+        }
+      });
     } else {
       Economy.addBuffs(item.id, 1); // a buff goes into the inventory; it is USED from the BUFFS tab (see buffs.js)
     }

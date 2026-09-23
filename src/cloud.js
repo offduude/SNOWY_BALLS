@@ -109,6 +109,19 @@ const Cloud = (() => {
       user = u ? { uid: u.uid, name: (u.displayName || "Player").slice(0, nameMax) } : null;
       if (user) authError = null; // any stale failure from an earlier attempt is done being relevant once we're actually signed in
       if (wasSignedIn && !user) {
+        if (signingIn) {
+          // CRITICAL FIX (real bug, reported: signing in on a phone reset real progress to 0): Firebase's own auth
+          // state goes "signed in" the instant the Google popup succeeds - BEFORE signIn()'s own checks run. Every
+          // ordinary refusal after that point (checkFailed, the "active elsewhere" guard, a declined overwrite, a
+          // corrupted cloud save) signs back out on purpose, and every one of those paths says "nothing was changed"
+          // - but this branch used to fire anyway on that sign-out, wiping the local save to a brand-new game even
+          // though nothing was ever linked, downloaded, or touched. A signOut() that happens WHILE an interactive
+          // signIn() attempt is still running is that attempt aborting itself, not a real "this device stops using
+          // the account" transition - must not reset anything. signIn()'s own .finally() still clears signingIn, and
+          // the normal notifyAuth() below still runs so the UI correctly shows "not signed in".
+          notifyAuth();
+          return;
+        }
         // Signed out for ANY reason - the SIGN OUT button (which already resets this itself, see signOut()), a revoked
         // or expired session, another tab signing out, the browser clearing site data, Firebase simply failing to
         // restore the session on this load - not just the button. This device's local save must never keep carrying

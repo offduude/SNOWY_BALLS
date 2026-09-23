@@ -286,7 +286,11 @@ const TANK_EXPLOSION_FX = { flashMs: 620, flashScale: 8, shakeMs: 620, shakeX: 0
 // as the player's head" - both stand on the same ground line, so that alignment falls out of the art, not a fudge.
 const TANK_GUN_DX = 1; // px right of the sprite's left edge - the muzzle touches x=0
 const TANK_GUN_DY = -61; // px up from the sprite's bottom edge
-const TANK_REST_X = ORIGIN_X - 30; // world x of the sprite's own origin (its left-bottom) once stopped
+// The character sprite is a 64x64 square drawn centered on its x (origin 0.5,1), so its own right edge sits
+// 32px right of ORIGIN_X - TANK_REST_X is picked so the gun tip (TANK_REST_X + TANK_GUN_DX) stops a clear ~5px
+// to the RIGHT of that edge: the tank drives up from the right and stops short of the player, so the blast has
+// to originate to their right too, not from inside or past them, for the leftward drift/fling to read correctly.
+const TANK_REST_X = ORIGIN_X + 37; // world x of the sprite's own origin (its left-bottom) once stopped
 
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears

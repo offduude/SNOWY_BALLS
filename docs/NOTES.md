@@ -2147,11 +2147,15 @@ event in the game it never spawns naturally (`eventDefs()`'s `natural: false`, t
   `TANK_GUN_DX = 1`, `TANK_GUN_DY = -61`. At that offset the muzzle lands within 3 world-px of the character's
   own head-top (`ch.y - 64`, the convention used everywhere else in the file) with zero fudging, because both
   stand on the same ground line - confirmed with an in-game debug marker (a cyan line at head-top, a red dot at
-  the computed gun position) screenshotted via `renderer.snapshot()`. `TANK_REST_X = ORIGIN_X - 30` keeps the
-  full 175px-wide sprite on-screen (the original guess, `ORIGIN_X + 70`, hung most of the tank off the right
-  edge) while stopping "before the player" - the tank's hull ends up overlapping the player's standing spot,
-  which is the point: they peek out from behind/above it through the art's own gaps, rather than the tank
-  stopping short with visible empty space between them.
+  the computed gun position) screenshotted via `renderer.snapshot()`.
+  `TANK_REST_X` went through three values before landing: the original guess (`ORIGIN_X + 70`) hung most of the
+  175px-wide sprite off the right edge of the camera; the next guess (`ORIGIN_X - 30`) fit the sprite on-screen
+  but put the muzzle *inside* the character's own 64x64 bounding box (an explicit "avoid overlap" correction);
+  the final value, **`ORIGIN_X + 37`**, was picked so the muzzle (`TANK_REST_X + TANK_GUN_DX`) stops ~5.5
+  world-px clear of the character's right edge (`ch.x + 32`) - to their RIGHT, not their left, per a direct
+  correction ("the point from which the explosion comes has to be to the RIGHT of the player sprite") - while
+  the sprite's own right edge still lands ~4.5px inside the camera's own right bound, so the whole tank stays
+  on-screen. Re-confirmed with the same debug-marker-plus-`renderer.snapshot()` technique after each change.
 - **Verified live** (test origin, via direct scene calls - `scene.startTankEvent()` / `scene.fireTank()` /
   `scene.updateTankEvent()` - rather than buying the item, to control timing precisely): full real-time run
   end-to-end (`tank` object null, `activeEvent` null, character back at `(411, 16)`, `rotation: 0`,
@@ -2159,9 +2163,12 @@ event in the game it never spawns naturally (`eventDefs()`'s `natural: false`, t
   or slide-out; `handleFreezeInput()` confirmed to leave `state` unchanged while `activeEvent === "tank"`;
   `eventBlocksStart()` confirmed `true` for the whole "in"/"paused"/"out" span; the halfway-reverse reset
   confirmed (`alpha: 0`, position/rotation restored) before its fade-in tween starts. No console errors on a
-  clean reload.
-- `economy.json`, `src/main.js?v=184`, `src/shop.js?v=33` (`Shop.rerollAll` itself landed under `v=33`
-  alongside the shop-slot fix above; the tank's own consumer code is the `v=184` bump).
+  clean reload. Re-verified end-to-end again after each `TANK_REST_X` recalibration.
+- `economy.json`, `src/main.js?v=186`, `src/shop.js?v=33` (`Shop.rerollAll` itself landed under `v=33`
+  alongside the shop-slot fix above; the tank's own consumer code went through `v=184`-`v=186` across the
+  calibration passes above).
 - Assets moved into place: `tank_banana.png` -> `assets/building/`, `toy_tank.png` -> `assets/items/`,
   `tank_moving.mp3` -> `assets/audio/`.
+- Local test session (`127.0.0.1:5501`, never the real save) stocked with 999 `toy_tank` buffs via
+  `Economy.addBuffs("toy_tank", 999)`, matching how the Heavy Pick was stocked for testing earlier.
 - **Not pushed** - local branch `toy-tank-event` only, per explicit instruction.

@@ -158,15 +158,9 @@ const Cloud = (() => {
           });
       }
     });
-    // checkSession first, syncNow only if it didn't just start signing this device out - a displaced device must not
-    // also push a write in the same tick it discovers it's no longer the account's active session.
-    const heartbeat = () => checkSession().then((displaced) => { if (!displaced) syncNow(); });
     setInterval(heartbeat, SYNC_INTERVAL_MS);
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) syncNow();
-      else heartbeat(); // returning to the tab: don't wait up to a minute to notice another device took over while it was away
-    });
-    window.addEventListener("pagehide", syncNow);
+    document.addEventListener("visibilitychange", heartbeat); // both directions - see the note on heartbeat() for why hidden must not call syncNow() directly
+    window.addEventListener("pagehide", heartbeat);
     // Fetch the standings once right away, not only the first time the LEADERBOARD screen is opened - otherwise the
     // account card's own rank-tier background stays "unranked" for a whole session until that screen gets visited.
     // The leaderboard is public to read, so this needs no signed-in user; Saves.refresh() is a safe no-op if nothing
@@ -251,6 +245,20 @@ const Cloud = (() => {
         return false;
       })
       .catch(() => false); // offline, or a transient read failure - try again next cycle rather than treat it as a real displacement
+  }
+
+  // checkSession first, syncNow only if it didn't just start signing this device out. THE REAL BUG THIS FIXES
+  // (2026-09-23): syncNow() unconditionally writes this device's OWN mySession.token into saves/{uid}.session on
+  // every dirty write (see syncNow) - it has no way to know, by itself, whether some OTHER device has since claimed
+  // the account. A device that had already been displaced but hadn't yet run its own periodic checkSession() -
+  // e.g. the OLD device, sitting backgrounded, that does anything at all dirty-marking and then gets backgrounded/
+  // closed/flushes a purchase - would silently reclaim the session and evict the device that legitimately took over
+  // moments before, which then discovers it on ITS next heartbeat and resets itself. Looks, from the newer device's
+  // side, exactly like "I downloaded the save fine, then it reset" - every trigger that can lead to a write
+  // (interval, visibility in either direction, pagehide, a purchase flush) must check first, never call syncNow()
+  // directly, or this same race reopens through whichever path skipped the check.
+  function heartbeat() {
+    return checkSession().then((displaced) => { if (!displaced) syncNow(); });
   }
 
   function setConfirmOverwrite(fn) {
@@ -430,7 +438,7 @@ const Cloud = (() => {
     clearTimeout(purchaseFlushTimer);
     purchaseFlushTimer = setTimeout(() => {
       purchaseFlushTimer = null;
-      syncNow();
+      heartbeat(); // not syncNow() directly - see the note on heartbeat()
     }, 5000);
   }
 

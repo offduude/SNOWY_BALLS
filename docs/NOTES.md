@@ -1588,3 +1588,10 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 - Removed the now-unused `pickRandom()` (both of its call sites became `pickWeightedFrom()`).
 - Verified live (test origin): a fresh load runs the shop's own `ensureStock()` at boot (which exercises `pickWeighted` for every slot) with no console errors; ran the SAME game session's calibration/shop flows repeatedly with no exceptions from the new code path.
 - `shop.js?v=29`.
+
+## Fixed: "YOU" clipped at the top; recoloured light grey (2026-09-23, PUSHED to main)
+
+- **Reported directly**, with a screenshot: the "YOU" label (see the entry just above) was visibly cut off at the top, and asked for light grey instead of teal.
+- **Cause**: `.board-name`'s default ("normal") line-height left too little headroom above this pixel font's cap-height - fine for plain names (no text-shadow), but `.board-you`'s outline reaches 1px above the glyphs themselves, and `.board-name`'s own `overflow: hidden` (there for the ellipsis on long real names) clipped that sliver off.
+- **Fixed**: `.board-name` now sets `line-height: 1.5` explicitly, giving enough room regardless of content; harmless for ordinary names (still one line, still ellipsizes). Colour changed from teal (`#2bd6d6`) to light grey (`#c7c7c7`).
+- Verified live (test origin): faked `Cloud.getUser()` against a leaderboard row and re-rendered - "YOU" now shows in full, light grey, not clipped.

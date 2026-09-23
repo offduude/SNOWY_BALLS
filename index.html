@@ -1339,13 +1339,17 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      /* Explicit headroom: "normal" left too little room above the cap-height in this pixel font, so .board-you's
+         text-shadow (it reaches 1px above the glyphs themselves) got clipped by this element's own overflow:hidden -
+         the "YOU" was visibly cut off at the top. Harmless for a plain name (still one line, still ellipsizes). */
+      line-height: 1.5;
     }
 
     /* The signed-in player's own row (saves.js leaderboardCardHtml): a distinct colour + outline (the same outline
        treatment as .board-hint below) so it reads as a SYSTEM LABEL, not a name - a player could otherwise set their
        own account name to literally "YOU" (CHANGE NAME has no such restriction) and be indistinguishable from it. */
     .board-you {
-      color: #2bd6d6;
+      color: #c7c7c7;
       letter-spacing: 0.05em;
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
     }
@@ -1558,7 +1562,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=267"></script>
+  <script src="src/version.js?v=268"></script>
   <script src="src/economy.js?v=41"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,

@@ -228,7 +228,7 @@ const SONG_EVENTS = {
     block: "heavyGuitarWindow",
     faceBox: HEAVY_GUITAR_FACE_BOX,
     color: EVENT_COLOR_HEAVY_GUITAR,
-    defaults: { faceMultiplier: 1.25, beatMs: 500 }, // twice a second, not once - the owner's call, 2026-09-23
+    defaults: { faceMultiplier: 1.25, beatMs: 250 }, // four times a second - the owner's call, 2026-09-23 (first 500ms, then quicker)
   },
 };
 const APPLAUSE_VOLUME = 0.8;
@@ -239,6 +239,21 @@ const ROSE_SPEED_MIN = 200;
 const ROSE_SPEED_MAX = 300;
 const ROSE_MEAN_SPEED = (ROSE_SPEED_MIN + ROSE_SPEED_MAX) / 2;
 const ROSE_ON_SCREEN = (ROSE_RATE * GAME_HEIGHT) / ROSE_MEAN_SPEED; // how many roses are in the picture at once (about 29): what the rate and the speed above give
+
+// CONCERT EFFECTS (Heavy Guitar only, 2026-09-23): smoke rising from the bottom of the screen and a few sweeping
+// stage lasers, for as long as the song plays (not the applause - it would fight the roses for attention, and the
+// crowd's gone quiet by then) - purely decorative, no gameplay effect, both textures generated once at runtime
+// (the same idea as makeMiracleGlowTexture) rather than shipped as image files. See updateConcertEffects.
+const SMOKE_RATE = 2.2; // puffs a second
+const SMOKE_RISE_SPEED_MIN = 16; // px/s upward
+const SMOKE_RISE_SPEED_MAX = 30;
+const SMOKE_LIFE_MS = 4200; // fade in, hold, fade out, over this long - long enough to drift most of the way up the picture
+const SMOKE_MAX_ALPHA = 0.6; // kept translucent - the windows behind it are still the actual target (tuned up from an initial 0.4: too close to the snowy street's own colour to read as smoke rather than more snow)
+const SMOKE_MAX_SIZE = 110; // px, at the peak of its growth (see updateConcertEffects: it grows as it rises, like real smoke spreading)
+const LASER_COLORS = [0xff2e4d, 0x2ecbff, 0xb04dff]; // red, cyan, purple - a few stage-light colours, cycled one per beam
+const LASER_LENGTH = 340;
+const LASER_WIDTH = 5;
+const LASER_ALPHA = 0.55;
 
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
@@ -621,6 +636,9 @@ class MainScene extends Phaser.Scene {
     this.activeEvent = null; // name of the running random event, or null - at most ONE runs at a time (see startEvent)
     this.songPhase = null; // null, "song" or "applause" while the disco event runs
     this.roses = []; // the roses falling during the applause
+    this.concertSmoke = []; // Heavy Guitar only: smoke puffs rising while the song plays - see updateConcertEffects
+    this.smokeAcc = 0;
+    this.lasers = null; // Heavy Guitar only: the sweeping stage lasers, or null while not running
     this.songEvent = null; // { name, startedAt } of the running disco (also saved: Economy.getEvent)
     this.heldEventStep = null; // a change of an event (its end, a new phase) that waits for the throw being aimed / in the air to be over
     Buffs.setEventLength((name) => (SONG_EVENTS[name] && this.songSounds ? this.songTimes(name).songMs : 0)); // (a summon buff shows how long its event lasts)
@@ -1766,6 +1784,139 @@ class MainScene extends Phaser.Scene {
     tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
   }
 
+  // ---- CONCERT EFFECTS (Heavy Guitar only): smoke rising from below the picture, and a few sweeping stage lasers -
+  // see the constants above and updateSong's call into updateConcertEffects. Both textures are plain white/grey with
+  // a soft gradient, generated once (like miracle_glow above) - the laser is tinted per-beam from LASER_COLORS
+  // instead of needing one texture per colour. ----
+
+  makeSmokeTexture() {
+    const tex = this.textures.createCanvas("concert_smoke", 128, 128);
+    const ctx = tex.getContext();
+    const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, "rgba(150,150,165,0.9)"); // darker than the snowy street it rises over, so it reads as smoke rather than more snow
+    grad.addColorStop(0.45, "rgba(130,130,148,0.5)");
+    grad.addColorStop(1, "rgba(130,130,148,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 128);
+    tex.refresh();
+    tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
+
+  makeLaserTexture() {
+    const w = 12, h = 256;
+    const tex = this.textures.createCanvas("concert_laser", w, h);
+    const ctx = tex.getContext();
+    // White with a gradient along its length (brightest at the fixture end, gone by the far end) - setTint() colours
+    // it per-beam, so one texture covers every colour in LASER_COLORS.
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "rgba(255,255,255,0.95)");
+    grad.addColorStop(0.15, "rgba(255,255,255,0.65)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    tex.refresh();
+    tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
+
+  // One smoke puff, born at the bottom edge of the default view - grows and fades over SMOKE_LIFE_MS while it
+  // drifts up with a slow side-to-side sway (see updateConcertSmoke), then is gone.
+  spawnSmokePuff() {
+    if (!this.textures.exists("concert_smoke")) this.makeSmokeTexture();
+    const x = Phaser.Math.FloatBetween(INITIAL_SCROLL_X, INITIAL_SCROLL_X + GAME_WIDTH);
+    const y = INITIAL_SCROLL_Y + GAME_HEIGHT + 12;
+    const img = this.add.image(x, y, "concert_smoke").setDepth(8).setAlpha(0);
+    this.concertSmoke.push({
+      img,
+      startX: x,
+      vy: -Phaser.Math.FloatBetween(SMOKE_RISE_SPEED_MIN, SMOKE_RISE_SPEED_MAX),
+      sway: Phaser.Math.FloatBetween(6, 16),
+      swayPhase: Math.random() * Math.PI * 2,
+      swaySpeed: Phaser.Math.FloatBetween(0.6, 1.1),
+      targetSize: Phaser.Math.FloatBetween(SMOKE_MAX_SIZE * 0.55, SMOKE_MAX_SIZE),
+      born: Date.now(),
+    });
+  }
+
+  updateConcertSmoke(dt) {
+    if (!this.concertSmoke.length) return;
+    const now = Date.now();
+    this.concertSmoke = this.concertSmoke.filter((s) => {
+      const t = (now - s.born) / SMOKE_LIFE_MS; // 0..1 over its life
+      if (t >= 1) {
+        s.img.destroy();
+        return false;
+      }
+      s.img.y += s.vy * dt;
+      s.swayPhase += s.swaySpeed * dt;
+      s.img.x = s.startX + Math.sin(s.swayPhase) * s.sway;
+      const size = s.targetSize * (0.3 + 0.7 * Math.min(1, t * 2)); // grows through the first half of its life, like real smoke spreading
+      s.img.setDisplaySize(size, size);
+      // fades in over the first 15%, holds, fades out over the last 25% - scaled down to SMOKE_MAX_ALPHA throughout (kept translucent: the windows behind it are still the actual target)
+      const fade = t < 0.15 ? t / 0.15 : t > 0.75 ? (1 - t) / 0.25 : 1;
+      s.img.setAlpha(fade * SMOKE_MAX_ALPHA);
+      return true;
+    });
+  }
+
+  // The sweeping lasers: fixed anchor points near the top of the picture (like rigged stage lights), each sweeping
+  // back and forth in angle at its own speed and phase so they never move in sync. Built once per song (see
+  // updateConcertEffects) and torn down when it ends.
+  initLasers() {
+    if (this.lasers) return;
+    if (!this.textures.exists("concert_laser")) this.makeLaserTexture();
+    const anchors = [
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.12, base: -1.15, amp: 0.5, speed: 0.7 },
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.5, base: -1.57, amp: 0.65, speed: 0.55 }, // -1.57 rad = straight up
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.88, base: -2.0, amp: 0.5, speed: 0.65 },
+    ];
+    const y = INITIAL_SCROLL_Y - 4; // just above the default view - the fixture itself is never seen, only its beam
+    this.lasers = anchors.map((a, i) => {
+      const img = this.add
+        .image(a.x, y, "concert_laser")
+        .setOrigin(0.5, 0)
+        .setDepth(8.5)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(LASER_COLORS[i % LASER_COLORS.length])
+        .setDisplaySize(LASER_WIDTH, LASER_LENGTH)
+        .setAlpha(LASER_ALPHA);
+      return { img, base: a.base, amp: a.amp, speed: a.speed, phase: Math.random() * Math.PI * 2 };
+    });
+  }
+
+  updateLasers(elapsedS) {
+    if (!this.lasers) return;
+    for (const l of this.lasers) l.img.rotation = l.base + Math.sin(elapsedS * l.speed + l.phase) * l.amp;
+  }
+
+  clearConcertEffects() {
+    this.concertSmoke.forEach((s) => s.img.destroy());
+    this.concertSmoke = [];
+    this.smokeAcc = 0;
+    if (this.lasers) {
+      this.lasers.forEach((l) => l.img.destroy());
+      this.lasers = null;
+    }
+  }
+
+  // Called every frame from updateSong: while Heavy Guitar's song is playing, spawns smoke at SMOKE_RATE a second
+  // and sweeps the lasers; otherwise tears both down (once - clearConcertEffects on an already-empty state is a
+  // harmless no-op, but this only runs the frame the state actually changes, via the running check below).
+  updateConcertEffects(dt) {
+    const running = this.songPhase === "song" && this.songEvent && this.songEvent.name === "heavy_guitar";
+    if (!running) {
+      if (this.concertSmoke.length || this.lasers) this.clearConcertEffects();
+      return;
+    }
+    this.initLasers();
+    this.updateLasers((Date.now() - this.songEvent.startedAt) / 1000);
+    this.smokeAcc += dt * SMOKE_RATE;
+    while (this.smokeAcc >= 1) {
+      this.smokeAcc -= 1;
+      this.spawnSmokePuff();
+    }
+    this.updateConcertSmoke(dt);
+  }
+
   // The shine around the carried projectile: a big soft halo and a hot core that pulse, plus a few sparkles circling it.
   createMiracleGlow() {
     const add = () => this.add.image(0, 0, "miracle_glow").setDepth(11).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
@@ -2158,6 +2309,7 @@ class MainScene extends Phaser.Scene {
       }
     }
     this.updateRoses(dt);
+    this.updateConcertEffects(dt);
   }
 
   // The audio follows the clock, once a second: not playing when it should be (it was blocked until the first tap, the app was closed) ->

@@ -1685,3 +1685,31 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   how Banan was unlocked there earlier this session.
 - `main.js?v=176`. This whole change lives on the `heavy-guitar-event` branch only - NOT merged into `main`, NOT
   pushed, per "on a local branch".
+
+## Heavy Guitar: quarter-second frames, plus concert smoke and lasers (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Asked directly**: cycle `heavy_guitar1-6` every 250ms (a quarter second) instead of 500ms, and "mimic some concert
+  characteristic things, like smoke coming out from below the screen, lasers and stuff."
+- `beatMs` changed to 250 in both `SONG_EVENTS.heavy_guitar.defaults` and economy.json's `heavyGuitarWindow` (the two
+  places every song event's numbers live, kept in sync as they already were for disco/guitar).
+- **New CONCERT EFFECTS**, Heavy Guitar only, running for the SONG phase only (not the applause - it would fight the
+  roses for attention, and the crowd's gone quiet by then), purely decorative:
+  - **Smoke**: puffs spawn at the bottom edge of the screen (`SMOKE_RATE` a second), drift upward with a slow side-
+    to-side sway, grow through the first half of their life and fade in/hold/fade out over it (`SMOKE_LIFE_MS`),
+    then are destroyed. A soft grey radial-gradient texture generated once at runtime (the same technique as the
+    Diamond Cross's `makeMiracleGlowTexture` already in the file), not a shipped image.
+  - **Lasers**: 3 fixed anchor points near the top of the screen, each sweeping back and forth in angle at its own
+    speed and phase (so they never move in sync), additive-blended in red/cyan/purple - one white gradient texture,
+    tinted per beam via `setTint()` rather than three separate textures.
+  - Both are torn down the instant the song ends (checked every frame in `updateSong`, alongside the existing rose
+    update) - confirmed live: `activeEvent`/`songPhase` go back to null, `concertSmoke`/`lasers` are empty/null on
+    the very next frame, and a different event can start right away.
+- **One real tuning pass, not just "add it and ship it"**: the first version (`SMOKE_MAX_ALPHA` 0.4, a lighter grey)
+  was checked with an actual in-game screenshot (cropped and zoomed via `game.renderer.snapshot`, the same technique
+  `calibrateSheet()` uses) and turned out nearly invisible against this game's snowy street - too close in colour to
+  the snow itself to read as smoke rather than more of it. Darkened the gradient and raised the alpha to 0.6; a
+  second screenshot confirmed it now reads clearly as smoke without the windows behind it being obscured.
+- Verified live (test origin): started the event directly - lasers visibly sweep in different colours, smoke rises
+  and fades correctly (checked both by eye and by reading individual puffs' position/alpha/size mid-flight), no
+  console errors, ends and clears exactly as described above.
+- `main.js?v=177`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.

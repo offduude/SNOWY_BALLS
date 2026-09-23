@@ -25,10 +25,10 @@
       "faceMultiplier": 1.25,
       "beatMs": 470
     },
-    "_heavyGuitarNote": "HEAVY GUITAR event (2026-09-23, see main.js SONG_EVENTS): legendary, like its summon buff (the Heavy Pick - no rarity of its own here, same as discoWindow). While heavy_guitar.mp3 plays W20 cycles heavy_guitar1 -> ... -> heavy_guitar6 (a new one every beatMs = 500ms, twice a second); a hit on the guitarist's FACE pays faceMultiplier x the coins of that throw (fixed, the face stays, so every hit of the song counts); a plain W20 hit pays as usual. Afterwards applause.mp3 plays while roses fall, then everything is normal - same shape as the disco/guitar events, only one of the three (or the banana face) can ever run at once.",
+    "_heavyGuitarNote": "HEAVY GUITAR event (2026-09-23, see main.js SONG_EVENTS): legendary, like its summon buff (the Heavy Pick - no rarity of its own here, same as discoWindow). While heavy_guitar.mp3 plays W20 cycles heavy_guitar1 -> ... -> heavy_guitar6 (a new one every beatMs = 250ms, four times a second) and concert smoke/lasers run (main.js CONCERT EFFECTS - the song phase only, not the applause); a hit on the guitarist's FACE pays faceMultiplier x the coins of that throw (fixed, the face stays, so every hit of the song counts); a plain W20 hit pays as usual. Afterwards applause.mp3 plays while roses fall, then everything is normal - same shape as the disco/guitar events, only one of the three (or the banana face) can ever run at once.",
     "heavyGuitarWindow": {
       "faceMultiplier": 1.25,
-      "beatMs": 500
+      "beatMs": 250
     }
   },
 

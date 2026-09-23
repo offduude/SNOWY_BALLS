@@ -2100,3 +2100,68 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   path) and confirmed leaving and reopening the shop replaced it with a fresh roll automatically, with no manual
   intervention. No console errors either time.
 - `src/shop.js?v=32`.
+
+## New event: Toy Tank (2026-09-23, local branch `toy-tank-event`, NOT pushed)
+
+A fully scripted, single-fire event triggered only by consuming the new **Toy Tank** buff - unlike every other
+event in the game it never spawns naturally (`eventDefs()`'s `natural: false`, the only entry with it, and
+`rollNaturalEvent()` now skips any def with `natural === false`). No face, no `coinMultiplier`, no
+`economy.json` `events` block of its own - it rerolls the whole shop instead of paying out coins.
+
+- **Item**: `toy_tank` in `economy.json` - legendary, `charge: true`, `ignorePriceOverride: true` (flat
+  4500-6000 price band, the owner's pick from an `AskUserQuestion` round rather than the usual profitability
+  formula, since this buff has no "hit value" to be profitable against - it just reshuffles the shop). Detail
+  is `"Rerolls the SHOP."`, matching the ALL-CAPS-the-mechanic convention other buff details already use.
+  `TANK_EVENT_SUMMONMS`-equivalent: `Buffs.setEventLength()`'s callback returns `0` for "tank" (it isn't a
+  `SONG_EVENTS` key), so `summonMs()` is `null` and the buff card's timer falls back to `"+1"` automatically -
+  same mechanism Diamond Cross already relies on, zero new timer-display code needed.
+- **Sequence** (`startTankEvent`/`updateTankEvent`/`fireTank`/`flingPlayerLeft`/`playTankExplosion`, all new,
+  after `resumeSavedEvent()`): `tank_banana.png` slides on from just past the right edge to `TANK_REST_X`,
+  taking exactly `tank_moving.mp3`'s own duration (read live off `this.tankMovingSound.duration`, ~4.99s -
+  never hardcoded, so a future audio swap can't desync the slide from the sound). Pauses `TANK_PAUSE_MS`
+  (500ms), then **fires**: `grenade_impact` at `TANK_EXPLOSION_VOLUME` (0.85, louder than the grenade's own
+  0.5), a directional explosion at the gun tip that drifts left instead of sitting still
+  (`playTankExplosion` - a left-drifting variant of the existing stationary `playExplosion`, reusing the same
+  procedural `explosion_glow` texture), `Shop.rerollAll()` (new - unconditionally replaces all 6 slots, not
+  just the currently-occupied ones, per the owner's explicit answer), and the player flung off the left edge
+  spinning (`flingPlayerLeft` - 3 full rotations over `TANK_FLING_MS`/500ms, `Cubic.easeOut`, tank's own
+  texture never flipped - only the player tween moves). Immediately starts reversing - same slide duration,
+  same sound replayed from the top. At the reverse's halfway point the player is silently reset to their
+  pre-event position/rotation at `alpha: 0` (so they reappear exactly where they stood, not wherever the fling
+  left them) and tweened back to `alpha: 1` over the remaining half. On completion: sprite destroyed,
+  `this.tank = null`, `this.activeEvent = null`.
+- **Mutual exclusion, both directions**: `startTankEvent()` bails via the existing `eventBlocksStart()` guard
+  like every other event, so it can't start mid-event; symmetrically, `eventBlocksStart()` returns `true` for
+  `activeEvent === "tank"`, so no other event (or a second tank) can start while it's running either.
+- **Throwing fully disabled for the event's whole length**, not just while a throw is mid-flight - unlike
+  other buffs (which only defer their own *start* until the current throw finishes, via `syncSummonBuff`'s
+  `this.state === STATE.IDLE` check), the tank additionally blocks new throws from beginning at all once it's
+  running: `handleFreezeInput()`'s very first line now bails if `this.activeEvent === "tank"`. Starting the
+  event itself still uses the same deferred-start pattern as every other summon buff (`syncSummonBuff` only
+  calls `startTankEvent` from `STATE.IDLE`) - no separate "reject mid-throw" mechanism was needed, per the
+  owner's own correction after the first pass: "other buffs already start after the throw is finished, do the
+  same here but make sure the player cant throw throughout the entire event."
+- **Calibration** (`TANK_GUN_DX`/`TANK_GUN_DY`/`TANK_REST_X`, all in `main.js`): measured directly off
+  `tank_banana.png`'s own opaque pixels via a canvas alpha scan rather than eyeballed - the muzzle's leftmost
+  opaque pixels sit at image-local `x≈0, y≈48` (of a 175x109 image, origin at the sprite's bottom-left), giving
+  `TANK_GUN_DX = 1`, `TANK_GUN_DY = -61`. At that offset the muzzle lands within 3 world-px of the character's
+  own head-top (`ch.y - 64`, the convention used everywhere else in the file) with zero fudging, because both
+  stand on the same ground line - confirmed with an in-game debug marker (a cyan line at head-top, a red dot at
+  the computed gun position) screenshotted via `renderer.snapshot()`. `TANK_REST_X = ORIGIN_X - 30` keeps the
+  full 175px-wide sprite on-screen (the original guess, `ORIGIN_X + 70`, hung most of the tank off the right
+  edge) while stopping "before the player" - the tank's hull ends up overlapping the player's standing spot,
+  which is the point: they peek out from behind/above it through the art's own gaps, rather than the tank
+  stopping short with visible empty space between them.
+- **Verified live** (test origin, via direct scene calls - `scene.startTankEvent()` / `scene.fireTank()` /
+  `scene.updateTankEvent()` - rather than buying the item, to control timing precisely): full real-time run
+  end-to-end (`tank` object null, `activeEvent` null, character back at `(411, 16)`, `rotation: 0`,
+  `alpha: 1`); shop stock fully replaced (`Shop.rerollAll()`) at the exact `fireTank()` call, not at slide-in
+  or slide-out; `handleFreezeInput()` confirmed to leave `state` unchanged while `activeEvent === "tank"`;
+  `eventBlocksStart()` confirmed `true` for the whole "in"/"paused"/"out" span; the halfway-reverse reset
+  confirmed (`alpha: 0`, position/rotation restored) before its fade-in tween starts. No console errors on a
+  clean reload.
+- `economy.json`, `src/main.js?v=184`, `src/shop.js?v=33` (`Shop.rerollAll` itself landed under `v=33`
+  alongside the shop-slot fix above; the tank's own consumer code is the `v=184` bump).
+- Assets moved into place: `tank_banana.png` -> `assets/building/`, `toy_tank.png` -> `assets/items/`,
+  `tank_moving.mp3` -> `assets/audio/`.
+- **Not pushed** - local branch `toy-tank-event` only, per explicit instruction.

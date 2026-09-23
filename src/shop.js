@@ -449,6 +449,34 @@ const Shop = (() => {
     return document.getElementById("game-container").classList.contains("shop-open");
   }
 
+  // A full, unconditional reset of the shop - every slot, including one currently SOLD OUT, gets a brand new item,
+  // amount/price and availability timer right now, as if all six had just been freshly stocked (the owner's call,
+  // 2026-09-23: ALL 6 slots, not just the ones currently on sale - a SOLD OUT slot's own countdown is skipped too,
+  // not left running). Used by the Toy Tank event (main.js fireTank) - "the entire shop should reroll the exact
+  // time the tank fires".
+  function rerollAll() {
+    const st = Economy.getShopState();
+    const slots = eco.shop.slots;
+    const now = shopNow();
+    const stock = new Array(slots).fill(null);
+    const offers = new Array(slots).fill(null);
+    const expires = new Array(slots).fill(null);
+    for (let i = 0; i < slots; i++) {
+      const others = stock.filter((id, j) => j !== i && id);
+      const id = pickFor(others);
+      stock[i] = id;
+      offers[i] = id !== null ? rollOffer(itemById(id)) : null;
+      const dur = id !== null ? availMs(itemById(id)) : 0;
+      expires[i] = dur ? now + dur : null;
+    }
+    st.stock = stock;
+    st.offers = offers;
+    st.expires = expires;
+    st.restock = new Array(slots).fill(null);
+    Economy.saveShop();
+    if (isShopOpen()) render();
+  }
+
   function setDot(on) {
     if (dotEl) dotEl.classList.toggle("show", !!on);
   }
@@ -576,5 +604,6 @@ const Shop = (() => {
       setDot(false);
       render();
     },
+    rerollAll, // exposed for the Toy Tank event (main.js fireTank) - see rerollAll's own comment
   };
 })();

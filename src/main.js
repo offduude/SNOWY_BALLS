@@ -265,6 +265,29 @@ const LASER_WIDTH = 5;
 const LASER_ALPHA = 0.85; // less transparent (was 0.55) - the owner's call, 2026-09-23
 const LASER_CYCLE_S = 26.6; // one full back-and-forth sweep, all three beams in time with each other (the owner's call, 2026-09-23)
 
+// TOY TANK (2026-09-23): a legendary event, summoned only by the Toy Tank buff - see eventDefs() (natural: false,
+// the only event that can't spawn on its own) and updateTankEvent. No face to hit, no coinMultiplier - it rerolls
+// the whole shop the instant it "fires", and throwing is disabled for its entire length (handleFreezeInput's gate).
+const TANK_PAUSE_MS = 500; // the beat of stillness after the tank stops, before it fires
+const TANK_FLING_MS = 500; // how long the player takes to be thrown off the left edge
+const TANK_FLING_SPINS = 3; // full rotations during the fling
+const TANK_EXPLOSION_VOLUME = 0.85; // louder than the grenade's own impact (PROJECTILE_VISUALS.grenade.impactVolume, 0.5) - same sound, played harder
+// Stronger than any existing explosion.flashMs/flashScale/shakeMs/shakeX/shakeY (the drone's, the biggest so far, tops
+// out at flashScale 7 / shakeMs 520) - "a strong explosion" for a legendary event, plus `drift`: how far the glow and
+// its hot core travel to the LEFT while they grow and fade (playExplosion has no such motion - every existing
+// explosion is stationary; this is the tank's own directional variant, playTankExplosion).
+const TANK_EXPLOSION_FX = { flashMs: 620, flashScale: 8, shakeMs: 620, shakeX: 0.032, shakeY: 0.017, drift: 70 };
+// CALIBRATION (tuned once by eye against a live screenshot, like the character hand offsets in CHARACTERS - these
+// are the numbers to adjust if the tank ever looks wrong, not the code around them): where the tank's gun sits
+// within tank_banana.png (175x109), as an offset from the sprite's own origin (bottom-left, see startTankEvent) -
+// measured directly off the muzzle's own opaque pixels (row ~48 of 109, touching the sprite's left edge) - and the
+// world x it slides in to rest at, chosen so the gun ends up close to the player without overlapping them. At this
+// DY the muzzle sits within 3px of the character's own head-top (ch.y - 64), matching "gun around the same height
+// as the player's head" - both stand on the same ground line, so that alignment falls out of the art, not a fudge.
+const TANK_GUN_DX = 1; // px right of the sprite's left edge - the muzzle touches x=0
+const TANK_GUN_DY = -61; // px up from the sprite's bottom edge
+const TANK_REST_X = ORIGIN_X - 30; // world x of the sprite's own origin (its left-bottom) once stopped
+
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
 
@@ -577,6 +600,10 @@ class MainScene extends Phaser.Scene {
     this.load.audio("guitar", "assets/audio/guitar.mp3");
     this.load.audio("heavy_guitar", "assets/audio/heavy_guitar.mp3");
     this.load.audio("applause", "assets/audio/applause.mp3");
+    // Toy Tank (2026-09-23): not a song event (no frames, no face) - just the one sprite, driven in and back out by
+    // updateTankEvent, and its own sound (tank_moving.mp3), replayed for the reverse too.
+    this.load.image("tank_banana", "assets/building/tank_banana.png");
+    this.load.audio("tank_moving", "assets/audio/tank_moving.mp3");
   }
 
   create() {
@@ -650,6 +677,7 @@ class MainScene extends Phaser.Scene {
     this.smokeAcc = [0, 0]; // one accumulator per SMOKE_X_FRACTIONS point, so the two fountains don't spawn in lockstep
     this.lasers = null; // Heavy Guitar only: the sweeping stage lasers, or null while not running
     this.songEvent = null; // { name, startedAt } of the running disco (also saved: Economy.getEvent)
+    this.tank = null; // { phase, phaseStartedAt, sprite } while the Toy Tank event runs - see startTankEvent/updateTankEvent. Not persisted (Economy.setEvent) - it is short enough that a reload mid-event just drops it cleanly, see the note there
     this.heldEventStep = null; // a change of an event (its end, a new phase) that waits for the throw being aimed / in the air to be over
     Buffs.setEventLength((name) => (SONG_EVENTS[name] && this.songSounds ? this.songTimes(name).songMs : 0)); // (a summon buff shows how long its event lasts)
     Buffs.setEventGate(() => this.eventBlocksStart()); // no event buff can be used while an event runs (the disco's applause can be cut)
@@ -687,6 +715,7 @@ class MainScene extends Phaser.Scene {
     this.songSounds = {}; // the song of each song event, by event name
     for (const [name, def] of Object.entries(SONG_EVENTS)) this.songSounds[name] = this.sound.add(def.sound, { volume: def.volume });
     this.applauseSound = this.sound.add("applause", { volume: APPLAUSE_VOLUME });
+    this.tankMovingSound = this.sound.add("tank_moving", { volume: 0.8 }); // played once sliding in, again reversing out - see startTankEvent/updateTankEvent
     this.resumeSavedEvent(); // a song event (disco, guitar) that was running when the game was closed goes on where the clock says it is
     if (/^(localhost|127\.)/.test(location.hostname)) {
       window.calibrateHeld = () => this.calibrateHeldProjectiles(); // dev tools, see docs/CALIBRATION.md
@@ -1569,6 +1598,9 @@ class MainScene extends Phaser.Scene {
   }
 
   handleFreezeInput() {
+    // Toy Tank: no throwing at all for the whole event (it starts only from IDLE - see syncSummonBuff/startTankEvent
+    // - so there is never a throw already in progress to interrupt; this just refuses every tap until it's over).
+    if (this.activeEvent === "tank") return;
     // Belt and braces: never advance the throw while the shop or a list covers the game.
     const cls = document.getElementById("game-container").classList;
     if (cls.contains("shop-open") || cls.contains("list-open")) return;
@@ -2478,6 +2510,112 @@ class MainScene extends Phaser.Scene {
     Economy.setEvent(null);
   }
 
+  // ---- TOY TANK (2026-09-23) ----
+  // Not a SONG_EVENT (no frames, no face, no economy.json block) - a short, fully scripted sequence: slide in
+  // (tank_moving.mp3's own real length), pause TANK_PAUSE_MS, fire (a directional explosion at the gun, the whole
+  // shop rerolled, the player flung off the left edge spinning), reverse out (the same length again, the same
+  // sound), fading the player back in from the reverse's halfway point. Throwing is disabled the whole time -
+  // handleFreezeInput()'s own gate checks activeEvent === "tank" directly. Not persisted across a reload (see the
+  // field's own comment on `this.tank`) - short enough that dropping it cleanly on a reload beats the complexity of
+  // resuming a mid-fling player sprite.
+  startTankEvent() {
+    if (this.eventBlocksStart()) return;
+    this.activeEvent = "tank";
+    const startX = INITIAL_SCROLL_X + GAME_WIDTH + 40; // just past the right edge - never visible before it starts sliding
+    const baseY = this.worldY(0) + CHARACTER_Y_OFFSET + 1; // the same ground line the character stands on
+    const sprite = this.add.image(startX, baseY, "tank_banana").setOrigin(0, 1).setDepth(3);
+    this.tank = {
+      phase: "in",
+      phaseStartedAt: Date.now(),
+      sprite,
+      faded: false,
+      playerHome: { x: this.character.x, y: this.character.y, rotation: this.character.rotation },
+    };
+    this.tankMovingSound.play({ seek: 0 });
+  }
+
+  updateTankEvent() {
+    const t = this.tank;
+    if (!t) return;
+    const now = Date.now();
+    const elapsed = now - t.phaseStartedAt;
+    const slideMs = this.tankMovingSound.duration * 1000; // the slide (in, and again out) always takes exactly as long as the sound
+    const startX = INITIAL_SCROLL_X + GAME_WIDTH + 40;
+    if (t.phase === "in") {
+      const frac = Math.min(1, elapsed / slideMs);
+      t.sprite.x = startX + (TANK_REST_X - startX) * frac;
+      if (frac >= 1) {
+        t.phase = "paused";
+        t.phaseStartedAt = now;
+      }
+      return;
+    }
+    if (t.phase === "paused") {
+      if (elapsed >= TANK_PAUSE_MS) this.fireTank();
+      return;
+    }
+    if (t.phase === "out") {
+      const frac = Math.min(1, elapsed / slideMs);
+      t.sprite.x = TANK_REST_X + (startX - TANK_REST_X) * frac;
+      if (!t.faded && frac >= 0.5) {
+        // Reset in place (invisible - alpha still 0) before fading in, so the player reappears exactly where they
+        // stood, not wherever the fling left them.
+        t.faded = true;
+        this.character.setPosition(t.playerHome.x, t.playerHome.y);
+        this.character.setRotation(t.playerHome.rotation);
+        this.character.setAlpha(0);
+        this.tweens.add({ targets: this.character, alpha: 1, duration: slideMs * 0.5, ease: "Linear" });
+      }
+      if (frac >= 1) {
+        t.sprite.destroy();
+        this.tank = null;
+        this.activeEvent = null;
+      }
+      return;
+    }
+  }
+
+  // The tank "fires": the explosion, the shop reroll, and the player flung off-screen all happen at this one
+  // moment, then the tank immediately starts reversing (see updateTankEvent's "paused" branch calling this, and
+  // its own transition into "out" straight after).
+  fireTank() {
+    const t = this.tank;
+    const gunX = t.sprite.x + TANK_GUN_DX;
+    const gunY = t.sprite.y + TANK_GUN_DY;
+    this.sound.play("grenade_impact", { volume: TANK_EXPLOSION_VOLUME }); // the same sound as the grenade's impact, just louder
+    this.playTankExplosion(gunX, gunY);
+    if (typeof Shop !== "undefined" && Shop.rerollAll) Shop.rerollAll(); // "the entire shop should reroll the exact time the tank fires"
+    this.flingPlayerLeft();
+    t.phase = "out";
+    t.phaseStartedAt = Date.now();
+    this.tankMovingSound.play({ seek: 0 }); // "the reversing should make the same sound and last as long as the sliding in"
+  }
+
+  // Violently off the left edge, spinning - the tank's own texture is untouched (never flipped; it just slides
+  // back the way it came, see updateTankEvent's "out" phase), this is only the PLAYER being thrown.
+  flingPlayerLeft() {
+    this.tweens.add({
+      targets: this.character,
+      x: INITIAL_SCROLL_X - 80,
+      rotation: this.character.rotation + Math.PI * 2 * TANK_FLING_SPINS,
+      duration: TANK_FLING_MS,
+      ease: "Cubic.easeOut",
+    });
+  }
+
+  // A directional variant of playExplosion (the grenade/drone's own, always stationary): the same procedural glow
+  // texture, but the glow and its hot core also drift LEFT while they grow and fade, instead of just growing in
+  // place - "a strong explosion that moves only to the left".
+  playTankExplosion(x, y) {
+    if (!this.textures.exists("explosion_glow")) this.makeExplosionGlowTexture();
+    const fx = TANK_EXPLOSION_FX;
+    const glow = this.add.image(x, y, "explosion_glow").setDepth(15).setBlendMode(Phaser.BlendModes.ADD).setScale(0.5).setAlpha(1);
+    this.tweens.add({ targets: glow, x: x - fx.drift, scale: fx.flashScale, alpha: 0, duration: fx.flashMs, ease: "Quad.easeOut", onComplete: () => glow.destroy() });
+    const core = this.add.image(x, y, "explosion_glow").setDepth(16).setBlendMode(Phaser.BlendModes.ADD).setScale(0.3).setAlpha(1);
+    this.tweens.add({ targets: core, x: x - fx.drift * 0.6, scale: fx.flashScale * 0.45, alpha: 0, duration: fx.flashMs * 0.55, ease: "Cubic.easeOut", onComplete: () => core.destroy() });
+    this.cameras.main.shake(fx.shakeMs, new Phaser.Math.Vector2(fx.shakeX, fx.shakeY), true);
+  }
+
   // ---- EVENT PARTICLES ----
   // Anything an event drops from the sky - the applause roses today, and EVERY event item added in the future - must fall through these three, so the
   // equipped weather always affects it (the owner's rule): eventFallMotion (how it falls), eventSky (where it lives) and eventFallRates (how many are
@@ -2562,6 +2700,10 @@ class MainScene extends Phaser.Scene {
       { name: "disco", start: () => this.startSongEvent("disco") },
       { name: "guitar", start: () => this.startSongEvent("guitar") },
       { name: "heavy_guitar", start: () => this.startSongEvent("heavy_guitar") },
+      // natural: false - the ONLY event that can't spawn on its own (the owner's explicit call, 2026-09-23):
+      // rerolling the whole shop at random, uninvited, would be far more disruptive than a song or the banana
+      // face. Still fully startable via startEvent("tank") - rollNaturalEvent() is the only thing that skips it.
+      { name: "tank", start: () => this.startTankEvent(), natural: false },
     ].map((d) => ({ ...d, rarity: this.eventRarity(d.name) }));
   }
 
@@ -2604,7 +2746,10 @@ class MainScene extends Phaser.Scene {
   // little rarer than its chance - by that better one's chance.)
   rollNaturalEvent() {
     const byRarity = {};
-    for (const d of this.eventDefs()) (byRarity[d.rarity] = byRarity[d.rarity] || []).push(d.name);
+    for (const d of this.eventDefs()) {
+      if (d.natural === false) continue; // Toy Tank: never a natural pick, only startEvent("tank") directly
+      (byRarity[d.rarity] = byRarity[d.rarity] || []).push(d.name);
+    }
     const rank = (id) => (this.eco.rarities || []).findIndex((r) => r.id === id);
     let best = null;
     for (const rar of Object.keys(byRarity)) {
@@ -2999,6 +3144,7 @@ class MainScene extends Phaser.Scene {
       step();
     }
     this.updateSong(dt);
+    this.updateTankEvent(dt);
     this.updateWeather(dt);
     this.updateBounce(dt);
     this.updateFallingBalls(dt);

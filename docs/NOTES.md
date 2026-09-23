@@ -1871,3 +1871,37 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 | Guitar Pick | guitar | epic | 7x1.25=8.75 | 5.375 | 1.628 | 561-932 | **914-1518** | 1232-7560 |
 | Disco Ticket | disco | legendary | 32x1.25=40 | 25 | 1.6 | 2925-4875 | **4680-7800** | 42240-172800 |
 | Heavy Pick | heavy_guitar | legendary | 8x1.25=10 | 25 | 0.4 | 2925-4875 | **1170-1950** | 10560-43200 |
+
+## Event-summon buffs, v3: derived faceMultiplier AND price together, profitability guarantee restored (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **"Forget all previous calculations"** - redirected again: derive a fair `faceMultiplier` AND price for each
+  event-summon buff together, both corresponding to rarity and time duration, and bring back "unprofitable below
+  the event's own rarity" as a hard requirement (v2 had given that up in favour of matching the shop's price scale).
+- **v3 method** (rewritten into `_eventSummonPricingNote`): 1) `hits` - same as before (1 for the single-hit face
+  window, `floor(songSeconds/5)` for a song event). 2) `faceMultiplier = BASE(rarity) x clamp(sqrt(REFERENCE_HITS
+  (rarity) / hits), 0.7, 1.8)` - BASE is a rarity's own "prestige" bonus (common 1.2, rare 1.35, epic 1.5, legendary
+  1.75); the sqrt term adjusts it against a TYPICAL hit count for that rarity (REFERENCE_HITS: common 5, rare 6,
+  epic 8, legendary 15) - an event with fewer hits than typical (the single-hit face window) gets boosted up to
+  +80%, one with more (Disco Ticket's 32) gets reduced down to -30% - so a 1-hit and a 32-hit event of the same
+  rarity land on a comparable overall payout instead of a flat multiplier regardless of duration. 3) `revenue
+  (rarity used) = hits x faceMultiplier x rarities[rarity used].projectileHitValue`. 4) `priceRange.min = ceil
+  (revenue(one tier below) x 1.1)`, `priceRange.max = floor(revenue(own rarity) x 0.9)` - same guarantee shape as v1.
+- **Said plainly again**: the legendary prices are large once more (Disco Ticket up to 170035) - restoring the
+  profitability guarantee for a 164-second, 4800-hit-value song makes that unavoidable regardless of how the
+  multiplier is tuned; it is not a leftover from v1, it is what the requirement itself costs for that specific event.
+- **Also changes `faceWindow.faceMultiplier` itself** (2 -> 2.7) - this is shared with the NATURAL (non-buff)
+  banana face event too, not just the Tomato-Juice-triggered one; said so directly in the JSON note.
+- Verified live (test origin): all four faceMultiplier values and priceRange values read back correctly from a
+  fresh load; recomputed revenue-at-one-tier-below and revenue-at-own-rarity for each item directly from the loaded
+  economy.json and confirmed `price.min > revenue(below)` and `price.max < revenue(match)` hold for all four, at
+  both ends of every price range - the guarantee is real, not just claimed.
+- `economy.json` only (cache-busted by `?t=` already, no version query on it).
+
+### Table
+
+| Item | Event | Rarity | Hits | REFERENCE_HITS | Duration adjust | faceMultiplier | Revenue @ rarity-1 | Revenue @ rarity | Price |
+|---|---|---|---|---|---|---|---|---|---|
+| Tomato Juice | face | epic | 1 | 8 | sqrt(8/1)=2.83 -> clamped 1.8 | **2.7** | 346 (rare) | 2592 (epic) | **381-2332** |
+| Guitar Pick | guitar | epic | 7 | 8 | sqrt(8/7)=1.07 | **1.6** | 1434 (rare) | 10752 (epic) | **1577-9676** |
+| Disco Ticket | disco | legendary | 32 | 15 | sqrt(15/32)=0.68 -> clamped 0.7 | **1.23** | 37786 (epic) | 188928 (legendary) | **41565-170035** |
+| Heavy Pick | heavy_guitar | legendary | 8 | 15 | sqrt(15/8)=1.37 | **2.4** | 18432 (epic) | 92160 (legendary) | **20276-82944** |

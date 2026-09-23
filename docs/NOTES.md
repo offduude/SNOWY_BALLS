@@ -1973,3 +1973,29 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 | Guitar Pick | epic | **1.5** | 192 (rare) | 1440 (epic) | **196-1411** |
 | Disco Ticket | legendary | **1.75** | 1680 (epic) | 8400 (legendary) | **1714-8232** |
 | Heavy Pick | legendary | **1.75** | 1680 (epic) | 8400 (legendary) | **1714-8232** |
+
+## Event-summon buffs v6: narrowed price swing to a tight band, geometric-mean centred (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Asked directly**: "make the price vary less, paying 200 for a buff then 1400 is crazy... same with legendary,
+  1700 once then 8000? estimate them more precisely." v5's range spanned nearly the whole gap between the two
+  profitability thresholds (196-1411 for epic, a 7.2x swing; 1714-8232 for legendary, 4.8x) - too wide for the SAME
+  item to roll at such different prices.
+- **v6 method** (the faceMultiplier logic itself - flat per rarity, no duration - is unchanged from v5; only the
+  price RANGE calculation changed): instead of spanning nearly the whole window between "just above unprofitable"
+  and "just below full match-rarity value", `priceRange` is now a narrow +-10% band centred on the GEOMETRIC MEAN
+  of those two thresholds - `sqrt(revenue_at_one_tier_below x revenue_at_own_rarity)` - the balanced point between
+  them in ratio terms (not a simple average, which would sit much closer to the larger number). Both ends land
+  safely inside the old v5 window with plenty of room, not hugging either edge.
+- Verified live (test origin): recomputed everything directly from the loaded economy.json - `price.min >
+  revenue(below)` and `price.max < revenue(match)` both still hold for all four, and the new max/min ratio is
+  exactly 1.22x for every item (down from 7.2x epic / 4.8x legendary). No console errors.
+- `economy.json` only (cache-busted by `?t=` already, no version query on it).
+
+### Table
+
+| Item | Rarity | Revenue @ rarity-1 | Revenue @ rarity | Geometric mean centre | Price (v6, +-10%) | Price (v5, rejected) |
+|---|---|---|---|---|---|---|
+| Tomato Juice | epic | 192 | 1440 | 525.8 | **474-578** | 196-1411 |
+| Guitar Pick | epic | 192 | 1440 | 525.8 | **474-578** | 196-1411 |
+| Disco Ticket | legendary | 1680 | 8400 | 3756.6 | **3381-4132** | 1714-8232 |
+| Heavy Pick | legendary | 1680 | 8400 | 3756.6 | **3381-4132** | 1714-8232 |

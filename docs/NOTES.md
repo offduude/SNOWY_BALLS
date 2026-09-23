@@ -1639,3 +1639,8 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   its timer and left the BUFFS menu open, as before. Using the Disco Ticket started its 2:44 countdown (visible in
   the top-left buff HUD) AND closed the menu immediately, landing back on the main screen. No console errors.
 - `buffs.js?v=32`, `collection.js?v=75`.
+
+## "YOU" recoloured white (2026-09-23, PUSHED to main)
+
+- Asked directly: light grey -> white. `.board-you` now `color: #ffffff`, same outline as before (matches `.board-hint`'s look exactly now).
+- Verified live (test origin): faked `Cloud.getUser()` against a leaderboard row and re-rendered - "YOU" shows white with the outline, unclipped.

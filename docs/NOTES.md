@@ -1563,3 +1563,28 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 - **2nd/3rd place colour removed**: `boardTierClass()` (saves.js) now only ever returns the legendary tier for rank 1 - the epic (purple) tier for 2nd/3rd is gone. This is the single source of truth for a leaderboard card, an inspected account card, AND the LEADERBOARD side button's own background (updateLeaderboardButton), so all three followed automatically. Removed the now-dead `.board-card.epic` / `.account-card.epic` / `#leaderboard-btn.epic` CSS rules.
 - Verified live (test origin): opened the real leaderboard (public data, same Firebase project) - rank 1 keeps the rainbow legendary shine, rank 2 (BOOM) and rank 3 (Candy) are plain cream with no purple tint anywhere (list card, side button, or inspect popup); inspecting BOOM's card shows "1655" at the same scale as the rest of the card, not oversized.
 - `saves.js?v=21`, `index.html` CSS only (no version query on it).
+
+## Leaderboard: place is a number again, "YOU" moved to the name (styled, 2026-09-23, PUSHED to main)
+
+- **Asked directly**: put the rank number back in the PLACE column of the signed-in player's own leaderboard row; show "YOU" in the NAME column instead, but styled so a player who set their own account name to literally "YOU" can't be confused with it.
+- `leaderboardCardHtml()` (saves.js): PLACE is now always the real rank; NAME renders `<span class="board-you">YOU</span>` for the signed-in player's own row instead of `esc(row.name)`.
+- New `.board-you` CSS: a distinct teal colour plus the same thin dark outline `.board-hint` already uses for system text (not a name) - reads as a label, not a player's name, at a glance.
+- Verified live (test origin): faked `Cloud.getUser()` to match the 2nd-place row and re-rendered - place still shows "2", name shows a teal outlined "YOU" clearly distinct from the plain cream "Domino"/"Candy" names either side of it.
+
+## Added a second character: Pryk (2026-09-23, PUSHED to main)
+
+- Common rarity, 350-600 coins (in line with the other common skins - Sunny 250-450, Rain 300-500) - bought once from the shop like any other skin, then equipped from SKINS > CHARACTERS.
+- Same hand position as `character1` (the owner's call - drawn on the same rig): `CHARACTERS.pryk` in main.js reuses `character1`'s `hands.idle` / `hands.aiming` numbers verbatim rather than re-measuring.
+- Calibrated against every projectile per docs/CALIBRATION.md (only Pryk's own rows checked - `character1` x everything is unaffected): `await calibrateHeld()` - every row `ok: true` (4-75 added pixels, all comfortably above the 4px floor); `calibrateSheet()` looked at by eye - the idle hold hangs upside down at the hand, the aiming hold sits on the fist under the fingers, both at the same position/size as `character1`'s own rows. No per-projectile `hold` override was needed for either pose.
+- Sprite files (already dropped at the project root) moved into `assets/character/` and renamed to match the existing convention: `pryk_idle.png` / `pryk_aiming.png` / `pryk_throwing.png` (all 64x64, matching `character1`'s) and `pryk_face.png` (32x32 card thumbnail, matching `character1_face.png`).
+- Confirmed a locked Pryk does NOT appear in SKINS > CHARACTERS (`collection.js` `isListed()` already only lists a skin that is `rarity: "default"` or unlocked - the same rule every other locked scenery/weather already follows; no change needed there). Force-unlocked it via the console on the test origin only to confirm it renders correctly in-game: idle, aiming (holding a snowball on the fist) and mid-throw all looked right, no console errors.
+- `economy.json` (no version query - cache-busted by `?t=` already), `main.js?v=174`.
+
+## Shop: skins are twice as rare within their rarity now (2026-09-23, PUSHED to main)
+
+- **Asked directly**: rarity odds stay the same (common/rare/epic/legendary chances untouched), but once a rarity is rolled for a slot, a skin (character/scenery/weather) should be about half as likely to be the one picked as anything else sharing that rarity - "so skins don't flood the shop as much."
+- `pickWeighted()` (shop.js) used to pick uniformly at random among every item of the rolled rarity. It now calls a new `pickWeightedFrom()`, weighting every item by `itemWeight()`: 1 for a normal item, 0.5 for anything in `SKIN_CATEGORIES` (character/scenery/weather). This only changes which item is picked ONCE a rarity has already been rolled - the rarity roll itself (`rarities[].chance`) is untouched.
+- Matches the owner's own worked example exactly in the limiting case: one legendary skin next to N-1 ordinary legendary items gives it a 0.5/N chance (weights: skin 0.5, others 1 each, total N-0.5+0.5 = N... concretely N=3: 0.5/(1+1+0.5) = 20% = 0.5/2.5, which IS 0.5/N when there is only one skin in the pool - with more than one skin sharing a rarity they thin each other slightly further instead of each independently landing on exactly 0.5/N, which no single fixed per-item weight can do at once).
+- Removed the now-unused `pickRandom()` (both of its call sites became `pickWeightedFrom()`).
+- Verified live (test origin): a fresh load runs the shop's own `ensureStock()` at boot (which exercises `pickWeighted` for every slot) with no console errors; ran the SAME game session's calibration/shop flows repeatedly with no exceptions from the new code path.
+- `shop.js?v=29`.

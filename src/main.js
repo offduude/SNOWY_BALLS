@@ -339,6 +339,16 @@ const CHARACTERS = {
       aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
     },
   },
+  // Pryk (2026-09-23): same hand position as character1 (the owner's call - drawn on the same rig) - reused
+  // verbatim rather than re-measured; still calibrated against every projectile per docs/CALIBRATION.md (only
+  // pryk's own rows checked, character1 x everything is unaffected and untouched).
+  pryk: {
+    sprites: { idle: "pryk_idle", aiming: "pryk_aiming", throwing: "pryk_throwing" },
+    hands: {
+      idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
+      aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
+    },
+  },
 };
 const DEFAULT_CHARACTER = "character1";
 const DEFAULT_BACKGROUND = "assets/building/background.png"; // the wall picture that is loaded at the start (the key "background"); the default scenery Frosty uses it
@@ -416,6 +426,13 @@ class MainScene extends Phaser.Scene {
     this.load.image("char_aiming", "assets/character/character1_aiming.png?v=3"); // empty-handed
     this.load.image("char_aiming_snowball", "assets/character/character1_aiming_snowball.png"); // a snowball in hand (used when USE_HELD_PROJECTILES is off)
     this.load.image("char_throwing", "assets/character/character1_throwing.png");
+    // Pryk (2026-09-23): the second character, empty-handed poses only (see CHARACTERS below) - the held-projectile
+    // system means a character needs no per-projectile art of its own any more (docs/CALIBRATION.md "Adding a
+    // character"). Its card thumbnail (pryk_face.png) is NOT loaded here - that one goes through the reactive
+    // characters/sceneries/weathers preload above, from its economy.json "image" field, like every other skin's.
+    this.load.image("pryk_idle", "assets/character/pryk_idle.png");
+    this.load.image("pryk_aiming", "assets/character/pryk_aiming.png");
+    this.load.image("pryk_throwing", "assets/character/pryk_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("onion", "assets/snowball/onion.png");
     // Keyed by its OWN PATH, not "weather_snow" - a real bug found and fixed 2026-09-22: Blizzard's particle happens to

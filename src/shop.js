@@ -96,17 +96,34 @@ const Shop = (() => {
     return minPrice(item) <= cfg.maxPriceInAverageHits * averageHitCoins();
   }
 
-  function pickRandom(list) {
-    return list[Math.floor(Math.random() * list.length)];
+  // A skin (character/scenery/weather) is worth HALF as much as anything else once an item is actually being picked
+  // FROM a rarity - the rarity roll itself (below) is untouched, this only thins skins out among whatever else
+  // shares that rarity, so the shop doesn't always have one waiting and flood the SKINS menu (the owner's call,
+  // 2026-09-23: "all skins appear twice as rarely"). A straight half WEIGHT in the draw, not a separate coin-flip
+  // first: with one legendary skin next to two ordinary legendary items, its chance is 0.5 / (1 + 1 + 0.5) = 20% -
+  // exactly 0.5/N (the owner's own example) in the limit where every OTHER item sharing its rarity is weight 1 and
+  // it is the only skin; with more than one skin in the same rarity pool they only thin each other a little further.
+  function itemWeight(item) {
+    return SKIN_CATEGORIES.includes(item.category) ? 0.5 : 1;
+  }
+
+  function pickWeightedFrom(list) {
+    const total = list.reduce((sum, it) => sum + itemWeight(it), 0);
+    let roll = Math.random() * total;
+    for (const it of list) {
+      roll -= itemWeight(it);
+      if (roll < 0) return it;
+    }
+    return list[list.length - 1];
   }
 
   // The pick for a slot is by RARITY: first a rarity is rolled by its chance (economy.json "rarities"; only rarities that
   // have an item in the pool take part, their chances are rescaled to 100%), then one of that rarity's items is picked
-  // at random - so the items of one rarity are equally likely. An item with no rarity counts as the most common one.
+  // (weighted - see pickWeightedFrom/itemWeight above). An item with no rarity counts as the most common one.
   function pickWeighted(pool) {
     // Only rarities with a chance above 0 can be rolled (the "default" one has 0: it is the snowball's, not for sale).
     const rarities = (eco.rarities || []).filter((r) => r.chance > 0);
-    if (!rarities.length) return pickRandom(pool);
+    if (!rarities.length) return pickWeightedFrom(pool);
     const rid = (it) => (rarities.some((r) => r.id === Rarity.ofItem(it)) ? Rarity.ofItem(it) : rarities[0].id);
     const present = rarities.filter((r) => pool.some((it) => rid(it) === r.id));
     const total = present.reduce((sum, r) => sum + r.chance, 0);
@@ -119,7 +136,7 @@ const Shop = (() => {
         break;
       }
     }
-    return pickRandom(pool.filter((it) => rid(it) === chosen.id));
+    return pickWeightedFrom(pool.filter((it) => rid(it) === chosen.id));
   }
 
   // Choose an item for one slot. `shownOthers` = ids in the OTHER slots.

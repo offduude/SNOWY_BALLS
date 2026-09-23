@@ -37,6 +37,15 @@
       "character": "character1",
       "rarity": "default",
       "detail": ""
+    },
+    {
+      "id": "pryk",
+      "name": "Pryk",
+      "description": "Isn't as old as you might think!",
+      "image": "assets/character/pryk_face.png",
+      "character": "pryk",
+      "rarity": "common",
+      "detail": ""
     }
   ],
   "sceneries": [
@@ -521,6 +530,16 @@
         "image": "assets/snowball/egg.png",
         "effect": { "type": "givesProjectile", "value": "egg" },
         "description": "No chickens inside. Enough for a 'basic' omelette."
+      },
+      {
+        "id": "pryk",
+        "name": "Pryk",
+        "category": "character",
+        "rarity": "common",
+        "priceRange": { "min": 350, "max": 600 },
+        "ignorePriceOverride": true,
+        "image": "assets/character/pryk_face.png",
+        "description": "Isn't as old as you might think!"
       },
       {
         "id": "frosty_night",

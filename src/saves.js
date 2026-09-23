@@ -322,11 +322,15 @@ const Saves = (() => {
 
   function leaderboardCardHtml(row, rank) {
     const me = typeof Cloud !== "undefined" && Cloud.getUser();
-    const place = me && me.uid === row.uid ? "YOU" : rank;
+    // The PLACE is always the real rank number now (it used to say "YOU" here, replacing the number - the owner's
+    // call, 2026-09-23: a rank is useful information on its own row too). "YOU" moved to the NAME instead, styled
+    // distinctly (.board-you) rather than as plain name text - a player could otherwise set their own account name
+    // to literally "YOU" (CHANGE NAME has no such restriction) and be indistinguishable from the real thing.
+    const name = me && me.uid === row.uid ? `<span class="board-you">YOU</span>` : esc(row.name);
     return (
       `<div class="board-card${boardTierClass(rank)}" data-uid="${esc(row.uid)}">` +
-      `<span class="board-place">${place}</span><span class="board-sep">|</span>` +
-      `<span class="board-name">${esc(row.name)}</span>` +
+      `<span class="board-place">${rank}</span><span class="board-sep">|</span>` +
+      `<span class="board-name">${name}</span>` +
       `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span></div>`
     );
   }

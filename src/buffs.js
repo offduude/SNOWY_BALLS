@@ -183,6 +183,8 @@ const Buffs = (() => {
     if (!Economy.takeBuff(id)) return false;
     activate(item);
     Economy.setLastUsedBuff(id); // the BUFFS list opens on the buff used last
+    // Push this use to the cloud right away, not on the normal cadence - see Cloud.noteBuffUse's own note.
+    if (typeof Cloud !== "undefined" && Cloud.noteBuffUse) Cloud.noteBuffUse();
     return true;
   }
 

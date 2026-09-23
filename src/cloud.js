@@ -454,6 +454,14 @@ const Cloud = (() => {
     heartbeat();
   }
 
+  // A used buff has the same exploit shape as a throw above: it takes one out of buffItems and starts its timer
+  // (buffs.js use()) - refreshing before the next periodic sync would hand back the pre-use state (the buff back
+  // in the inventory, its timer gone), letting it be used again for free. Same fix: immediate, not debounced.
+  function noteBuffUse() {
+    dirty = true;
+    heartbeat();
+  }
+
   // Pushes the leaderboard card AND the full save together (one batched write) if signed in, not in god mode, and
   // something actually changed since the last successful write. Called on the timer and on the two "the player is
   // leaving" signals above - never on every single coin/character change. Returns a promise that resolves once the
@@ -530,6 +538,7 @@ const Cloud = (() => {
     markDirty,
     notePurchase,
     noteThrow,
+    noteBuffUse,
     getAuthError,
     setConfirmOverwrite,
     getLeaderboardCache,

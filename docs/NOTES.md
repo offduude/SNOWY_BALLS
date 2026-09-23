@@ -2205,4 +2205,26 @@ event in the game it never spawns naturally (`eventDefs()`'s `natural: false`, t
     reconsider (drop to epic/rare to match the new price tier, or add a small direct coin payout instead) if
     that reads better in play.
   - `economy.json` only - no code or version-bump needed, `priceRange` is read live.
-- **Not pushed** - local branch `toy-tank-event` only, per explicit instruction.
+- **PUSHED to main** (fast-forwarded from `toy-tank-event`, 2026-09-23) - keep legendary, 600-900 confirmed by
+  the owner.
+
+## Buff use now syncs to the cloud immediately, not on the normal cadence (2026-09-23, PUSHED to main)
+
+**Asked directly**: "make the game write after each time a buff is used." `Buffs.use(id)` (`buffs.js`) already
+took the buff out of `buffItems` and started its timer locally (both go through `Economy.save()`), but the
+CLOUD write for that change waited for the normal ~30s heartbeat cadence (`cloud.js` `SYNC_INTERVAL_MS`) like
+any other change - unlike a throw, which already gets an immediate, non-debounced push (`Cloud.noteThrow()`,
+called from `finishThrow()`) specifically because of the exploit that leaves open: use it, refresh before the
+next sync, and the cloud hands back the pre-use save on load (the restored-session flow in `cloud.js`
+`onAuthStateChanged` adopts whatever the cloud currently has whenever it differs from local) - the buff is back
+in the inventory and its timer is gone, free to use again.
+
+- **New `Cloud.noteBuffUse()`** (`cloud.js`), a direct copy of `noteThrow()`'s own shape (sets `dirty`, calls
+  `heartbeat()` immediately, not debounced like `notePurchase()`'s 5s window) - same exploit, same fix. Exported
+  alongside `notePurchase`/`noteThrow`.
+- **Called from `Buffs.use()`** (`buffs.js`) right after `Economy.takeBuff()`/`activate()` succeed, guarded the
+  same way every other `Cloud.*` call site in the codebase is (`typeof Cloud !== "undefined" && Cloud.noteBuffUse`).
+- Verified live (test origin): monkey-patched `Cloud.noteBuffUse` to count calls, gave the local save 3 Water
+  Bottles, called `Buffs.use("water_bottle")` - exactly one call, the buff count dropped 3 -> 2, no console
+  errors.
+- `src/cloud.js?v=25`, `src/buffs.js?v=33`.

@@ -309,17 +309,15 @@ const Saves = (() => {
   }
 
   // ---------- LEADERBOARD: its own top-level screen (collection.js open("leaderboard")), ranked by CURRENT coins.
-  // A "leaderboard card" per player: place, a "|", name, coins on the right. Rank 1 gets the legendary shine, 2-3 the
-  // epic tint, the rest the plain card background - a fixed-by-RANK look, not each player's own rarity (they have none).
-  // Clicking a card inspects that player's account card (see wireLeaderboardClick) - the same card accountCardHtml
-  // draws, showing their chosen character; the button there is SIGN IN/OUT only for the player's OWN card, everyone
-  // else's shows their coins instead (there is nothing to press on somebody else's account). ----------
+  // A "leaderboard card" per player: place, a "|", name, coins on the right. Rank 1 gets the legendary shine, everyone
+  // else (2nd place down) the plain card background - a fixed-by-RANK look, not each player's own rarity (they have
+  // none). Clicking a card inspects that player's account card (see wireLeaderboardClick) - the same card
+  // accountCardHtml draws, showing their chosen character; the button there is SIGN IN/OUT only for the player's OWN
+  // card, everyone else's shows their coins instead (there is nothing to press on somebody else's account). ----------
   let boardEl = null; // the leaderboard screen's own scroll area (set by renderLeaderboard)
 
   function boardTierClass(rank) {
-    if (rank === 1) return " legendary";
-    if (rank >= 2 && rank <= 3) return " epic"; // NOT just "rank <= 3" - null <= 3 is true in JS, which quietly gave an unranked player the epic tier
-    return "";
+    return rank === 1 ? " legendary" : ""; // only #1 gets a tier colour now (2nd/3rd used to get the epic tint - owner's call, 2026-09-23)
   }
 
   function leaderboardCardHtml(row, rank) {

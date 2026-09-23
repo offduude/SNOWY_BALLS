@@ -870,10 +870,6 @@
        updateLeaderboardButton/myRank), the same rank-tier rule as a leaderboard/account card - just tuned brighter
        (like #ammo-box's rarity tint) since this button's base colour is dark brown, not cream. No rank (signed out, or
        just not on the board): plain #side-btn brown, no override needed. */
-    #leaderboard-btn.epic {
-      background-image: linear-gradient(rgba(162, 92, 255, 0.5), rgba(162, 92, 255, 0.5));
-    }
-
     #leaderboard-btn.legendary {
       background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.65), rgba(255, 168, 77, 0.65), rgba(255, 240, 77, 0.65), rgba(91, 255, 110, 0.65),
         rgba(77, 210, 255, 0.65), rgba(106, 107, 255, 0.65), rgba(193, 77, 255, 0.65), rgba(255, 77, 77, 0.65));
@@ -1314,18 +1310,6 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* The same rule applies to an ACCOUNT card (OPTIONS, or a leaderboard card held down) - its background reflects
-       the player's CURRENT LEADERBOARD PLACE too (saves.js accountCardHtml / myRank), the same rule as a leaderboard
-       card's own background, just on a cream .pick-row instead of a .board-card. */
-    .board-card.epic {
-      background-image: linear-gradient(rgba(162, 92, 255, 0.22), rgba(162, 92, 255, 0.22));
-    }
-
-    /* Same purple as #leaderboard-btn.epic exactly (not the softer .board-card shade above) - the owner's request. */
-    .account-card.epic {
-      background-image: linear-gradient(rgba(162, 92, 255, 0.5), rgba(162, 92, 255, 0.5));
-    }
-
     .board-card.legendary,
     .account-card.legendary {
       background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
@@ -1362,6 +1346,11 @@
       display: flex;
       align-items: baseline;
       gap: calc(var(--u) * 0.6);
+      /* Explicit, not inherited: inside a .board-card this used to just inherit that card's own 1.4u font-size, but
+         inside #board-inspect-card (inspecting a leaderboard entry's account card) nothing in the ancestor chain sets
+         a font-size at all, so it fell back to the unscaled browser default - reading way too big next to everything
+         else on the card, which is all sized in --u. Same 1.4u either way now. */
+      font-size: calc(var(--u) * 1.4);
     }
 
     .board-coins .coin {
@@ -1560,7 +1549,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=265"></script>
+  <script src="src/version.js?v=266"></script>
   <script src="src/economy.js?v=41"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1593,7 +1582,7 @@
   <script src="src/buffs.js?v=31"></script>
   <script src="src/shop.js?v=28"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=20"></script>
+  <script src="src/saves.js?v=21"></script>
   <script src="src/collection.js?v=73"></script>
   <script src="src/main.js?v=173"></script>
   <script>

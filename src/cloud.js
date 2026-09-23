@@ -442,6 +442,18 @@ const Cloud = (() => {
     }, 5000);
   }
 
+  // A throw's outcome (a miss, or a spent projectile) must reach the cloud before the player can refresh their way
+  // out of it - unlike notePurchase() above, this is NOT debounced: the restored-session read-on-load flow (see
+  // onAuthStateChanged) adopts whatever saves/{uid} currently holds whenever it differs from local, so if the
+  // player reloads before a debounce window elapsed, the reload would hand back the pre-throw state (the exploit
+  // this closes: throw, miss, refresh before the old ~30s cadence caught up, keep the projectile). Still routed
+  // through heartbeat(), not a bare syncNow() - a throw is as much a "this device is genuinely still playing" signal
+  // as anything else, and must not skip the displacement check either (see the note on heartbeat()).
+  function noteThrow() {
+    dirty = true;
+    heartbeat();
+  }
+
   // Pushes the leaderboard card AND the full save together (one batched write) if signed in, not in god mode, and
   // something actually changed since the last successful write. Called on the timer and on the two "the player is
   // leaving" signals above - never on every single coin/character change. Returns a promise that resolves once the
@@ -517,6 +529,7 @@ const Cloud = (() => {
     getUser,
     markDirty,
     notePurchase,
+    noteThrow,
     getAuthError,
     setConfirmOverwrite,
     getLeaderboardCache,

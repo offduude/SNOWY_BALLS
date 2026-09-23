@@ -1954,6 +1954,12 @@ class MainScene extends Phaser.Scene {
 
     if (this.savedBy) this.flashAmmoSaved(); // the counter's outline flashes bright white once, alongside the "Saved Projectile" message
 
+    // Push this throw's outcome to the cloud right away, not on the normal cadence - otherwise a miss (or a spent
+    // projectile) could be undone by refreshing before the next periodic sync: the restored-session read-on-load
+    // flow (cloud.js) adopts whatever the cloud currently has whenever it differs from local, which would mean
+    // reloading before this throw synced hands back the pre-throw state.
+    if (typeof Cloud !== "undefined" && Cloud.noteThrow) Cloud.noteThrow();
+
     this.maybeStartRandomEvent();
 
     this.time.delayedCall(1400, () => {

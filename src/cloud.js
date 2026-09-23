@@ -429,26 +429,24 @@ const Cloud = (() => {
     dirty = true;
   }
 
-  // A shop purchase is worth syncing sooner than the normal cadence - it's real coins spent and a real item gained,
-  // exactly the kind of thing worth protecting against a lost/crashed tab. Debounced: several purchases in quick
-  // succession (buying out a slot, then another) only schedule ONE sync, 5s after the LATEST one, not one per purchase.
-  let purchaseFlushTimer = null;
+  // A shop purchase must reach the cloud before the player can refresh their way out of it - it's real coins spent
+  // and a real item gained, exactly the kind of thing the restored-session read-on-load flow (see
+  // onAuthStateChanged) would otherwise hand back the pre-purchase version of on a reload that beat the normal
+  // ~30s cadence (buy something, refresh immediately, keep the coins AND the item). Immediate, not debounced -
+  // same reasoning as noteThrow() below, which this now matches (it used to wait 5s after the LATEST purchase in
+  // a burst; every purchase now gets its own immediate sync instead).
   function notePurchase() {
     dirty = true; // onSave already does this (Economy.spendCoins/addProjectiles/etc. all save()), but cheap to be explicit
-    clearTimeout(purchaseFlushTimer);
-    purchaseFlushTimer = setTimeout(() => {
-      purchaseFlushTimer = null;
-      heartbeat(); // not syncNow() directly - see the note on heartbeat()
-    }, 5000);
+    heartbeat(); // not syncNow() directly - see the note on heartbeat()
   }
 
   // A throw's outcome (a miss, or a spent projectile) must reach the cloud before the player can refresh their way
-  // out of it - unlike notePurchase() above, this is NOT debounced: the restored-session read-on-load flow (see
-  // onAuthStateChanged) adopts whatever saves/{uid} currently holds whenever it differs from local, so if the
-  // player reloads before a debounce window elapsed, the reload would hand back the pre-throw state (the exploit
-  // this closes: throw, miss, refresh before the old ~30s cadence caught up, keep the projectile). Still routed
-  // through heartbeat(), not a bare syncNow() - a throw is as much a "this device is genuinely still playing" signal
-  // as anything else, and must not skip the displacement check either (see the note on heartbeat()).
+  // out of it - the restored-session read-on-load flow (see onAuthStateChanged) adopts whatever saves/{uid}
+  // currently holds whenever it differs from local, so if the player reloads before the next sync, the reload
+  // would hand back the pre-throw state (the exploit this closes: throw, miss, refresh before the old ~30s
+  // cadence caught up, keep the projectile). Routed through heartbeat(), not a bare syncNow() - a throw is as
+  // much a "this device is genuinely still playing" signal as anything else, and must not skip the displacement
+  // check either (see the note on heartbeat()).
   function noteThrow() {
     dirty = true;
     heartbeat();

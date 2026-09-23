@@ -2220,11 +2220,29 @@ next sync, and the cloud hands back the pre-use save on load (the restored-sessi
 in the inventory and its timer is gone, free to use again.
 
 - **New `Cloud.noteBuffUse()`** (`cloud.js`), a direct copy of `noteThrow()`'s own shape (sets `dirty`, calls
-  `heartbeat()` immediately, not debounced like `notePurchase()`'s 5s window) - same exploit, same fix. Exported
-  alongside `notePurchase`/`noteThrow`.
+  `heartbeat()` immediately) - same exploit, same fix. Exported alongside `notePurchase`/`noteThrow`.
 - **Called from `Buffs.use()`** (`buffs.js`) right after `Economy.takeBuff()`/`activate()` succeed, guarded the
   same way every other `Cloud.*` call site in the codebase is (`typeof Cloud !== "undefined" && Cloud.noteBuffUse`).
 - Verified live (test origin): monkey-patched `Cloud.noteBuffUse` to count calls, gave the local save 3 Water
   Bottles, called `Buffs.use("water_bottle")` - exactly one call, the buff count dropped 3 -> 2, no console
   errors.
 - `src/cloud.js?v=25`, `src/buffs.js?v=33`.
+
+## Shop purchases sync to the cloud immediately too, same as buffs (2026-09-23, PUSHED to main)
+
+**Asked directly**: "instead of writing 5s after latest shop purchase the game writes immediately after each
+shop purchase." `Cloud.notePurchase()` (see the buff-use entry just above) was debounced - several purchases in
+a burst (buying out a slot, then another) scheduled one `setTimeout`, reset on every call, that only actually
+synced 5s after the LATEST purchase. Same exploit shape as a throw or a buff use (buy something, refresh inside
+that 5s window, the restored-session flow hands back the pre-purchase save - the coins AND the item both come
+back), just with a wider window than either of those already had.
+
+- `notePurchase()` now matches `noteThrow()`/`noteBuffUse()` exactly: `dirty = true; heartbeat();`, no
+  `setTimeout`, no debounce. The `purchaseFlushTimer` variable and its `clearTimeout`/`setTimeout` pair are
+  gone - nothing else referenced them.
+- Every purchase gets its own immediate sync now instead of a shared delayed one - the intentional tradeoff
+  (this was debounced for a reason, buying out several slots back-to-back now fires several heartbeats instead
+  of one) accepted by the explicit ask.
+- Verified live (test origin): wrapped `window.setTimeout` while calling `Cloud.notePurchase()` directly -
+  zero `setTimeout` calls recorded (the old code always scheduled exactly one). No console errors.
+- `src/cloud.js?v=26`.

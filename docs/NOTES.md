@@ -1905,3 +1905,42 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 | Guitar Pick | guitar | epic | 7 | 8 | sqrt(8/7)=1.07 | **1.6** | 1434 (rare) | 10752 (epic) | **1577-9676** |
 | Disco Ticket | disco | legendary | 32 | 15 | sqrt(15/32)=0.68 -> clamped 0.7 | **1.23** | 37786 (epic) | 188928 (legendary) | **41565-170035** |
 | Heavy Pick | heavy_guitar | legendary | 8 | 15 | sqrt(15/8)=1.37 | **2.4** | 18432 (epic) | 92160 (legendary) | **20276-82944** |
+
+## Song events now end when the face is hit; event-summon prices recalculated, v4 (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Asked directly**: "lets change all those events to end when the face is hit. so each pays out only once. this
+  should simplify things. calculate again with this new addition."
+- **Gameplay change**: `finishThrow()`'s song-event face-hit branch now calls `this.onSongEnd()` right after
+  applying `faceMultiplier` - the exact same song-phase -> applause-phase transition a song's natural timeout
+  already uses (singer fades, roses start), just triggered early instead of waiting for the clock. This makes
+  guitar/disco/heavy_guitar behave exactly like the face window already did: one decisive hit, then it's over.
+  Missing the face still just pays the throw's normal coins and the song keeps running. Updated the stale "every
+  hit of the song counts" comments in main.js and economy.json's `_discoNote`/`_guitarNote`/`_heavyGuitarNote`
+  accordingly.
+- **v4 pricing, genuinely simpler this time**: since every event scores exactly once now, `revenue` no longer
+  multiplies by a hit count - it's always `1 x faceMultiplier x HV(rarity used)`. What time duration still affects
+  is the MULTIPLIER itself: `attempts = floor(the event's time window in seconds / 5)` (the face window's own 20s
+  fits this same formula now too - no more hardcoded "1 hit" special case for it), `faceMultiplier = BASE(rarity) x
+  clamp(sqrt(REFERENCE_ATTEMPTS(rarity) / attempts), 0.7, 1.8)` - same idea as v3 (a tighter window raises the
+  multiplier, a longer one lowers it), `price = [110% of revenue one rarity tier down, 90% of revenue at the
+  event's own rarity]` - the profitability guarantee, unchanged in shape from v3.
+- Guitar Pick, Disco Ticket and Heavy Pick's faceMultiplier values are UNCHANGED from v3 (their attempts count -
+  song length / 5 - didn't change, only what revenue does with it did). Only Tomato Juice's multiplier changed
+  (2.7 -> 2.12), since it no longer gets a hardcoded "1 hit" - the face window's real 20-second timer now feeds the
+  same attempts formula as everything else.
+- **Prices dropped substantially from v3** (the actual simplification the owner predicted) - Disco Ticket alone
+  goes from 41565-170035 down to 1299-5313, since a 164-second song no longer means 32x the payout.
+- Verified live (test origin): all four faceMultiplier and priceRange values read back correctly; called
+  `onSongEnd()` directly mid-song and confirmed `songPhase` flips from "song" to "applause" immediately (matching
+  exactly what the real face-hit branch now triggers); fast-forwarded the applause through to a clean finish
+  (`activeEvent`/`songPhase` both null, a different event could start right after). No console errors.
+- `main.js?v=181`, `economy.json` (cache-busted by `?t=` already, no version query on it).
+
+### Table
+
+| Item | Event | Rarity | Window | Attempts (5s each) | REFERENCE | Duration adjust | faceMultiplier | Revenue @ rarity-1 | Revenue @ rarity | Price |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Tomato Juice | face | epic | 20s | 4 | 8 | sqrt(8/4)=1.41 | **2.12** | 271 (rare) | 2035 (epic) | **299-1831** |
+| Guitar Pick | guitar | epic | 38.64s song | 7 | 8 | sqrt(8/7)=1.07 | **1.6** | 205 (rare) | 1536 (epic) | **226-1382** |
+| Disco Ticket | disco | legendary | 164.42s song | 32 | 15 | sqrt(15/32)=0.68 -> clamped 0.7 | **1.23** | 1181 (epic) | 5904 (legendary) | **1299-5313** |
+| Heavy Pick | heavy_guitar | legendary | 42.67s song | 8 | 15 | sqrt(15/8)=1.37 | **2.4** | 2304 (epic) | 11520 (legendary) | **2535-10368** |

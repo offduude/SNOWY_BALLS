@@ -198,10 +198,11 @@ const HEAVY_GUITAR_FACE_BOX = {
   heightFrom: FACE_IMG_TOP_HEIGHT - HEAVY_GUITAR_FACE_RAW.yTo,
   heightTo: FACE_IMG_TOP_HEIGHT - HEAVY_GUITAR_FACE_RAW.yFrom,
 };
-// THE SONG EVENTS (the disco, the guitar, heavy guitar): a song plays, W20 cycles through `frames` (a new one every `beatMs`), a hit on the face (`faceBox`) pays
-// `faceMultiplier` x, and when the song is over the applause and the roses come. `block` = its numbers in economy.json events.<block> (over
-// `defaults`; the block also names the event's rarity when it has no summon buff). To add another song event: an entry here, its pictures / song in
-// preload, and eventDefs().
+// THE SONG EVENTS (the disco, the guitar, heavy guitar): a song plays, W20 cycles through `frames` (a new one every `beatMs`). A hit on the face
+// (`faceBox`) pays `faceMultiplier` x and ENDS the song right there (2026-09-23: pays out once, like the banana face always has - see finishThrow) -
+// straight into its applause and roses; missing the face just pays the throw's normal coins and the song keeps going until it is hit or its own
+// clock runs out. `block` = its numbers in economy.json events.<block> (over `defaults`; the block also names the event's rarity when it has no
+// summon buff). To add another song event: an entry here, its pictures / song in preload, and eventDefs().
 const SONG_EVENTS = {
   disco: {
     sound: "disco",
@@ -2159,7 +2160,13 @@ class MainScene extends Phaser.Scene {
 
       if (faceHit) {
         if (SONG_EVENTS[this.activeEvent]) {
-          coins *= this.songConfig().faceMultiplier; // a song event's face hit (disco, guitar): a fixed bonus; the face stays, the event goes on
+          // A song event's face hit (disco, guitar, heavy guitar) now pays once and ends the song right there -
+          // straight into its applause (the owner's call, 2026-09-23: "change all those events to end when the
+          // face is hit, so each pays out only once"). onSongEnd() is the exact same transition a song's natural
+          // timeout already uses (song phase -> applause phase, singer fades, roses start) - reused as-is, just
+          // triggered early instead of waiting for the clock.
+          coins *= this.songConfig().faceMultiplier;
+          this.onSongEnd();
         } else {
           this.bananaHitTriggered = true;
           coins *= this.eco.events.faceWindow.faceMultiplier; // hitting the banana face multiplies this throw's coins (events.faceWindow.faceMultiplier, x2) and ends the event

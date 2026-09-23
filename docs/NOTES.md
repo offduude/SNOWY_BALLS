@@ -1644,3 +1644,44 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 
 - Asked directly: light grey -> white. `.board-you` now `color: #ffffff`, same outline as before (matches `.board-hint`'s look exactly now).
 - Verified live (test origin): faked `Cloud.getUser()` against a leaderboard row and re-rendered - "YOU" shows white with the outline, unclipped.
+
+## New event: Heavy Guitar, on a local branch (2026-09-23, NOT pushed - branch `heavy-guitar-event`)
+
+- **Asked directly, on a local branch**: a new event "heavy guitar" - same shape as the regular GUITAR event (see
+  `_guitarNote`), but its own song (`heavy_guitar.mp3`), 6 frames instead of 3 (`heavy_guitar1..6`) cycled every
+  500ms (twice a second, not once), applause at the end, only one event ever running at a time, legendary, can
+  spawn naturally, summoned by a new legendary item "Heavy Pick" (`heavy_guitar_pick.png`, "Turn the volume up.",
+  same detail line as the regular Guitar Pick: "Listen to a virtuoso of our times.").
+- **Turned out to need almost no new machinery** - `SONG_EVENTS` (main.js) was already built generically for
+  exactly this ("To add another song event: an entry here, its pictures / song in preload, and eventDefs()" - the
+  comment's own words). Added: a `heavy_guitar` entry in `SONG_EVENTS` (sound/frames/block/faceBox/color/defaults),
+  a line in `eventDefs()`, the 6 image + 1 audio preload calls, a `heavyGuitarWindow` block in economy.json (no
+  explicit `rarity` field - like `discoWindow`, not `guitarWindow`, since Heavy Pick's own rarity already makes it
+  legendary; only an event with NO summon buff needs to name one), and the shop item itself. Everything else -
+  mutual exclusion (`activeEvent`/`eventBlocksStart`), the applause + roses, the face-hit payout, natural spawn
+  chance by rarity, the summon-buff wiring (`Buffs.summonBuff`/`syncSummonBuff`) - is shared, unmodified code that
+  already treats every `SONG_EVENTS` entry uniformly.
+- **Face hitzone**: reused `GUITAR_FACE_RAW`'s numbers as-is for `HEAVY_GUITAR_FACE_RAW` rather than re-measuring -
+  `heavy_guitar1-6.png` are the exact same 58x50 canvas as `guitar1-3.png`/`discoface1-6.png`/`goal_window_face.png`,
+  so the guitarist should sit in the same spot. Flagged in a code comment in case the new art's face is actually
+  positioned differently - there is no way to verify this programmatically the way the character-hand calibration
+  can (a pixel-count check can't tell "is this specific rectangle where a face is").
+- **Coin bonus**: "figure this one yourself" - used `faceMultiplier: 1.25`, matching BOTH existing song events
+  (disco and guitar already use exactly this number), rather than inventing a new one with no precedent.
+- **Colour**: gave it its own hitzone colour (`0xff2e2e`, red) rather than reusing the regular guitar's orange -
+  every other event already has a colour of its own (face yellow, disco purple, guitar orange), and reusing one
+  would make the two guitar events indistinguishable on the aim bar at a glance.
+- **Price**: 5000-8000, the same legendary range already used this session for Banan and (informally) discussed for
+  a shop-reroll item - Disco Ticket (the closest precedent: also a full-song legendary summon buff) is 5100-8550.
+- Verified live (test origin): granted 5 Heavy Picks and called `scene.startEvent("heavy_guitar")` directly - config
+  reads `{ beatMs: 500, faceMultiplier: 1.25 }`; confirmed frame cycling matches `elapsed / beatMs` exactly (caught
+  mid-song on "heavy_guitar4" exactly when the math said it should be); starting `guitar`/`disco` while it ran was
+  refused (mutual exclusion holds); fast-forwarded through the song (jumped `songEvent.startedAt`) into the applause
+  phase (roses + applause sound confirmed playing) and then past the end (event cleared, `activeEvent` back to
+  `null`, a new event could start again). The shop card shows the legendary rainbow correctly (rolled 6316 coins,
+  within the 5000-8000 range). No console errors anywhere in the pass.
+- Granted 999 Heavy Picks directly on the owner's real localhost save (`Economy.addBuffs`, not through the shop) so
+  it's ready to test without waiting - per "on the local testing server stock 999 of those heavy picks", matching
+  how Banan was unlocked there earlier this session.
+- `main.js?v=176`. This whole change lives on the `heavy-guitar-event` branch only - NOT merged into `main`, NOT
+  pushed, per "on a local branch".

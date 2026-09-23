@@ -116,6 +116,7 @@ const AIM_COLOR_POWER_CSS = "#ff6f6f";
 const EVENT_COLOR_FACE = 0xffd52e; // the face-window event's hitzone on the aim bars
 const EVENT_COLOR_DISCO = 0xb04dff; // the disco event's face: a purple hitzone on the aim bars
 const EVENT_COLOR_GUITAR = 0xff8a3d; // the guitar event's face: an orange hitzone on the aim bars
+const EVENT_COLOR_HEAVY_GUITAR = 0xff2e2e; // the heavy guitar event's face: a red hitzone - its own colour, distinct from the regular guitar's
 
 // ---------------------------------------------------------------------------------------------------------
 // WEIGHT is a TIER (very light ... very heavy, economy.json weightTiers), not a number.
@@ -187,7 +188,17 @@ const GUITAR_FACE_BOX = {
   heightFrom: FACE_IMG_TOP_HEIGHT - GUITAR_FACE_RAW.yTo,
   heightTo: FACE_IMG_TOP_HEIGHT - GUITAR_FACE_RAW.yFrom,
 };
-// THE SONG EVENTS (the disco, the guitar): a song plays, W20 cycles through `frames` (a new one every `beatMs`), a hit on the face (`faceBox`) pays
+// Heavy Guitar (2026-09-23): same 58x50 frame as the regular guitar's (heavy_guitar1-6.png match guitar1-3.png's
+// canvas exactly), so its FACE_RAW is reused as-is rather than re-measured - if the new art's guitarist stands in a
+// different spot than the regular one, this box needs adjusting to match, same as GUITAR_FACE_RAW was measured.
+const HEAVY_GUITAR_FACE_RAW = GUITAR_FACE_RAW;
+const HEAVY_GUITAR_FACE_BOX = {
+  xFrom: FACE_IMG_X + HEAVY_GUITAR_FACE_RAW.xFrom,
+  xTo: FACE_IMG_X + HEAVY_GUITAR_FACE_RAW.xTo,
+  heightFrom: FACE_IMG_TOP_HEIGHT - HEAVY_GUITAR_FACE_RAW.yTo,
+  heightTo: FACE_IMG_TOP_HEIGHT - HEAVY_GUITAR_FACE_RAW.yFrom,
+};
+// THE SONG EVENTS (the disco, the guitar, heavy guitar): a song plays, W20 cycles through `frames` (a new one every `beatMs`), a hit on the face (`faceBox`) pays
 // `faceMultiplier` x, and when the song is over the applause and the roses come. `block` = its numbers in economy.json events.<block> (over
 // `defaults`; the block also names the event's rarity when it has no summon buff). To add another song event: an entry here, its pictures / song in
 // preload, and eventDefs().
@@ -209,6 +220,15 @@ const SONG_EVENTS = {
     faceBox: GUITAR_FACE_BOX,
     color: EVENT_COLOR_GUITAR,
     defaults: { faceMultiplier: 1.25, beatMs: 470 }, // about 128 bpm (measured from the song)
+  },
+  heavy_guitar: {
+    sound: "heavy_guitar",
+    volume: 0.8,
+    frames: ["heavy_guitar1", "heavy_guitar2", "heavy_guitar3", "heavy_guitar4", "heavy_guitar5", "heavy_guitar6"],
+    block: "heavyGuitarWindow",
+    faceBox: HEAVY_GUITAR_FACE_BOX,
+    color: EVENT_COLOR_HEAVY_GUITAR,
+    defaults: { faceMultiplier: 1.25, beatMs: 500 }, // twice a second, not once - the owner's call, 2026-09-23
   },
 };
 const APPLAUSE_VOLUME = 0.8;
@@ -526,9 +546,11 @@ class MainScene extends Phaser.Scene {
     this.load.audio("tomato_impact", "assets/audio/tomato_impact.mp3");
     for (let i = 1; i <= 6; i++) this.load.image("discoface" + i, "assets/building/discoface" + i + ".png");
     for (let i = 1; i <= 3; i++) this.load.image("guitar" + i, "assets/building/guitar" + i + ".png");
+    for (let i = 1; i <= 6; i++) this.load.image("heavy_guitar" + i, "assets/building/heavy_guitar" + i + ".png");
     this.load.image("rose", "assets/building/rose.png");
     this.load.audio("disco", "assets/audio/disco.mp3");
     this.load.audio("guitar", "assets/audio/guitar.mp3");
+    this.load.audio("heavy_guitar", "assets/audio/heavy_guitar.mp3");
     this.load.audio("applause", "assets/audio/applause.mp3");
   }
 
@@ -2311,6 +2333,7 @@ class MainScene extends Phaser.Scene {
       { name: "face", start: () => this.startBananaEvent() },
       { name: "disco", start: () => this.startSongEvent("disco") },
       { name: "guitar", start: () => this.startSongEvent("guitar") },
+      { name: "heavy_guitar", start: () => this.startSongEvent("heavy_guitar") },
     ].map((d) => ({ ...d, rarity: this.eventRarity(d.name) }));
   }
 

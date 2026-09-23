@@ -161,7 +161,7 @@ const Shop = (() => {
 
   // ---------- sold-out timers ----------
   // Buying an item empties its slot ("SOLD OUT") and starts a timer. The timer is a timestamp on the SHOP'S CLOCK (Economy.shopNow(): the device's
-  // clock, run at 1.2x with Frosty Night equipped - see economy.js) saved with the stock, so it keeps running while the
+  // clock, sped up by any equipped skin's shopSpeed effect (economy.js) - nothing has one today, Frosty Night's 1.2x was removed 2026-09-23) saved with the stock, so it keeps running while the
   // app is closed: when the player comes back, every slot whose time has passed is restocked. Every time below is in shop time (ms of it);
   // what the player is shown is real time: shop time / Economy.shopRate().
   const shopNow = () => Economy.shopNow();
@@ -513,8 +513,8 @@ const Shop = (() => {
     init(economyJson) {
       eco = economyJson;
       if (eco.shop && eco.shop.buffMax) Economy.setBuffMax(eco.shop.buffMax);
-      // The shop's clock runs at the product of the equipped skins' `shopSpeed` effects (Frosty Night 1.2): set now (a save may have been loaded with one
-      // equipped) and again every time something is equipped.
+      // The shop's clock runs at the product of the equipped skins' `shopSpeed` effects (nothing has one today - Frosty Night's 1.2x was removed
+      // 2026-09-23, but a future skin could still use it): set now (a save may have been loaded with one equipped) and again every time something is equipped.
       const syncRate = () => Economy.setShopRate(Economy.skinEffects(eco).filter((e) => e.type === "shopSpeed").reduce((a, e) => a * e.value, 1));
       Economy.setEquippedHook(syncRate);
       syncRate();

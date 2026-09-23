@@ -614,7 +614,7 @@ const Economy = (() => {
 
   // ---- THE SHOP'S CLOCK ----
   // The shop's timers (how long an item stays on sale, the SOLD OUT timer) are timestamps on THIS clock, not on the device clock: it runs at `rate` x the
-  // device clock (1, or 1.2 with Frosty Night equipped - a skin's `shopSpeed` effect). It is the device clock itself until the rate changes (base 0, shop 0,
+  // device clock (1, or faster with a skin's `shopSpeed` effect equipped - nothing has one today, Frosty Night's 1.2x was removed 2026-09-23). It is the device clock itself until the rate changes (base 0, shop 0,
   // rate 1), so saves from before it work unchanged. When the rate changes the clock is re-based at that moment (nothing jumps); it goes on at the saved rate while
   // the app is closed - the skin stays equipped - so the timers keep running faster offline too. Shop time to real time: divide by the rate.
   function shopNow() {

@@ -621,6 +621,13 @@ const Collection = (() => {
       const updateSkinsDot = () => skinsDot && skinsDot.classList.toggle("show", Economy.hasNewSkinsToEnter());
       Economy.onSkinsChange(updateSkinsDot);
       updateSkinsDot();
+      // Red dot on the top-right corner of the OPTIONS button: a reminder to sign in, not a "something new" notice -
+      // it stays on for as long as the player is signed out (2026-09-23), unlike every other dot here which clears
+      // once looked at. Only shown once Cloud actually has a project configured - nothing to sign into otherwise.
+      const optionsDot = document.getElementById("options-dot");
+      const updateOptionsDot = () => optionsDot && optionsDot.classList.toggle("show", typeof Cloud !== "undefined" && Cloud.isConfigured() && !Cloud.getUser());
+      if (typeof Cloud !== "undefined") Cloud.onAuthChange(updateOptionsDot);
+      updateOptionsDot();
       scrollEl.addEventListener("scroll", checkDisplayed);
       // Red dot on the top-left corner of the BUFFS button: a new kind of buff arrived (not more of one already there).
       const buffDot = document.getElementById("buffs-dot");

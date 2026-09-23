@@ -94,6 +94,9 @@ const Saves = (() => {
       : `<button type="button" class="save-icon-btn" data-act="signin">SIGN IN</button>`;
     // Signed out: no picture, no description - there is no account to show yet, just "Not signed in" next to SIGN IN
     // (the plain .pick-row/.pick-text/.pick-action pieces accountCardHtml also uses, without its picture or bio).
+    // The corner dot (the same NEW_DOT markup collection.js uses) is persistent here, not "something new to look at" -
+    // it's baked straight into this card's own markup, so it is there for as long as this signed-out card renders,
+    // and gone the moment the signed-in branch above takes over (2026-09-23, matches the OPTIONS button's own dot).
     const card = user
       ? accountCardHtml(
           (typeof Economy !== "undefined" && Economy.getAccountName()) || user.name,
@@ -102,7 +105,7 @@ const Saves = (() => {
           action,
           boardTierClass(myRank())
         )
-      : `<div class="pick-row buff-row account-card"><div class="pick-text center-self"><div class="pick-name">Not signed in.</div></div><div class="pick-action">${action}</div></div>`;
+      : `<div class="pick-row buff-row account-card"><span class="notif-dot pick-new show"></span><div class="pick-text center-self"><div class="pick-name">Not signed in.</div></div><div class="pick-action">${action}</div></div>`;
     const error = Cloud.getAuthError();
     const errorLine = error ? `<div class="account-error">${user ? "" : "Sign-in failed: "}${esc(error)}</div>` : "";
     // CHANGE NAME / CHANGE DESCRIPTION only mean anything once there's an account to attach them to.

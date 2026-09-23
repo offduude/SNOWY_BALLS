@@ -2034,3 +2034,30 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   tens of seconds longer the bug would have needed) - `songEvent`/`activeEvent`/the saved event all cleanly null,
   a different event could start right after. No console errors throughout.
 - `main.js?v=182`, `economy.js?v=42`.
+
+## Frosty Night loses its shop-speed bonus; persistent sign-in reminder dot (2026-09-23, PUSHED to main)
+
+- **Asked directly**: (1) remove the 1.2x shop timer effect from Frosty Night, and its detail line about it; (2) a
+  persistent red dot on the OPTIONS button and the account card while the player is signed out.
+- **Frosty Night**: dropped its `effects: [{"type":"shopSpeed","value":1.2}]` and blanked `detail` (was "Shop timer
+  runs 1.2x faster.") - the `shopSpeed` MECHANISM itself (economy.js shopNow/shop.js) is untouched and still live
+  for whatever skin uses it next; nothing does today. Updated the handful of comments across economy.json/shop.js/
+  economy.js that used "Frosty Night 1.2" as their worked example, so they don't point at a bonus that no longer
+  exists.
+- **Sign-in reminder dots**: unlike every other red dot in the game (new projectile/skin/buff/shop-restock - all
+  clear once looked at), this one is deliberately PERSISTENT: it reflects `!Cloud.getUser()` directly, live, for as
+  long as that's true, with no "seen" state to dismiss it.
+  - **OPTIONS button**: new `#options-dot` (index.html, positioned the same way as `#projectiles-dot`/`#skins-dot`
+    - the third button in `#side-buttons`, 80px down, minus half the dot). `collection.js` wires it to
+    `Cloud.onAuthChange`, toggling `.show` on `Cloud.isConfigured() && !Cloud.getUser()` - suppressed entirely if
+    Cloud isn't even configured (nothing to sign into).
+  - **Account card**: the "Not signed in." card's own markup (`saves.js` `accountSectionHtml`) now includes the
+    same dot markup `collection.js` uses for a "new" item (`notif-dot pick-new show`) - baked directly into the
+    signed-out branch's HTML, so it's simply gone the instant the signed-in branch renders instead; no separate JS
+    state needed.
+- Verified live (test origin): both dots show correctly on a fresh (signed-out) load, confirmed the OPTIONS dot's
+  exact position against the button's own bounding box (centred on its top-right corner, matching the pattern);
+  faked a signed-in `Cloud.getUser()` and confirmed both the button dot and the account-card dot disappear. No
+  console errors.
+- `economy.json`, `index.html`, `src/collection.js?v=76`, `src/economy.js?v=43`, `src/saves.js?v=23`,
+  `src/shop.js?v=31`.

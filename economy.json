@@ -32,7 +32,7 @@
     }
   },
 
-  "_skinsNote": "SKINS (the SKINS button, between PROJECTILES and OPTIONS): characters, sceneries and weather (see _weatherNote) are equipped, and each may carry `effects` [{type, value}] that are on for as long as it is equipped (coinMultiplier and offsetCenter, read like a buff's by buffs.js modifiers() - none uses them today; shopSpeed: the shop's timers - the item's availability timer and the sold-out timer - run value x as fast, on a clock that goes on while the app is closed: Economy.shopNow(), Frosty Night 1.2 = a 30 minute timer takes 25), never consumed, never unequipped (only by equipping another one), and listed by rarity, the rarest first. characters: the thrower; `character` names its entry in CHARACTERS (main.js: the empty-handed pictures and hand numbers), `image` is the face on its card, `detail` will describe the bonus it gives (empty for the default one). sceneries: the picture behind the game; `background` is the wall texture - it must be EXACTLY the size of assets/building/background.png (704x1000) with the windows in the same places, so a scenery is only a visual change; `image` is its card picture. rarity: one of the rarities below (default = free, always owned); others must be unlocked (Economy.unlock).",
+  "_skinsNote": "SKINS (the SKINS button, between PROJECTILES and OPTIONS): characters, sceneries and weather (see _weatherNote) are equipped, and each may carry `effects` [{type, value}] that are on for as long as it is equipped (coinMultiplier and offsetCenter, read like a buff's by buffs.js modifiers() - none uses them today; shopSpeed: the shop's timers - the item's availability timer and the sold-out timer - run value x as fast, on a clock that goes on while the app is closed: Economy.shopNow(), e.g. value 1.2 = a 30 minute timer takes 25 - Frosty Night had this until 2026-09-23, removed at the owner's request; nothing uses shopSpeed today, but the mechanism is still live for whatever does next), never consumed, never unequipped (only by equipping another one), and listed by rarity, the rarest first. characters: the thrower; `character` names its entry in CHARACTERS (main.js: the empty-handed pictures and hand numbers), `image` is the face on its card, `detail` will describe the bonus it gives (empty for the default one). sceneries: the picture behind the game; `background` is the wall texture - it must be EXACTLY the size of assets/building/background.png (704x1000) with the windows in the same places, so a scenery is only a visual change; `image` is its card picture. rarity: one of the rarities below (default = free, always owned); others must be unlocked (Economy.unlock).",
   "characters": [
     {
       "id": "andek",
@@ -78,9 +78,8 @@
       "description": "The same wall, after dark.",
       "image": "assets/scenery/frosty_night.png",
       "background": "assets/scenery/frosty_night_bg.png",
-      "effects": [{ "type": "shopSpeed", "value": 1.2 }],
       "rarity": "rare",
-      "detail": "Shop timer runs 1.2x faster."
+      "detail": ""
     }
   ],
 

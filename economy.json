@@ -12,22 +12,22 @@
     "faceWindow": {
       "durationMs": 20000,
       "hitRevertMs": 1000,
-      "faceMultiplier": 2.12
+      "faceMultiplier": 1.5
     },
     "_discoNote": "DISCO event (see main.js startDiscoEvent): legendary like its summon buff (see _rarityNote for how often it spawns by itself). While disco.mp3 plays (about 2:44) W20 shows discoface1-6 (a new one every beatMs = 500 ms, 120 bpm); a hit on the singer's FACE pays faceMultiplier x the coins of that throw and ENDS the song right there, straight into its applause (2026-09-23: every song event now pays out once, like the banana face always has - see _eventSummonPricingNote); a plain W20 hit (missing the face) pays as usual and the song keeps going. Afterwards applause.mp3 plays while roses fall, then everything is normal.",
     "discoWindow": {
-      "faceMultiplier": 1.23,
+      "faceMultiplier": 1.75,
       "beatMs": 500
     },
     "_guitarNote": "GUITAR event (the same idea as the disco, see main.js SONG_EVENTS): EPIC (it has no summon buff, so its own rarity below names it; it shares the epic events' natural chance with the banana face - see _rarityNote). While guitar.mp3 plays W20 cycles guitar1 -> guitar2 -> guitar3 (a new one every beatMs); a hit on the guitarist's FACE pays faceMultiplier x the coins of that throw and ENDS the song right there, straight into its applause (2026-09-23: pays out once, like the banana face); a plain W20 hit (missing the face) pays as usual and the song keeps going. Afterwards applause.mp3 plays while roses fall, then everything is normal.",
     "guitarWindow": {
       "rarity": "epic",
-      "faceMultiplier": 1.6,
+      "faceMultiplier": 1.5,
       "beatMs": 470
     },
     "_heavyGuitarNote": "HEAVY GUITAR event (2026-09-23, see main.js SONG_EVENTS): legendary, like its summon buff (the Heavy Pick - no rarity of its own here, same as discoWindow). While heavy_guitar.mp3 plays W20 cycles heavy_guitar1 -> ... -> heavy_guitar6 (a new one every beatMs = 250ms, four times a second) and concert smoke/lasers run (main.js CONCERT EFFECTS - the song phase only, not the applause); a hit on the guitarist's FACE pays faceMultiplier x the coins of that throw and ENDS the song right there, straight into its applause (pays out once, like the banana face); a plain W20 hit (missing the face) pays as usual and the song keeps going. Afterwards applause.mp3 plays while roses fall, then everything is normal - same shape as the disco/guitar events, only one of the three (or the banana face) can ever run at once.",
     "heavyGuitarWindow": {
-      "faceMultiplier": 2.4,
+      "faceMultiplier": 1.75,
       "beatMs": 250
     }
   },
@@ -213,7 +213,7 @@
     },
 
     "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (guideLines, precision, strengthControl, coinMultiplier - see src/buffs.js). a single item can have priceRange {min, max} instead of price: its price is rolled in that range each time it is put on sale. category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; the same stack can be on sale in several slots at once, each with its own roll).",
-    "_eventSummonPricingNote": "PRICING an event-summon item's faceMultiplier AND price (triggerEvent effect: tomato_juice/faceWindow, guitar_pick/guitarWindow, disco_ticket/discoWindow, heavy_guitar_pick/heavyGuitarWindow - 2026-09-23, the owner's formula, v4, superseding v1 (pure earning power - pushed legendary items past every other shop item), v2 (matched other consumables' prices, but dropped the profitability guarantee), and v3 (guarantee restored, but a long song's repeated hits still pushed prices very high). v4's own gameplay change made this simpler: EVERY song event (guitar/disco/heavy_guitar) now ends the moment its face is hit, exactly like the face window always has (main.js finishThrow, onSongEnd called early) - so every event in this file pays out exactly ONCE, never many times over a song.\n\nMETHOD: 1) attempts = floor(the event's own time window in seconds / 5) - the face window's durationMs (20s) for the face event, or the song's real length (main.js songTimes) for a song event; 5s/throw is a stated fast-active-play assumption (aim + flight + the result message), not the passive throwsPerHour used for natural spawn odds. attempts is no longer a hit COUNT (only one hit ever scores) - it is how many tries the window realistically gives you to land that one hit, which is what still ties the multiplier to time duration. 2) faceMultiplier = BASE(rarity) x clamp(sqrt(REFERENCE_ATTEMPTS(rarity) / attempts), 0.7, 1.8) - BASE (a rarity's 'prestige' bonus: common 1.2, rare 1.35, epic 1.5, legendary 1.75) adjusted against a typical attempt count for that rarity (REFERENCE_ATTEMPTS: common 5, rare 6, epic 8, legendary 15) - a tighter window than typical raises the multiplier (up to +80%, rewarding the pressure of fewer tries), a longer one lowers it (down to -30%, since landing the one hit is easier). 3) revenue(rarity used) = 1 x faceMultiplier x rarities[rarity used].projectileHitValue - always exactly one hit now, which is the actual simplification: no more multiplying by how long the song ran. 4) priceRange.min = ceil(revenue(one rarity tier below the event's own) x 1.1) - a guaranteed loss on weaker ammo even at the item's cheapest roll; priceRange.max = floor(revenue(the event's own rarity) x 0.9) - a guaranteed profit at that rarity or higher even at the item's priciest roll.\n\nRESULT (attempts, faceMultiplier, price): face/Tomato Juice - 4 (20s/5), 2.12, 299-1831. guitar/Guitar Pick - 7, 1.6, 226-1382. disco/Disco Ticket - 32, 1.23, 1299-5313. heavy_guitar/Heavy Pick - 8, 2.4, 2535-10368. Guitar/Disco/Heavy Pick's own faceMultiplier didn't need to change from v3 (their attempts count is unchanged, only what revenue does with it changed) - only Tomato Juice's did, since it no longer gets a hardcoded '1 hit' special case: the face window's 20-second timer now feeds the SAME attempts formula every other event uses. NOTE: faceWindow.faceMultiplier is shared with the NATURAL (non-buff-triggered) banana face event too, not just Tomato Juice. Ammo scarcity (a rarity's usual stack size) is still not modelled.",
+    "_eventSummonPricingNote": "PRICING an event-summon item's faceMultiplier AND price (triggerEvent effect: tomato_juice/faceWindow, guitar_pick/guitarWindow, disco_ticket/discoWindow, heavy_guitar_pick/heavyGuitarWindow - 2026-09-23, the owner's formula, v5, superseding v1-v4 (each still weighed the event's TIME WINDOW somehow - as a hit count, then as an 'attempts' adjustment to the multiplier). The owner's call this round: since every event now pays out exactly once (see finishThrow, onSongEnd called on a face hit - the same change v4 made), duration is no longer a factor AT ALL - only RARITY decides the multiplier and the price, and the guarantee only has to hold one rarity tier down (own rarity or higher = profitable, exactly one tier below = not).\n\nMETHOD: 1) faceMultiplier = BASE(rarity) - a flat number per rarity, no adjustment: common 1.2, rare 1.35, epic 1.5, legendary 1.75. 2) revenue(rarity used) = 1 x faceMultiplier x rarities[rarity used].projectileHitValue. 3) priceRange.min = ceil(revenue(one rarity tier below the event's own) x 1.02) - a guaranteed (if narrow) loss on weaker ammo even at the item's cheapest roll; priceRange.max = floor(revenue(the event's own rarity) x 0.98) - a guaranteed (if narrow) profit at that rarity or higher even at the item's priciest roll. The 2% margin (was 10% in v1/v3) is deliberately tight - 'estimate more precisely' - while still holding strictly after rounding to whole coins.\n\nRESULT: every EPIC event-summon item (Tomato Juice, Guitar Pick) now shares faceMultiplier 1.5 and price 196-1411; every LEGENDARY one (Disco Ticket, Heavy Pick) shares faceMultiplier 1.75 and price 1714-8232. Said plainly: with duration no longer a differentiator, nothing is left to tell two items of the SAME rarity apart price-wise - this is the direct, intended consequence of the owner's instruction, not an oversight. NOTE: faceWindow.faceMultiplier is shared with the NATURAL (non-buff-triggered) banana face event too, not just Tomato Juice. Ammo scarcity (a rarity's usual stack size) is still not modelled.",
     "items": [
       {
         "id": "skyr_orange",
@@ -363,7 +363,7 @@
         "name": "Tomato Juice",
         "category": "consumable",
         "rarity": "epic",
-        "priceRange": { "min": 299, "max": 1831 },
+        "priceRange": { "min": 196, "max": 1411 },
         "ignorePriceOverride": true,
         "duration": { "seconds": 20 },
         "image": "assets/items/tomato_juice.png",
@@ -402,7 +402,7 @@
         "name": "Disco Ticket",
         "category": "consumable",
         "rarity": "legendary",
-        "priceRange": { "min": 1299, "max": 5313 },
+        "priceRange": { "min": 1714, "max": 8232 },
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/disco_ticket.png",
@@ -415,7 +415,7 @@
         "name": "Guitar Pick",
         "category": "consumable",
         "rarity": "epic",
-        "priceRange": { "min": 226, "max": 1382 },
+        "priceRange": { "min": 196, "max": 1411 },
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/guitar_pick.png?v=2",
@@ -428,7 +428,7 @@
         "name": "Heavy Pick",
         "category": "consumable",
         "rarity": "legendary",
-        "priceRange": { "min": 2535, "max": 10368 },
+        "priceRange": { "min": 1714, "max": 8232 },
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/heavy_guitar_pick.png",

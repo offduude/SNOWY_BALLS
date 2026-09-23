@@ -1944,3 +1944,32 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 | Guitar Pick | guitar | epic | 38.64s song | 7 | 8 | sqrt(8/7)=1.07 | **1.6** | 205 (rare) | 1536 (epic) | **226-1382** |
 | Disco Ticket | disco | legendary | 164.42s song | 32 | 15 | sqrt(15/32)=0.68 -> clamped 0.7 | **1.23** | 1181 (epic) | 5904 (legendary) | **1299-5313** |
 | Heavy Pick | heavy_guitar | legendary | 42.67s song | 8 | 15 | sqrt(15/8)=1.37 | **2.4** | 2304 (epic) | 11520 (legendary) | **2535-10368** |
+
+## Event-summon buffs v5: rarity only, duration dropped, tighter margins (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Asked directly**: "estimate price range more precisely, remember only has to be profitable with a projectile
+  of the same or higher rarity, we no longer should account for the duration since youre only getting one hit
+  anyway."
+- **v5 method** (rewritten into `_eventSummonPricingNote`): with every event paying out exactly once (v4's
+  gameplay change), duration is no longer a factor anywhere - `faceMultiplier` is now a FLAT number per rarity,
+  no adjustment: common 1.2, rare 1.35, epic 1.5, legendary 1.75. `revenue(rarity used) = 1 x faceMultiplier x
+  rarities[rarity used].projectileHitValue`. `priceRange.min = ceil(revenue(one tier below) x 1.02)`,
+  `priceRange.max = floor(revenue(own rarity) x 0.98)` - the margin tightened from 10% (v1/v3) to 2% ("estimate
+  more precisely"), while still holding strictly after rounding to whole coins.
+- **Said plainly**: with duration gone, nothing differentiates two items of the SAME rarity any more - Tomato
+  Juice and Guitar Pick (both epic) now share the exact same faceMultiplier (1.5) and price range; Disco Ticket
+  and Heavy Pick (both legendary) share 1.75 and their own matching range. This is the direct, intended consequence
+  of the instruction, not an oversight.
+- Verified live (test origin): recomputed revenue at one-tier-below and at-rarity directly from the loaded
+  economy.json for all four items and confirmed `price.min > revenue(below)` and `price.max < revenue(match)`
+  hold strictly at every value, no console errors.
+- `economy.json` only (cache-busted by `?t=` already, no version query on it).
+
+### Table
+
+| Item | Rarity | faceMultiplier | Revenue @ rarity-1 | Revenue @ rarity | Price |
+|---|---|---|---|---|---|
+| Tomato Juice | epic | **1.5** | 192 (rare) | 1440 (epic) | **196-1411** |
+| Guitar Pick | epic | **1.5** | 192 (rare) | 1440 (epic) | **196-1411** |
+| Disco Ticket | legendary | **1.75** | 1680 (epic) | 8400 (legendary) | **1714-8232** |
+| Heavy Pick | legendary | **1.75** | 1680 (epic) | 8400 (legendary) | **1714-8232** |

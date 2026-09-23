@@ -240,20 +240,25 @@ const ROSE_SPEED_MAX = 300;
 const ROSE_MEAN_SPEED = (ROSE_SPEED_MIN + ROSE_SPEED_MAX) / 2;
 const ROSE_ON_SCREEN = (ROSE_RATE * GAME_HEIGHT) / ROSE_MEAN_SPEED; // how many roses are in the picture at once (about 29): what the rate and the speed above give
 
-// CONCERT EFFECTS (Heavy Guitar only, 2026-09-23): smoke rising from the bottom of the screen and a few sweeping
-// stage lasers, for as long as the song plays (not the applause - it would fight the roses for attention, and the
-// crowd's gone quiet by then) - purely decorative, no gameplay effect, both textures generated once at runtime
-// (the same idea as makeMiracleGlowTexture) rather than shipped as image files. See updateConcertEffects.
-const SMOKE_RATE = 2.2; // puffs a second
-const SMOKE_RISE_SPEED_MIN = 16; // px/s upward
-const SMOKE_RISE_SPEED_MAX = 30;
-const SMOKE_LIFE_MS = 4200; // fade in, hold, fade out, over this long - long enough to drift most of the way up the picture
-const SMOKE_MAX_ALPHA = 0.6; // kept translucent - the windows behind it are still the actual target (tuned up from an initial 0.4: too close to the snowy street's own colour to read as smoke rather than more snow)
-const SMOKE_MAX_SIZE = 110; // px, at the peak of its growth (see updateConcertEffects: it grows as it rises, like real smoke spreading)
+// CONCERT EFFECTS (Heavy Guitar only, 2026-09-23; tuned the same day after the owner watched it run): smoke rising
+// from the bottom of the screen and a few sweeping stage lasers, for as long as the song plays (not the applause -
+// it would fight the roses for attention, and the crowd's gone quiet by then) - purely decorative, no gameplay
+// effect, both textures generated once at runtime (the same idea as makeMiracleGlowTexture) rather than shipped as
+// image files. See updateConcertEffects.
+const SMOKE_RATE = 2.2; // puffs a second, PER spawn point (see SMOKE_X_FRACTIONS - two fountains, not one)
+// Exactly two smoke machines, symmetric about the player: the midpoint of each screen HALF (25% and 75% across),
+// not a random x - "two places total at an equal distance from the player" (the owner's call, 2026-09-23).
+const SMOKE_X_FRACTIONS = [0.25, 0.75];
+const SMOKE_RISE_SPEED_MIN = 110; // px/s upward - fast, "for the maximum effect" (was 16-30: a lazy drift, not a blast)
+const SMOKE_RISE_SPEED_MAX = 160;
+const SMOKE_LIFE_MS = 1900; // shortened to match the faster rise (at ~135px/s average this still covers most of the picture's height); a puff that outruns its own fade is also culled once it clears the top of the view, see updateConcertSmoke
+const SMOKE_MAX_ALPHA = 0.85; // higher contrast (was 0.6, itself already raised once from an initial 0.4)
+const SMOKE_MAX_SIZE = 120; // px, at the peak of its growth (see updateConcertEffects: it grows as it rises, like real smoke spreading)
 const LASER_COLORS = [0xff2e4d, 0x2ecbff, 0xb04dff]; // red, cyan, purple - a few stage-light colours, cycled one per beam
 const LASER_LENGTH = 340;
 const LASER_WIDTH = 5;
 const LASER_ALPHA = 0.55;
+const LASER_CYCLE_S = 26.6; // one full back-and-forth sweep, all three beams in time with each other (the owner's call, 2026-09-23)
 
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
 const MARK_QUICK_FADE_MS = 300; // faster than the normal MARK_FADE_MS, for the banana-tied clears
@@ -637,7 +642,7 @@ class MainScene extends Phaser.Scene {
     this.songPhase = null; // null, "song" or "applause" while the disco event runs
     this.roses = []; // the roses falling during the applause
     this.concertSmoke = []; // Heavy Guitar only: smoke puffs rising while the song plays - see updateConcertEffects
-    this.smokeAcc = 0;
+    this.smokeAcc = [0, 0]; // one accumulator per SMOKE_X_FRACTIONS point, so the two fountains don't spawn in lockstep
     this.lasers = null; // Heavy Guitar only: the sweeping stage lasers, or null while not running
     this.songEvent = null; // { name, startedAt } of the running disco (also saved: Economy.getEvent)
     this.heldEventStep = null; // a change of an event (its end, a new phase) that waits for the throw being aimed / in the air to be over
@@ -1793,9 +1798,11 @@ class MainScene extends Phaser.Scene {
     const tex = this.textures.createCanvas("concert_smoke", 128, 128);
     const ctx = tex.getContext();
     const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    grad.addColorStop(0, "rgba(150,150,165,0.9)"); // darker than the snowy street it rises over, so it reads as smoke rather than more snow
-    grad.addColorStop(0.45, "rgba(130,130,148,0.5)");
-    grad.addColorStop(1, "rgba(130,130,148,0)");
+    // Higher contrast (2026-09-23, tuned again after the owner watched it run): a dark, near-black core, well clear
+    // of the snowy street's own pale colour - it needs to read as smoke at a glance, not just a faint haze.
+    grad.addColorStop(0, "rgba(45,45,55,0.95)");
+    grad.addColorStop(0.45, "rgba(60,60,72,0.55)");
+    grad.addColorStop(1, "rgba(60,60,72,0)");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 128, 128);
     tex.refresh();
@@ -1818,18 +1825,19 @@ class MainScene extends Phaser.Scene {
     tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
   }
 
-  // One smoke puff, born at the bottom edge of the default view - grows and fades over SMOKE_LIFE_MS while it
-  // drifts up with a slow side-to-side sway (see updateConcertSmoke), then is gone.
-  spawnSmokePuff() {
+  // One smoke puff, born at the bottom edge of the default view at one of the two fixed SMOKE_X_FRACTIONS points
+  // (pointIndex 0 or 1) - grows and fades over SMOKE_LIFE_MS while it rises fast with a slight side-to-side sway
+  // (see updateConcertSmoke), then is gone.
+  spawnSmokePuff(pointIndex) {
     if (!this.textures.exists("concert_smoke")) this.makeSmokeTexture();
-    const x = Phaser.Math.FloatBetween(INITIAL_SCROLL_X, INITIAL_SCROLL_X + GAME_WIDTH);
+    const x = INITIAL_SCROLL_X + GAME_WIDTH * SMOKE_X_FRACTIONS[pointIndex];
     const y = INITIAL_SCROLL_Y + GAME_HEIGHT + 12;
     const img = this.add.image(x, y, "concert_smoke").setDepth(8).setAlpha(0);
     this.concertSmoke.push({
       img,
       startX: x,
       vy: -Phaser.Math.FloatBetween(SMOKE_RISE_SPEED_MIN, SMOKE_RISE_SPEED_MAX),
-      sway: Phaser.Math.FloatBetween(6, 16),
+      sway: Phaser.Math.FloatBetween(4, 10), // kept tighter than before - it should still read as its own column, not blur into the other one
       swayPhase: Math.random() * Math.PI * 2,
       swaySpeed: Phaser.Math.FloatBetween(0.6, 1.1),
       targetSize: Phaser.Math.FloatBetween(SMOKE_MAX_SIZE * 0.55, SMOKE_MAX_SIZE),
@@ -1842,7 +1850,9 @@ class MainScene extends Phaser.Scene {
     const now = Date.now();
     this.concertSmoke = this.concertSmoke.filter((s) => {
       const t = (now - s.born) / SMOKE_LIFE_MS; // 0..1 over its life
-      if (t >= 1) {
+      // Cut short once it clears the top of the default view too - at the faster rise speed a puff can outrun its
+      // own SMOKE_LIFE_MS fade and would otherwise keep updating, fully visible, off-screen above the building.
+      if (t >= 1 || s.img.y + s.img.displayHeight / 2 < INITIAL_SCROLL_Y) {
         s.img.destroy();
         return false;
       }
@@ -1858,18 +1868,25 @@ class MainScene extends Phaser.Scene {
     });
   }
 
-  // The sweeping lasers: fixed anchor points near the top of the picture (like rigged stage lights), each sweeping
-  // back and forth in angle at its own speed and phase so they never move in sync. Built once per song (see
-  // updateConcertEffects) and torn down when it ends.
+  // The sweeping lasers: fixed anchor points just BELOW the bottom edge of the default view (like floor-mounted
+  // stage lights shooting up into the crowd - the owner's call, 2026-09-23: anchored near the top they had no
+  // visible source, reading as light "coming from nowhere on the building"), each sweeping back and forth in angle
+  // around straight-up, all three sharing the same LASER_CYCLE_S period (so the whole rig moves "in time") but with
+  // their own amplitude and a staggered phase so they don't overlap. Built once per song (see updateConcertEffects)
+  // and torn down when it ends.
   initLasers() {
     if (this.lasers) return;
     if (!this.textures.exists("concert_laser")) this.makeLaserTexture();
+    // base is measured from straight up (Math.PI, since the texture's bright end anchors at origin (0.5, 0) and
+    // extends towards +y - i.e. "down" - when unrotated; Math.PI flips that to "up"), the same fan of angles the
+    // beams used to sweep around when they hung from the top and pointed down, just mirrored to point up instead.
     const anchors = [
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.12, base: -1.15, amp: 0.5, speed: 0.7 },
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.5, base: -1.57, amp: 0.65, speed: 0.55 }, // -1.57 rad = straight up
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.88, base: -2.0, amp: 0.5, speed: 0.65 },
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.12, base: Math.PI - 1.15, amp: 0.5 },
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.5, base: Math.PI - 1.57, amp: 0.65 }, // straight up at the centre of its sweep
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.88, base: Math.PI - 2.0, amp: 0.5 },
     ];
-    const y = INITIAL_SCROLL_Y - 4; // just above the default view - the fixture itself is never seen, only its beam
+    const y = INITIAL_SCROLL_Y + GAME_HEIGHT + 4; // just below the default view - the fixture itself is never seen, only its beam
+    const speed = (2 * Math.PI) / LASER_CYCLE_S; // shared by all three - one full sweep every LASER_CYCLE_S
     this.lasers = anchors.map((a, i) => {
       const img = this.add
         .image(a.x, y, "concert_laser")
@@ -1879,7 +1896,7 @@ class MainScene extends Phaser.Scene {
         .setTint(LASER_COLORS[i % LASER_COLORS.length])
         .setDisplaySize(LASER_WIDTH, LASER_LENGTH)
         .setAlpha(LASER_ALPHA);
-      return { img, base: a.base, amp: a.amp, speed: a.speed, phase: Math.random() * Math.PI * 2 };
+      return { img, base: a.base, amp: a.amp, speed, phase: (i / anchors.length) * Math.PI * 2 };
     });
   }
 
@@ -1891,7 +1908,7 @@ class MainScene extends Phaser.Scene {
   clearConcertEffects() {
     this.concertSmoke.forEach((s) => s.img.destroy());
     this.concertSmoke = [];
-    this.smokeAcc = 0;
+    this.smokeAcc = [0, 0];
     if (this.lasers) {
       this.lasers.forEach((l) => l.img.destroy());
       this.lasers = null;
@@ -1899,8 +1916,9 @@ class MainScene extends Phaser.Scene {
   }
 
   // Called every frame from updateSong: while Heavy Guitar's song is playing, spawns smoke at SMOKE_RATE a second
-  // and sweeps the lasers; otherwise tears both down (once - clearConcertEffects on an already-empty state is a
-  // harmless no-op, but this only runs the frame the state actually changes, via the running check below).
+  // from EACH of the two fixed points and sweeps the lasers; otherwise tears both down (once - clearConcertEffects
+  // on an already-empty state is a harmless no-op, but this only runs the frame the state actually changes, via the
+  // running check below).
   updateConcertEffects(dt) {
     const running = this.songPhase === "song" && this.songEvent && this.songEvent.name === "heavy_guitar";
     if (!running) {
@@ -1909,10 +1927,12 @@ class MainScene extends Phaser.Scene {
     }
     this.initLasers();
     this.updateLasers((Date.now() - this.songEvent.startedAt) / 1000);
-    this.smokeAcc += dt * SMOKE_RATE;
-    while (this.smokeAcc >= 1) {
-      this.smokeAcc -= 1;
-      this.spawnSmokePuff();
+    for (let i = 0; i < SMOKE_X_FRACTIONS.length; i++) {
+      this.smokeAcc[i] += dt * SMOKE_RATE;
+      while (this.smokeAcc[i] >= 1) {
+        this.smokeAcc[i] -= 1;
+        this.spawnSmokePuff(i);
+      }
     }
     this.updateConcertSmoke(dt);
   }

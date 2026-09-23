@@ -1713,3 +1713,41 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   and fades correctly (checked both by eye and by reading individual puffs' position/alpha/size mid-flight), no
   console errors, ends and clears exactly as described above.
 - `main.js?v=177`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.
+
+## Concert effects, round 2: grounded lasers, twin smoke columns, higher contrast, 26.6s sweep (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Asked directly, four changes**: (1) the lasers looked like they came from nowhere on the building - anchor them
+  below the default display instead; (2) smoke should come from only two fixed places, the midpoint of each screen
+  half, equidistant from the player; (3) higher contrast and a much faster rise, "for the maximum effect"; (4)
+  "adjust the cycle time to 26.6 seconds."
+- **Lasers**: anchor moved from just above the top of the default view to just below the bottom (`INITIAL_SCROLL_Y +
+  GAME_HEIGHT + 4`, the same edge smoke spawns from) - floor-mounted stage lights shooting up into the crowd, not a
+  light with no visible source. Every base sweep angle got `+ Math.PI` (a guaranteed 180-degree flip regardless of
+  the exact trig, since reversing any direction by half a turn is unambiguous) so the same fan of beams that used to
+  rain down from the top now shoots up from the ground instead - confirmed live: anchor y (24) sits just past the
+  bottom edge of the view (20), same as before but mirrored.
+- **Smoke**: `SMOKE_X_FRACTIONS = [0.25, 0.75]` replaces the old random-across-the-width spawn - exactly two fixed
+  columns, the midpoint of each screen half, symmetric about the player (who stands at the horizontal centre).
+  Verified live: every spawned puff's x was either 303 or 519 (world units) - the player's own x (411) sits exactly
+  108 either way. Sway range tightened (was 6-16px, now 4-10px) so puffs still read as their own column rather than
+  drifting into each other.
+- **Contrast + speed**: rise speed 16-30px/s -> 110-160px/s ("very fast... for the maximum effect"); the gradient's
+  core darkened from a light grey to a near-black `rgba(45,45,55,...)`, and `SMOKE_MAX_ALPHA` raised 0.6 -> 0.85 (a
+  second tuning pass on top of the one from the previous entry - both times decided by an actual in-game screenshot,
+  not by eye on the numbers alone). `SMOKE_LIFE_MS` shortened 4200 -> 1900 to match the faster rise (a slow-fade
+  timer tuned for a lazy drift would otherwise leave puffs fully opaque well past where they've visually finished
+  rising); also added a hard cull once a puff clears the top of the default view, since a puff can now genuinely
+  outrun its own fade timer at this speed and would otherwise sit fully visible off-screen for the rest of its life.
+- **Cycle time -> 26.6 seconds**: interpreted as the laser sweep's own period (how long one full back-and-forth
+  motion takes) rather than the frame beat (already set to 250ms the message before, and 26.6s makes no sense as a
+  per-frame time) or the song's actual length (not a configurable number - it comes from the real `heavy_guitar.mp3`
+  file's duration). All three beams now share the same `LASER_CYCLE_S = 26.6` period (`speed = 2*PI / 26.6`, same
+  for every beam) rather than each having its own arbitrary speed, so the whole rig moves "in time" - individual
+  amplitude and a staggered starting phase per beam keep them from overlapping. **Flagging this interpretation
+  explicitly in case "cycle time" meant something else** - it's a one-line change to point at a different number if so.
+- Verified live (test origin): laser anchor y (24) and rotation confirmed just past the bottom edge; smoke x values
+  confirmed exactly the two intended columns; a real screenshot shows two dark, clearly-visible smoke columns either
+  side of the player and lasers visibly originating from street level, sweeping up across the building. Fast-forwarded
+  past the end again - clean teardown (`activeEvent` null, smoke/lasers empty, `smokeAcc` reset to `[0, 0]`, a new
+  event could start). No console errors.
+- `main.js?v=178`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.

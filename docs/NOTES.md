@@ -1773,3 +1773,32 @@ Decided over a longer conversation, not just built outright - the reasoning (why
   two dense, clearly-visible dark smoke columns confined to the lower half of the picture, and two laser beams
   reading as close to vertical. Fast-forwarded past the end - clean teardown as before, no console errors.
 - `main.js?v=179`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.
+
+## Found and fixed the real laser bug; smoke back to white (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Reported**: "the lasers are basically horizontal, almost nonexistent at the screen" - after TWO earlier rounds
+  that each claimed to make them "more vertical."
+- **Root cause, finally found**: `Math.PI - 1.57` (used as "straight up" in both previous rounds) is not
+  `Math.PI` - it's `~1.57`, i.e. `~PI/2`. With this beam's origin (0.5, 0) - anchored at its bright end, extending
+  towards +y ("down") at rotation 0 - the rotation that actually points "up" is `Math.PI` alone; `+-PI/2` from
+  rotation 0 is HORIZONTAL (left/right), not a step towards vertical. The very first round (this file, "New
+  character/event" entries above) labelled `-1.57 rad` as "straight up" in a comment without ever checking it
+  against a real reference - it was actually close to horizontal from the start. Every later round (including the
+  "more vertical" fix two entries back) swept a smaller angular range around that same wrong, horizontal-ish
+  centre - reducing the swing's SIZE without ever moving its CENTRE to actual vertical, which is exactly why the
+  beams kept reading as "basically horizontal" no matter how much the amplitude was trimmed. The previous round's
+  own "verified: 16-23 degrees from vertical" check was measuring deviation from that same wrong reference, so it
+  falsely confirmed a fix that hadn't happened.
+- **Fixed**: base angles are now built from `Math.PI` directly (`Math.PI - 0.18`, `Math.PI`, `Math.PI + 0.18`) -
+  genuinely centred on straight up this time. Verified live using `Math.PI` as the actual reference (not the old
+  wrong one): true deviation from vertical is now 1.3-12.8 degrees (accounting for angle wraparound) - and, more to
+  the point, a screenshot shows two long, clearly-vertical, clearly-visible beams reaching from the ground straight
+  up past the building, nothing like the "almost nonexistent" horizontal lines from before.
+- **Also**: `LASER_ALPHA` 0.55 -> 0.85 (less transparent, as asked).
+- **Smoke**: recoloured back to white (`rgba(255,255,255,...)` core) - the dark near-black core from two rounds ago
+  read more like exhaust than stage fog; visibility against the snowy street now rests on the density (SMOKE_RATE)
+  and alpha (already raised to 0.9) rather than on being darker than its surroundings. Spawn point moved a bit
+  further under the default view's bottom edge (+12 -> +28) so it more clearly originates from off-screen.
+- Verified live (a fresh tab again): no console errors, clean teardown, lasers now unmistakably vertical and
+  visible in a real screenshot, smoke back to a white cloud.
+- `main.js?v=180`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.

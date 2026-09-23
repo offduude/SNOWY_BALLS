@@ -261,7 +261,7 @@ const SMOKE_MAX_SIZE = 150; // px, at the peak of its growth - bigger blobs, mor
 const LASER_COLORS = [0xff2e4d, 0x2ecbff, 0xb04dff]; // red, cyan, purple - a few stage-light colours, cycled one per beam
 const LASER_LENGTH = 340;
 const LASER_WIDTH = 5;
-const LASER_ALPHA = 0.55;
+const LASER_ALPHA = 0.85; // less transparent (was 0.55) - the owner's call, 2026-09-23
 const LASER_CYCLE_S = 26.6; // one full back-and-forth sweep, all three beams in time with each other (the owner's call, 2026-09-23)
 
 const BANANA_FADE_MS = 350; // "quickly fade/change" - texture transitions
@@ -1802,11 +1802,12 @@ class MainScene extends Phaser.Scene {
     const tex = this.textures.createCanvas("concert_smoke", 128, 128);
     const ctx = tex.getContext();
     const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    // Higher contrast (2026-09-23, tuned again after the owner watched it run): a dark, near-black core, well clear
-    // of the snowy street's own pale colour - it needs to read as smoke at a glance, not just a faint haze.
-    grad.addColorStop(0, "rgba(45,45,55,0.95)");
-    grad.addColorStop(0.45, "rgba(60,60,72,0.55)");
-    grad.addColorStop(1, "rgba(60,60,72,0)");
+    // Whiter again (2026-09-23, the owner's call - the dark near-black core from the previous round read more like
+    // exhaust than stage fog): a bright white core - visibility against the snowy street now comes from the density
+    // (SMOKE_RATE) and alpha (SMOKE_MAX_ALPHA) rather than from being darker than its surroundings.
+    grad.addColorStop(0, "rgba(255,255,255,0.95)");
+    grad.addColorStop(0.45, "rgba(240,240,245,0.55)");
+    grad.addColorStop(1, "rgba(240,240,245,0)");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 128, 128);
     tex.refresh();
@@ -1835,7 +1836,7 @@ class MainScene extends Phaser.Scene {
   spawnSmokePuff(pointIndex) {
     if (!this.textures.exists("concert_smoke")) this.makeSmokeTexture();
     const x = INITIAL_SCROLL_X + GAME_WIDTH * SMOKE_X_FRACTIONS[pointIndex];
-    const y = INITIAL_SCROLL_Y + GAME_HEIGHT + 12;
+    const y = INITIAL_SCROLL_Y + GAME_HEIGHT + 28; // a bit further under the default view's bottom edge (was +12) - the owner's call, 2026-09-23
     const img = this.add.image(x, y, "concert_smoke").setDepth(8).setAlpha(0);
     this.concertSmoke.push({
       img,
@@ -1881,16 +1882,19 @@ class MainScene extends Phaser.Scene {
   initLasers() {
     if (this.lasers) return;
     if (!this.textures.exists("concert_laser")) this.makeLaserTexture();
-    // base is measured from straight up (Math.PI, since the texture's bright end anchors at origin (0.5, 0) and
-    // extends towards +y - i.e. "down" - when unrotated; Math.PI flips that to "up"), the same fan of angles the
-    // beams used to sweep around when they hung from the top and pointed down, just mirrored to point up instead.
+    // base is measured from straight up: with origin (0.5, 0) the beam extends towards +y ("down" on screen) at
+    // rotation 0, and towards -y ("up") at rotation Math.PI (a half turn always reverses a direction, whatever it
+    // was) - so Math.PI alone, not Math.PI - 1.57 as an earlier round had it, is actually straight up.
+    // FIX (2026-09-23, found from the owner's report "basically horizontal, almost nonexistent"): the previous two
+    // rounds' base angles were all built from an original round-1 value, -1.57, that was labelled "straight up" in
+    // a comment but was never checked - -1.57 rad is ~-90 degrees from rotation 0 ("down"), which is HORIZONTAL,
+    // not vertical (rotation swings 0->down, +-PI/2->horizontal either way, PI->up). Every later round then swept
+    // a *smaller range* around that same wrong, horizontal-ish centre, which is exactly why "more vertical" didn't
+    // actually fix it - it was never centred on vertical to begin with. Centring on the real Math.PI fixes it.
     const anchors = [
-      // Kept close to straight up (the owner's call, 2026-09-23: the wider swing before spent most of its time
-      // tilted far enough over that the beam sat mostly below the screen instead of rising through it) - a small
-      // splay per beam plus a small sweep, never straying far from vertical.
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.12, base: Math.PI - 1.57 - 0.18, amp: 0.22 },
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.5, base: Math.PI - 1.57, amp: 0.28 }, // straight up at the centre of its sweep
-      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.88, base: Math.PI - 1.57 + 0.18, amp: 0.22 },
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.12, base: Math.PI - 0.18, amp: 0.22 },
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.5, base: Math.PI, amp: 0.28 }, // straight up at the centre of its sweep
+      { x: INITIAL_SCROLL_X + GAME_WIDTH * 0.88, base: Math.PI + 0.18, amp: 0.22 },
     ];
     const y = INITIAL_SCROLL_Y + GAME_HEIGHT + 4; // just below the default view - the fixture itself is never seen, only its beam
     const speed = (2 * Math.PI) / LASER_CYCLE_S; // shared by all three - one full sweep every LASER_CYCLE_S

@@ -1802,3 +1802,40 @@ Decided over a longer conversation, not just built outright - the reasoning (why
 - Verified live (a fresh tab again): no console errors, clean teardown, lasers now unmistakably vertical and
   visible in a real screenshot, smoke back to a white cloud.
 - `main.js?v=180`. Still local-only, branch `heavy-guitar-event`, not merged into `main` or pushed.
+
+## Repriced every event-summon buff by actual earning power, not rarity-tier guesswork (2026-09-23, still on `heavy-guitar-event`, NOT pushed)
+
+- **Asked directly**: "why is regular guitar pick so cheap?" (245-405, epic - priced like a typical epic buff, never
+  checked against what the event it summons actually pays out) - and: "when i tell you to price items, i trust you
+  to make a reasonable decision based on a fair estimate." Then: fix all four event-summon buffs' prices with a
+  formula based on rarity and the event's timespan, such that the item is only profitable with a projectile of the
+  event's own rarity or higher - and print a table.
+- **The formula** (also written into economy.json as `_eventSummonPricingNote`, next to `_itemsNote`, so a future
+  event-summon item follows the same reasoning): `revenue(rarity) = hits x rarities[rarity].projectileHitValue x
+  the event's faceMultiplier`. `hits` = 1 for the face window (a single-hit event - it ends the moment it's hit) or
+  `floor(songSeconds / 5)` for a song event (disco/guitar/heavy_guitar - "every hit of the song counts", so hits
+  scale with how long the song runs). The "5 seconds a throw" is a STATED assumption for fast, deliberate active
+  play (aim + flight + the 1.4s result message) - deliberately NOT the same as `throwsPerHour` (120/hour, 30s/throw)
+  used elsewhere for natural event-spawn odds, which models idle/passive play and would badly undercount an
+  actively-farmed event. `priceRange.min = ceil(revenue(one rarity tier below) x 1.1)` - a guaranteed loss on
+  weaker ammo even at the item's cheapest roll. `priceRange.max = floor(revenue(the event's own rarity) x 0.9)` - a
+  guaranteed profit at that rarity or higher even at the item's priciest roll.
+- **Not modelled**: ammo scarcity (whether a player can actually KEEP matching-rarity ammo in hand for the whole
+  song) - said so plainly in the JSON note rather than silently assuming it away.
+- **Real-world sanity check, said plainly rather than hidden**: these prices are far above the current shop's other
+  numbers, and above what any observed account currently holds (the leaderboard's top account has under 5000 coins
+  at the time of writing) - `disco_ticket` alone now tops out at 172800. That is the honest output of "price by what
+  a 164-second legendary song is actually worth if played well," which is exactly what was asked for, but it is
+  worth flagging plainly rather than quietly shipping numbers this far outside the game's observed economy.
+- Verified live (test origin): all four items' `priceRange` read back correctly from a fresh load with no console
+  or JSON-parse errors.
+- `economy.json` only (cache-busted by `?t=` already, no version query on it).
+
+### Table
+
+| Item | Event | Rarity | Timespan | Hits (5s/throw) | Revenue @ rarity-1 | Revenue @ rarity | Old price | New price |
+|---|---|---|---|---|---|---|---|---|
+| Tomato Juice | face | epic | 20s window, 1 hit (ends on hit) | 1 | 256 (rare) | 1920 (epic) | 410-685 | **282-1728** |
+| Guitar Pick | guitar | epic | 38.64s song | 7 | 1120 (rare) | 8400 (epic) | 245-405 | **1232-7560** |
+| Disco Ticket | disco | legendary | 164.42s song | 32 | 38400 (epic) | 192000 (legendary) | 5100-8550 | **42240-172800** |
+| Heavy Pick | heavy_guitar | legendary | 42.67s song | 8 | 9600 (epic) | 48000 (legendary) | 5000-8000 | **10560-43200** |

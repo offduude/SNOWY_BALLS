@@ -213,6 +213,7 @@
     },
 
     "_itemsNote": "Empty slots show (TBD) - the shop only has real items now. Optional item field image = a picture path for the card. Consumables are timed BUFFS: bought = active right away for duration.seconds, with a list of effects (guideLines, precision, strengthControl, coinMultiplier - see src/buffs.js). a single item can have priceRange {min, max} instead of price: its price is rolled in that range each time it is put on sale. category is 'consumable' (a timed buff: can be on sale in several slots at once; needs a duration) or 'projectile' (a stack of consumable projectiles: each time it is put on sale the amount (amount.min..max) and the price of ONE (unitPrice.min..max) are rolled at random, the slot's price is amount x unitPrice; the same stack can be on sale in several slots at once, each with its own roll).",
+    "_eventSummonPricingNote": "PRICING an event-summon item (triggerEvent effect: tomato_juice, disco_ticket, guitar_pick, heavy_guitar_pick - 2026-09-23, the owner's own formula, replacing plain rarity-tier guesswork that priced Guitar Pick far below what the event it summons actually earns): revenue(rarity) = hits x rarities[rarity].projectileHitValue x the event's faceMultiplier, where hits = 1 for a single-hit event (the face window - it ends on the first hit) or floor(song seconds / 5) for a song event (main.js songTimes) - 5 seconds/throw is a stated assumption for a fast, deliberate active throw (aim + flight + the result message), NOT the same as throwsPerHour used for natural spawn odds (that one is a passive/idle rate and would undercount active play badly). priceRange.min = ceil(revenue(one rarity tier below the event's own) x 1.1) - a guaranteed loss on weaker ammo even at the item's cheapest roll. priceRange.max = floor(revenue(the event's own rarity) x 0.9) - a guaranteed profit at that rarity or higher even at the item's priciest roll. Ammo scarcity (a rarity's usual stack size) is NOT modelled - this assumes the player can keep matching-rarity ammo in hand for the whole event.",
     "items": [
       {
         "id": "skyr_orange",
@@ -362,7 +363,7 @@
         "name": "Tomato Juice",
         "category": "consumable",
         "rarity": "epic",
-        "priceRange": { "min": 410, "max": 685 },
+        "priceRange": { "min": 282, "max": 1728 },
         "ignorePriceOverride": true,
         "duration": { "seconds": 20 },
         "image": "assets/items/tomato_juice.png",
@@ -401,7 +402,7 @@
         "name": "Disco Ticket",
         "category": "consumable",
         "rarity": "legendary",
-        "priceRange": { "min": 5100, "max": 8550 },
+        "priceRange": { "min": 42240, "max": 172800 },
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/disco_ticket.png",
@@ -414,7 +415,7 @@
         "name": "Guitar Pick",
         "category": "consumable",
         "rarity": "epic",
-        "priceRange": { "min": 245, "max": 405 },
+        "priceRange": { "min": 1232, "max": 7560 },
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/guitar_pick.png?v=2",
@@ -427,7 +428,7 @@
         "name": "Heavy Pick",
         "category": "consumable",
         "rarity": "legendary",
-        "priceRange": { "min": 5000, "max": 8000 },
+        "priceRange": { "min": 10560, "max": 43200 },
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/heavy_guitar_pick.png",

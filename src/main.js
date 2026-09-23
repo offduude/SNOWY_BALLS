@@ -928,6 +928,7 @@ class MainScene extends Phaser.Scene {
   // While the equipped refilling projectile is out, the message in the middle says so and counts down to the next one;
   // as soon as one arrives it goes back to "TAP to aim".
   updateStockMessage() {
+    if (this.activeEvent === "tank") return; // startTankEvent/updateTankEvent own the message for the whole event
     if (this.state !== STATE.IDLE) {
       this.stockMessageShown = false;
       return;
@@ -2525,6 +2526,7 @@ class MainScene extends Phaser.Scene {
   startTankEvent() {
     if (this.eventBlocksStart()) return;
     this.activeEvent = "tank";
+    this.showMessage(""); // "TAP to AIM" has no business showing while the player can't throw - see updateStockMessage's own guard
     const startX = INITIAL_SCROLL_X + GAME_WIDTH + 40; // just past the right edge - never visible before it starts sliding
     const baseY = this.worldY(0) + CHARACTER_Y_OFFSET + 1; // the same ground line the character stands on
     const sprite = this.add.image(startX, baseY, "tank_banana").setOrigin(0, 1).setDepth(3);
@@ -2574,6 +2576,7 @@ class MainScene extends Phaser.Scene {
         t.sprite.destroy();
         this.tank = null;
         this.activeEvent = null;
+        this.showMessage("TAP to AIM");
       }
       return;
     }

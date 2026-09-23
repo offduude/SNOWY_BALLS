@@ -2171,4 +2171,38 @@ event in the game it never spawns naturally (`eventDefs()`'s `natural: false`, t
   `tank_moving.mp3` -> `assets/audio/`.
 - Local test session (`127.0.0.1:5501`, never the real save) stocked with 999 `toy_tank` buffs via
   `Economy.addBuffs("toy_tank", 999)`, matching how the Heavy Pick was stocked for testing earlier.
+- **UX fix**: "TAP to AIM" stayed on screen the whole event even though throwing was disabled - misleading,
+  since it's the game's own invitation to tap and throw. `startTankEvent()` now clears the message
+  (`this.showMessage("")`) the instant the event starts, `updateTankEvent()`'s finish branch restores
+  `"TAP to AIM"` the instant it ends, and `updateStockMessage()` (which otherwise runs every frame while idle
+  and can overwrite the message with an "OUT of X" stock notice) bails immediately while `activeEvent ===
+  "tank"` so nothing can stomp the cleared text mid-event. Verified live: cleared on start, stays empty across
+  repeated `updateStockMessage()` ticks, restored to `"TAP to AIM"` the instant the event ends. `main.js?v=187`.
+- **Repriced after a profitability check, using this project's own established pricing assumptions**
+  (`docs/FUTURE_PRICES.md`: 10 throws/minute, 75% hits, "buffs must be profitable with items of their own
+  rarity") - asked directly: "evaluate average shop reroll profit if you hit 75% of your shots... is it even
+  profitable to use the toy tank?" It is not, and structurally cannot be, at any price:
+  - Every other priced buff in the game returns COINS (a face multiplier, a coin multiplier, a save chance) that
+    its price is checked against. Toy Tank's own effect - `Shop.rerollAll()` - pays no coins at all: its
+    "return" in this game's pricing framework is exactly **0**.
+  - It is also the only buff that fully disables throwing for its own duration (10.484s: 2 x the slide, the
+    `tank_moving.mp3` duration measured live, plus `TANK_PAUSE_MS`) rather than just delaying its own start
+    like every other summon buff - a real, measurable opportunity cost on top of its price. With the only
+    legendary projectile actually in the game (Drone, `hitValue: 12000`, "profitable with items of its own
+    rarity" being this project's own standard) at 75% hits and 10 throws/min: 0.75 x 12,000 = 9,000
+    coins/throw x (10/60) throws/s = **1,500 coins/s** of foregone income, x 10.484s = **~15,730 coins** given
+    up just by not being able to throw during the event - about 2.6-3.5x the OLD price (4,500-6,000) on top of
+    the price itself, for zero coins back.
+  - **New price: 600-900** (avg 750), down from 4,500-6,000. Since "60% of return" (this project's usual rule)
+    is 60% of 0 either way, the old legendary-tier price had no basis to begin with - it was set the same way
+    the face-hit buffs were (profitable with a same-or-higher-rarity projectile) despite Toy Tank having no
+    face and no payout, which doesn't apply here. The new price sits below every other legendary buff
+    (Diamond Cross, the cheapest at 1,800-3,000, still has a guaranteed-hit return Toy Tank has none of) -
+    roughly mid-epic-buff territory (Burger 570-940, Mints 675-1,125) - reflecting a pure QoL/spectacle
+    purchase rather than an investment. **Rarity left at legendary** (a design call, not a forced one): it's
+    still the single most elaborate scripted sequence in the game and the rarest thing to see land in the shop
+    on its own account, even though its price no longer matches that rarity's usual return - happy to
+    reconsider (drop to epic/rare to match the new price tier, or add a small direct coin payout instead) if
+    that reads better in play.
+  - `economy.json` only - no code or version-bump needed, `priceRange` is read live.
 - **Not pushed** - local branch `toy-tank-event` only, per explicit instruction.

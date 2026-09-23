@@ -402,7 +402,7 @@
         "name": "Toy Tank",
         "category": "consumable",
         "rarity": "legendary",
-        "priceRange": { "min": 4500, "max": 6000 },
+        "priceRange": { "min": 600, "max": 900 },
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/toy_tank.png",

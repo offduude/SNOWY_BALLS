@@ -219,10 +219,11 @@ const Collection = (() => {
   // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner, the EQUIP
   // button with how many the player has under it (stackable, never consumed - see Economy.getSkinCount), the detail
   // at the bottom. `action` replaces the EQUIP button (the SKINS list's CHANGE, the shop's price button), `extraClass`
-  // is added to the card.
-  function skinRowHtml(kind, item, action, extraClass, dot) {
+  // is added to the card. `hideAmount` drops the owned-count line entirely (the BOXES inspect popup's item preview,
+  // 2026-09-27 - the owner didn't want a quantity shown there).
+  function skinRowHtml(kind, item, action, extraClass, dot, hideAmount) {
     const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
-    const amount = `<div class="pick-regen"><span>${countText(Economy.getSkinCount(kind, item.id))}</span></div>`;
+    const amount = hideAmount ? "" : `<div class="pick-regen"><span>${countText(Economy.getSkinCount(kind, item.id))}</span></div>`;
     return (
       `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}${Rarity.cardClass(item.rarity)}" data-id="${esc(item.id)}">` +
       (dot ? NEW_DOT : "") +

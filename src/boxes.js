@@ -182,19 +182,16 @@ const Boxes = (() => {
     if (inspectEl) inspectEl.classList.remove("show");
   }
 
-  // The odds grid: just each item's picture and its chance%, styled like "TAP to AIM" (white, black-outlined
-  // text) - no other text at all, per the owner's ask. Tapping a picture opens that item's own card on top.
-  // Laid out as a rectangle that scales with the item count (2026-09-27, the owner's ask) - roughly
-  // ceil(sqrt(n)) columns, so e.g. 4 items make a 2x2 block and 6 make a 3x2 one, rather than a loose wrapped
-  // row that happens to look however wide the last one left it.
+  // The odds rectangle (index.html #boxes-inspect-grid: a real cream/brown panel now, 2026-09-27 - "give the box
+  // inspect popup a background"): just each possible item's picture and its chance%, styled like "TAP to AIM"
+  // (white, black-outlined text) - no other text at all, all in a single row inside that panel (2026-09-27, the
+  // owner's ask - superseded the earlier ceil(sqrt(n)) grid attempt). Tapping a picture opens that item's own
+  // card on top.
   function openInspect(kind) {
     const def = boxDef(kind);
     if (!def || !inspectGridEl) return;
-    const odds = oddsFor(kind);
-    const cols = Math.max(1, Math.ceil(Math.sqrt(odds.length)));
-    inspectGridEl.style.gridTemplateColumns = `repeat(${cols}, auto)`;
     inspectGridEl.dataset.kind = kind;
-    inspectGridEl.innerHTML = odds
+    inspectGridEl.innerHTML = oddsFor(kind)
       .map(
         ({ item, chance }) =>
           `<div class="box-inspect-cell" data-id="${esc(item.id)}">` +
@@ -209,9 +206,9 @@ const Boxes = (() => {
   function openItem(kind, id) {
     const item = poolFor(kind).find((it) => it.id === id);
     if (!item || !itemCardEl) return;
-    // No EQUIP button here (this is a preview, not owned yet a lot of the time) - skinRowHtml already renders the
-    // owned count under whatever `action` is ("x0" reads as "not owned" just as clearly as a label would).
-    itemCardEl.innerHTML = Collection.skinRowHtml(kind, item, "<span></span>");
+    // No EQUIP button (this is a preview, not owned yet a lot of the time) and no owned-count line either
+    // (2026-09-27, the owner's ask: "the inspected item in the box shouldn't have its quantity displayed").
+    itemCardEl.innerHTML = Collection.skinRowHtml(kind, item, "<span></span>", "", false, true);
     itemEl.classList.add("show");
   }
 

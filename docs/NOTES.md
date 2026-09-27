@@ -2623,3 +2623,46 @@ it scrolled away and was only visible at the very bottom of a long scroll.
 - Verified live (test origin): opened LEADERBOARD, hint shows fixed at the panel's bottom edge; switched to
   PROJECTILES, hint cleared.
 - `src/saves.js?v=25`, `src/collection.js?v=81`, `index.html`.
+
+## SHOP/BOXES polish round 3: NO STOCK text, dim-not-hide, layout tweaks (2026-09-27)
+
+**Asked directly**, from three screenshots: (1) instead of greying the card, an unavailable row should show plain
+red "NO STOCK" text in place of the buy button - keep the unaffordable button's own look exactly as it was; (2)
+"other buttons... are still invisible behind the shop tab" - asked to clarify, confirmed via AskUserQuestion:
+they should stay ON SCREEN (dimmed by the same backdrop as everything else), not vanish via opacity:0; (3) the
+side buttons (PROJECTILES/BUFFS) looked "weird" - taller, bigger text, but narrower, and shifted up off dead
+centre; (4) the box inspect popup needed an actual background panel, and its items in one single row, not a
+ceil(sqrt(n)) grid; (5) the inspected item's own card shouldn't show a quantity; (6) the shop's reroll countdown
+moves to the header's top-LEFT, vertically centred, bigger text.
+
+- **NO STOCK text** (1): `shop.js rowHtml()`'s unavailable branch is now a plain
+  `<span class="shop-no-stock">NO STOCK</span>` (red, same width as the button it replaces so the layout doesn't
+  jump) instead of a disabled greyed button - and the row's own background override from the previous pass is
+  gone, back to the normal card look. The unaffordable branch (still in stock, too expensive) is completely
+  untouched - same greyed BUY button as before.
+- **Dim, don't hide** (2): every `opacity: 0` in the shop/boxes "hide other buttons" rules (`#side-buttons`,
+  `#leaderboard-btn`, `#buffs-btn`, `#ammo-box`, `#buff-hud`, and the `#shop-btn`/`#boxes-btn` mutual-hide pair)
+  is removed - only `pointer-events: none` and the earlier `z-index: 1` (so the semi-transparent backdrop, at
+  z-index 3, actually renders OVER them and dims them) remain. They now look like part of the darkened
+  background, same as everything else in the scene, instead of disappearing.
+- **Slimmer-but-bigger side buttons, shifted up** (3): `.shop-cat-btn` grew from 26px/7px to 40px/9px (taller,
+  bigger text, wrapping to two lines now that the column is narrower rather than overflowing) while `#shop-cats`
+  itself narrowed (12% -> 11% wide) and its vertical span shrank (`height: 76% -> 55%`, same `top`), pulling its
+  centred content up from dead-centre.
+- **A real inspect panel, one row** (4): `#boxes-inspect-grid` is a solid cream/brown panel now (same family as
+  every other card), `display: flex` in a single row instead of the previous CSS grid - `boxes.js openInspect()`
+  drops the `ceil(sqrt(n))` column math entirely, it's just a row now, however many items that makes.
+- **No quantity on the inspected item** (5): `Collection.skinRowHtml` gained a `hideAmount` parameter (6th arg)
+  that skips the owned-count line entirely; `boxes.js openItem()` passes it. The SKINS menu and shop's own use of
+  `skinRowHtml` are unaffected (they don't pass it, so they keep showing the count as before).
+- **Shop timer, top-left, bigger** (6): `#shop-timer` moved from `right` to `left`, `top:50%; transform:
+  translateY(-50%)` for true vertical centring (the header's `align-items` also switched from `baseline` to
+  `center` to match), font-size 0.95u -> 1.3u.
+- Verified live (test origin): fresh tab, no console errors. Confirmed LEADERBOARD/BUFFS/PROJECTILES/SKINS/
+  OPTIONS/ammo-box/buff-hud all render at opacity 1 (dimmed by the backdrop, not gone) with pointer-events:none
+  while the shop is open; Chestnut/Stone show red "NO STOCK" on a normal (non-greyed) card, Potato (in stock)
+  keeps its real gold BUY button; held Scenery Box - a real panel background around its single-row odds, tapped
+  Frosty Night's picture and confirmed no quantity line on its card; reopened SHOP fresh and confirmed no
+  leftover double-panel state from earlier ad hoc testing (a `.click()` on a hidden button bypasses
+  pointer-events, which a real tap never would - not a reachable bug).
+- `src/shop.js?v=41`, `src/boxes.js?v=5`, `src/collection.js?v=82`, `index.html`.

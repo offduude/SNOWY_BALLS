@@ -218,9 +218,13 @@ const Shop = (() => {
     const offer = available ? (st.offers || [])[slot] || null : null;
     const p = price(item); // fixed now (2026-09-27) - the same number whether or not it's currently in stock
     const buyable = available && Economy.getCoins() >= p && !isMaxed(item); // a maxed-out buff looks unbuyable, like a too-expensive one
-    const action =
-      `<button class="pick-equip shop-buy${buyable ? "" : " cant"}" type="button" data-id="${esc(item.id)}"${available ? "" : " disabled"}>` +
-      `<i class="coin"></i><span>${p}</span></button>`;
+    // Unavailable (not in the current roll): a plain red "NO STOCK" label instead of a button at all (2026-09-27,
+    // the owner's ask - replacing the earlier "greyed-out button + greyed row" look). Unaffordable (in stock,
+    // too expensive right now) keeps its own look exactly as it already was - a real, greyed BUY button.
+    const action = available
+      ? `<button class="pick-equip shop-buy${buyable ? "" : " cant"}" type="button" data-id="${esc(item.id)}">` +
+        `<i class="coin"></i><span>${p}</span></button>`
+      : `<span class="shop-no-stock">NO STOCK</span>`;
     // Replaces the old per-item availability countdown (removed 2026-09-27, see the global-reroll note above) in
     // that same spot under the button: how many are LEFT in this slot for a stack item (2026-09-27: an
     // unavailable stack explicitly reads "x0" rather than showing nothing, the owner's ask - it's still an

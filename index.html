@@ -183,13 +183,20 @@
       pointer-events: auto;
     }
 
-    /* A rectangle that scales with however many items are in the box, not a fixed shape - boxes.js sets
-       grid-template-columns inline (roughly ceil(sqrt(count)) columns) so it reads as one deliberate block
-       instead of a loose wrapped row. */
+    /* A real panel now (2026-09-27, the owner's ask: "give the box inspect popup a background"), same cream/brown
+       family as every other card in the game - not just icons floating on the dimmed backdrop. All items sit in
+       a single row inside it (superseded an earlier ceil(sqrt(n)) grid attempt - the owner wants one row, not a
+       2D block), and the panel widens/narrows with however many items the box has. */
     #boxes-inspect-grid {
-      display: grid;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
       gap: calc(var(--u) * 1.8);
-      justify-content: center;
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 6px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+      padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2);
     }
 
     .box-inspect-cell {
@@ -508,11 +515,13 @@
       z-index: 4;
     }
 
+    /* Slimmer, bigger text, and sitting a bit above dead-centre rather than perfectly vertically centred in the
+       panel's own span (2026-09-27, the owner's ask - looked "violent" dead centre against the background). */
     #shop-cats {
-      left: 80%;
+      left: 82%;
       top: 12%;
-      width: 12%;
-      height: 76%;
+      width: 11%;
+      height: 55%;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -528,12 +537,12 @@
     }
 
     /* The gold header bar (vs #list-title's plain brown) is the shop's own visual signature - the coin price
-       buttons throughout the list carry the same gold. The reroll countdown sits at its top-right (the owner's
-       ask) - see shop.js updateTimerText. */
+       buttons throughout the list carry the same gold. The reroll countdown sits at its top-LEFT now (moved from
+       the right, 2026-09-27 - the owner's ask), vertically centred in the header. */
     #shop-header {
       flex: none;
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: center;
       position: relative;
       padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6);
@@ -548,21 +557,25 @@
 
     #shop-timer {
       position: absolute;
-      right: calc(var(--u) * 1.6);
-      font-size: calc(var(--u) * 0.95);
+      left: calc(var(--u) * 1.6);
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: calc(var(--u) * 1.3);
       color: #5a3d1c;
     }
 
     .shop-cat-btn {
       width: 100%;
-      height: 26px; /* slimmer than the standard 32px side button (the owner's ask, 2026-09-27) */
-      padding: 0;
+      height: 40px; /* taller, bigger text (2026-09-27, the owner's follow-up: the slimmer/shorter version looked "weird") */
+      padding: 0 calc(var(--u) * 0.3);
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 7px;
+      font-size: 9px;
+      line-height: 1.2;
+      white-space: normal; /* "PROJECTILES" can wrap to 2 lines in the now-narrower column rather than overflow */
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
@@ -590,15 +603,19 @@
       display: none;
     }
 
-    /* A row not currently in stock is only lightly dimmed (its picture/name/description stay fully readable -
-       the owner didn't want the old heavier grayscale treatment); its BUY button always shows the item's real
-       (fixed) price, just greyed out and disabled like an unaffordable one - see .pick-equip.shop-buy.cant below.
-       There is no separate "NOT IN STOCK" label any more (2026-09-27, the owner's ask - one consistent look for
-       "can't buy this right now", whatever the reason). The row's own background is greyed (not just dimmed via
-       opacity - the owner's follow-up ask, "visibly unavailable... somewhat greying out their backgrounds") so
-       it reads as unavailable even at a glance, before reading the button. */
-    .shop-row.unavailable {
-      background: #b8b0a4;
+    /* A row not currently in stock (2026-09-27, the owner's final call on this): looks exactly like a normal
+       row - no greyed card background, no dimming - except its BUY button is replaced entirely by a plain red
+       "NO STOCK" label (shop.js rowHtml). An unaffordable row (still in stock, just too pricey) is a completely
+       separate look, untouched: a real BUY button, just greyed - see .pick-equip.shop-buy.cant below. */
+    .shop-no-stock {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: calc(var(--u) * (1.2 * 8 + 2.4) + 4px); /* same width as the BUY button it replaces, so the layout doesn't jump */
+      color: #c0392b;
+      font-weight: normal;
+      font-size: calc(var(--u) * 0.95);
+      letter-spacing: 0.03em;
     }
 
     /* "xN" left in this slot's offer for a stack currently on sale - replaces the old (removed 2026-09-27)
@@ -764,11 +781,14 @@
       background: #74491f;
     }
 
-    /* BOXES and SHOP hide each other while either is open - only one full-screen panel at a time. */
+    /* BOXES and SHOP go non-interactive while the other is open - only one full-screen panel at a time - but stay
+       ON SCREEN, dimmed by the same backdrop that dims the rest of the game (2026-09-27, the owner's correction:
+       "they vanish completely and shouldn't" - they used to fully disappear via opacity:0). z-index drops below
+       the backdrop (3) so it actually dims them instead of them sitting on top of it undimmed. */
     #game-container.shop-open #boxes-btn,
     #game-container.boxes-open #shop-btn {
-      opacity: 0;
       pointer-events: none;
+      z-index: 1;
     }
 
     /* PROJECTILES / CHARACTERS buttons: middle of the left edge, same look as the SHOP button.
@@ -785,14 +805,14 @@
       transition: opacity 0.25s ease;
     }
 
+    /* Stays ON SCREEN while the shop/boxes panel is open, just dimmed by the same backdrop that dims the rest of
+       the game and unclickable (2026-09-27, the owner's correction: "they vanish completely and shouldn't" - an
+       earlier pass made this opacity:0, fully invisible, which wasn't the ask). #side-buttons' own z-index (5) is
+       normally ABOVE the shop/boxes panel (4) and its backdrop (3) - dropping it to 1 here puts it BELOW the
+       backdrop so the backdrop's dimming actually shows over it, instead of it sitting on top undimmed. */
     #game-container.shop-open #side-buttons,
     #game-container.boxes-open #side-buttons {
-      opacity: 0;
       pointer-events: none;
-      /* #side-buttons' own z-index (5) is normally ABOVE the shop/boxes panel (4) - so are the other buttons
-         still hidden below - so without this they'd render on TOP of the panel for the length of the opacity
-         fade instead of fading out behind it (the owner's bug report, 2026-09-27: "other buttons disappearing
-         behind the shop tab" - they were briefly disappearing IN FRONT of it instead). */
       z-index: 1;
     }
 
@@ -1144,8 +1164,7 @@
        were the two left showing through, everything else already had its own hide-while-open rule. */
     #game-container.shop-open #buff-hud,
     #game-container.boxes-open #buff-hud {
-      opacity: 0;
-      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
+      z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
     }
 
     .buff-card {
@@ -1223,9 +1242,8 @@
 
     #game-container.shop-open #leaderboard-btn,
     #game-container.boxes-open #leaderboard-btn {
-      opacity: 0;
       pointer-events: none;
-      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
+      z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
     }
 
     /* The LEADERBOARD button's own background reflects the signed-in player's CURRENT LEADERBOARD PLACE (saves.js
@@ -1287,9 +1305,8 @@
 
     #game-container.shop-open #ammo-box,
     #game-container.boxes-open #ammo-box {
-      opacity: 0;
       pointer-events: none;
-      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
+      z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
     }
 
     /* The counter's background reflects the equipped projectile's rarity (main.js tintAmmoBox): its colour over the brown (--tint), or for a LEGENDARY one
@@ -1333,9 +1350,8 @@
 
     #game-container.shop-open #buffs-btn,
     #game-container.boxes-open #buffs-btn {
-      opacity: 0;
       pointer-events: none;
-      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
+      z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
     }
 
     /* The running timer sits exactly where the USE / EQUIP button is (same width), so nothing shifts when a button
@@ -2007,7 +2023,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=301"></script>
+  <script src="src/version.js?v=302"></script>
   <script src="src/economy.js?v=46"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2038,11 +2054,11 @@
   <script src="src/cloud.js?v=26"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
-  <script src="src/shop.js?v=40"></script>
-  <script src="src/boxes.js?v=4"></script>
+  <script src="src/shop.js?v=41"></script>
+  <script src="src/boxes.js?v=5"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=25"></script>
-  <script src="src/collection.js?v=81"></script>
+  <script src="src/collection.js?v=82"></script>
   <script src="src/main.js?v=190"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

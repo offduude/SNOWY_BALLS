@@ -40,9 +40,10 @@ const Economy = (() => {
       coinCarry: 0, // the fraction of a coin left over from a payout with a coin multiplier (0 <= x < 1), added to the next payout
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
-      unlockedCharacters: ["andek"], // the ids of the characters the player has (the default one always)
-      unlockedSceneries: ["frosty"], // ... and of the sceneries
-      unlockedWeathers: ["snow"], // ... and of the weathers
+      // How many of each character/scenery/weather skin the player has (0 or absent = doesn't have it any more).
+      // Stackable and never consumed - like CS2 skins, not a one-time unlock (changed 2026-09-27; each kind's
+      // default starts at 1 and can never really run out since it's never spent, just displayed like any other count).
+      skinCounts: { character: { andek: 1 }, scenery: { frosty: 1 }, weather: { snow: 1 } },
       shopClock: { base: 0, shop: 0, rate: 1 }, // the SHOP's clock (see shopNow): shop time = shop + rate x (device time - base); the default is the device clock itself
       equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" }, // what the player currently uses
       buffs: [], // active timed buffs: { id, endsAt } - endsAt is a Date.now() timestamp (device clock)
@@ -149,10 +150,26 @@ const Economy = (() => {
         : [],
       buffsUnseen: p.buffsUnseen === true,
       projectilesUnseen: p.projectilesUnseen === true,
-      // (the default character used to be called "default": it is Andek now)
-      unlockedCharacters: [...new Set([...base.unlockedCharacters, ...(Array.isArray(p.unlockedCharacters) ? p.unlockedCharacters : []).map((id) => (id === "default" ? "andek" : id))])],
-      unlockedSceneries: [...new Set([...base.unlockedSceneries, ...(Array.isArray(p.unlockedSceneries) ? p.unlockedSceneries : [])])],
-      unlockedWeathers: [...new Set([...base.unlockedWeathers, ...(Array.isArray(p.unlockedWeathers) ? p.unlockedWeathers : [])])],
+      // skinCounts: migrates an older boolean-unlock save (unlockedCharacters/Sceneries/Weathers id arrays) into
+      // counts of 1 each (the default character used to be called "default": it is Andek now), and cleans a save
+      // already on the count model the same way every other id->count map here is cleaned.
+      skinCounts: (() => {
+        const out = { character: { ...base.skinCounts.character }, scenery: { ...base.skinCounts.scenery }, weather: { ...base.skinCounts.weather } };
+        const migrate = (kind, oldKey, renameDefault) => {
+          if (!Array.isArray(p[oldKey])) return;
+          for (const id of p[oldKey]) {
+            const rid = renameDefault && id === "default" ? renameDefault : id;
+            out[kind][rid] = Math.max(out[kind][rid] || 0, 1);
+          }
+        };
+        migrate("character", "unlockedCharacters", "andek");
+        migrate("scenery", "unlockedSceneries");
+        migrate("weather", "unlockedWeathers");
+        if (p.skinCounts && typeof p.skinCounts === "object") {
+          for (const kind of ["character", "scenery", "weather"]) Object.assign(out[kind], cleanCounts(p.skinCounts[kind]));
+        }
+        return out;
+      })(),
       shopClock: (() => {
         const c = p.shopClock;
         return c && [c.base, c.shop, c.rate].every(Number.isFinite) && c.rate > 0 ? { base: c.base, shop: c.shop, rate: c.rate } : base.shopClock;
@@ -595,9 +612,19 @@ const Economy = (() => {
     skinListeners.forEach((fn) => fn());
   }
 
-  // The list of the ids the player has of a skin kind.
-  function unlockedList(kind) {
-    return kind === "character" ? state.unlockedCharacters : kind === "weather" ? state.unlockedWeathers : state.unlockedSceneries;
+  // How many of a character/scenery/weather skin the player has (0 = doesn't have it).
+  function getSkinCount(kind, id) {
+    return (state.skinCounts[kind] && state.skinCounts[kind][id]) || 0;
+  }
+
+  // Adds `n` of a skin. Never consumed (equipping doesn't spend it) - this only ever goes up, from the shop or a
+  // BOXES draw. The first time a kind/id goes from 0 to owned it raises the same "new skin" dots as before.
+  function addSkin(kind, id, n) {
+    const before = getSkinCount(kind, id);
+    state.skinCounts[kind][id] = before + n;
+    if (before === 0 && n > 0) state.newSkins.push({ kind, id, entered: false, displayed: false });
+    save();
+    skinsChanged();
   }
 
   // kind: "character" | "scenery" | "weather" | "projectile"
@@ -710,8 +737,7 @@ const Economy = (() => {
       for (const id of projectileIds) if (!state.projectiles[id]) ((state.projectiles[id] = 999), (changed = true));
       for (const id of buffIds) if (!state.buffItems[id]) ((state.buffItems[id] = 999), (changed = true));
       for (const [kind, ids] of Object.entries(skins || {})) {
-        const list = unlockedList(kind);
-        for (const id of ids) if (!list.includes(id)) (list.push(id), (changed = true));
+        for (const id of ids) if (!(state.skinCounts[kind][id] > 0)) ((state.skinCounts[kind][id] = 999), (changed = true));
       }
       if (changed) save();
     },
@@ -746,16 +772,8 @@ const Economy = (() => {
     setShopRate,
     skinEffects,
     // Characters, sceneries and weathers the player has (kind: "character", "scenery" or "weather"); the default ones are always there.
-    isUnlocked: (kind, id) => unlockedList(kind).includes(id),
-    unlock: (kind, id) => {
-      const list = unlockedList(kind);
-      if (!list.includes(id)) {
-        list.push(id);
-        state.newSkins.push({ kind, id, entered: false, displayed: false }); // a new skin: the red dots (below)
-        save();
-        skinsChanged();
-      }
-    },
+    getSkinCount,
+    addSkin,
     // ---- THE RED DOTS OF A NEW SKIN (three of them, each with its own rule) ----
     //  - the SKINS button's: on while a new skin's category has not been ENTERED (opening the SKINS list itself does not count) - enterSkinKind
     //  - the category's (its card in the SKINS list): on until the new skin has been DISPLAYED, i.e. it was on screen in the category's menu (the player scrolls

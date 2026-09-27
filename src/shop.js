@@ -3,11 +3,11 @@
 // Timers are device-clock timestamps saved with the stock (Economy.getShopState()), so they keep
 // running while the app is closed and leaving/re-entering can not reroll anything.
 //
-// Item types: "consumable" (a timed buff, the same one can be on sale in several slots),
-// "projectile" (a STACK of consumable projectiles: the amount and the price of one are rolled at random
-// each time it is put on sale, the slot's price is amount x unit price) and the three SKIN types "character",
-// "scenery" and "weather" (bought once: the item's id is the skin's id in economy.json characters / sceneries /
-// weathers and buying unlocks it - it is then equipped from the SKINS menu; the card's label says which kind it is).
+// Item types: "consumable" (a timed buff, the same one can be on sale in several slots) and "projectile" (a
+// STACK of consumable projectiles: the amount and the price of one are rolled at random each time it is put
+// on sale, the slot's price is amount x unit price). Skins (character/scenery/weather) used to be a third,
+// one-time-unlock type sold here too, but were pulled from the shop's pool entirely (2026-09-27, owner's call)
+// - they're bought from the new BOXES feature instead, as stackable items (see Economy.addSkin).
 // Any item can be on sale in several slots at once - each slot has its own offer.
 // When a slot restocks while the shop is closed, the SHOP button gets a dot and a sound plays.
 //
@@ -25,10 +25,10 @@ const Shop = (() => {
   let root = null;
   let dotEl = null;
 
-  // The label in the top-left corner of a card, by the item's category.
-  const CATEGORY_LABEL = { consumable: "BUFF", projectile: "PROJECTILE", character: "CHARACTER", scenery: "SCENERY", weather: "WEATHER" };
-  const SKIN_CATEGORIES = ["character", "scenery", "weather"];
-  const ownedSkin = (item) => SKIN_CATEGORIES.includes(item.category) && Economy.isUnlocked(item.category, item.id);
+  // The label in the top-left corner of a card, by the item's category. Skins (character/scenery/weather) were
+  // pulled from the shop's pool entirely (2026-09-27, owner's call) - they're bought from the new BOXES feature
+  // instead, so this only ever needs to label the two categories still sold here.
+  const CATEGORY_LABEL = { consumable: "BUFF", projectile: "PROJECTILE" };
 
   // ---------- rules ----------
 
@@ -83,9 +83,8 @@ const Shop = (() => {
   // Items that may go into a slot: all of them - nothing is unique any more (the same item, projectiles included,
   // can be on sale in any number of slots; every slot rolls its own amount and price).
   // (An item with "godOnly" - a test buff - is never sold: a god mode save just has it, see Economy.fillGod.)
-  // (A skin the player already has is not sold again.)
   function eligible() {
-    return eco.shop.items.filter((it) => !it.godOnly && !ownedSkin(it));
+    return eco.shop.items.filter((it) => !it.godOnly);
   }
 
   function averageHitCoins() {
@@ -96,15 +95,10 @@ const Shop = (() => {
     return minPrice(item) <= cfg.maxPriceInAverageHits * averageHitCoins();
   }
 
-  // A skin (character/scenery/weather) is worth HALF as much as anything else once an item is actually being picked
-  // FROM a rarity - the rarity roll itself (below) is untouched, this only thins skins out among whatever else
-  // shares that rarity, so the shop doesn't always have one waiting and flood the SKINS menu (the owner's call,
-  // 2026-09-23: "all skins appear twice as rarely"). A straight half WEIGHT in the draw, not a separate coin-flip
-  // first: with one legendary skin next to two ordinary legendary items, its chance is 0.5 / (1 + 1 + 0.5) = 20% -
-  // exactly 0.5/N (the owner's own example) in the limit where every OTHER item sharing its rarity is weight 1 and
-  // it is the only skin; with more than one skin in the same rarity pool they only thin each other a little further.
+  // Every item in a rarity pool is drawn with equal weight now that skins (which used to be thinned to half
+  // weight here, see git history) aren't in the pool at all any more.
   function itemWeight(item) {
-    return SKIN_CATEGORIES.includes(item.category) ? 0.5 : 1;
+    return 1;
   }
 
   function pickWeightedFrom(list) {
@@ -224,12 +218,8 @@ const Shop = (() => {
     const expires = Array.isArray(st.expires) ? st.expires.slice(0, slots) : [];
     while (expires.length < slots) expires.push(null);
 
-    // Invalid entries (item removed from economy.json, duplicate unique item, or a skin that got bought/unlocked
-    // some other way while it was still sitting on sale - see ownedSkin) become empty slots. This is the general
-    // safety net; buy() below also clears a skin's OTHER slots the instant it's bought, so this mostly only ever
-    // has to catch a skin unlocked by some other means (the owner's report, 2026-09-23: "wasting slots" - an
-    // owned skin must never sit on sale, however it became owned).
-    stock = stock.map((id) => (id && itemById(id) && !ownedSkin(itemById(id)) ? id : null));
+    // Invalid entries (an id removed from economy.json since this was saved) become empty slots.
+    stock = stock.map((id) => (id && itemById(id) ? id : null));
 
     for (let i = 0; i < slots; i++) {
       if (stock[i] !== null) {
@@ -282,9 +272,9 @@ const Shop = (() => {
     return restocked;
   }
 
-  // A buff can't be held in more than Economy.getBuffMax() (99) copies; a skin only once (a card still on sale after it was bought in another slot cannot be bought).
+  // A buff can't be held in more than Economy.getBuffMax() (99) copies.
   function isMaxed(item) {
-    return (item.category === "consumable" && Economy.getBuffCount(item.id) >= Economy.getBuffMax()) || ownedSkin(item);
+    return item.category === "consumable" && Economy.getBuffCount(item.id) >= Economy.getBuffMax();
   }
 
   function buy(slot) {
@@ -300,20 +290,6 @@ const Shop = (() => {
       // The whole stack goes into the inventory. If this is a kind the player had none of, the PROJECTILES
       // list expands and its red dot comes on (Economy raises it; more of a kind they already have doesn't).
       Economy.addProjectiles(item.id, offer ? offer.amount : 1);
-    } else if (SKIN_CATEGORIES.includes(item.category)) {
-      Economy.unlock(item.category, item.id); // a character / scenery / weather is unlocked: it shows up in its SKINS menu, equipped from there
-      // The same skin can be on sale in several slots at once - every OTHER one showing it is stale the instant
-      // it's bought anywhere, so clear it right now too (ensureStock's own stock-validation step is the general
-      // safety net for every other way a skin can become owned while stocked; this is the immediate path for the
-      // one that can happen inside a single shop visit - the owner's report, 2026-09-23: "wasting slots").
-      st.stock.forEach((otherId, i) => {
-        if (i !== slot && otherId === item.id) {
-          st.stock[i] = null;
-          st.offers[i] = null;
-          if (st.expires) st.expires[i] = null;
-          st.restock[i] = { at: shopNow() + restockMs(), prev: item.id };
-        }
-      });
     } else {
       Economy.addBuffs(item.id, 1); // a buff goes into the inventory; it is USED from the BUFFS tab (see buffs.js)
     }

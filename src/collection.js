@@ -149,7 +149,7 @@ const Collection = (() => {
   }
 
   function isListed(kind, it) {
-    if (SKIN_MENUS.includes(kind)) return it.rarity === "default" || Economy.isUnlocked(kind, it.id); // the default ones are always there
+    if (SKIN_MENUS.includes(kind)) return it.rarity === "default" || Economy.getSkinCount(kind, it.id) > 0; // the default ones are always there
     if (kind !== "projectile") return false;
     const p = eco && eco.projectiles && eco.projectiles[it.id];
     if (p && p.godOnly && !Economy.isGod()) return false; // a test projectile: god mode saves only
@@ -216,17 +216,20 @@ const Collection = (() => {
     });
   }
 
-  // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner (no amount), the EQUIP button, the detail at the bottom.
-  // `action` replaces the EQUIP button (the SKINS list's CHANGE, the shop's price button), `extraClass` is added to the card.
-  function skinRowHtml(item, action, extraClass, dot) {
+  // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner, the EQUIP
+  // button with how many the player has under it (stackable, never consumed - see Economy.getSkinCount), the detail
+  // at the bottom. `action` replaces the EQUIP button (the SKINS list's CHANGE, the shop's price button), `extraClass`
+  // is added to the card.
+  function skinRowHtml(kind, item, action, extraClass, dot) {
     const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
+    const amount = `<div class="pick-regen"><span>${countText(Economy.getSkinCount(kind, item.id))}</span></div>`;
     return (
       `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}${Rarity.cardClass(item.rarity)}" data-id="${esc(item.id)}">` +
       (dot ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div>` +
       `<div class="pick-desc">${esc(item.description || "")}</div></div>` +
-      `<div class="pick-action">${action || `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>`}</div>` +
+      `<div class="pick-action">${action || `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>`}${amount}</div>` +
       detail +
       cornerHtml(item.rarity, "") +
       `</div>`
@@ -240,7 +243,7 @@ const Collection = (() => {
     return SKIN_MENUS.map((kind) => {
       const list = skinItems(kind);
       const it = list.find((x) => x.id === Economy.getEquipped(kind)) || list[0];
-      return it ? skinRowHtml(it, `<button class="pick-equip skins-change" type="button" data-skins="${kind}">CHANGE</button>`, " skins-category", Economy.kindHasUndisplayedSkins(kind)) : "";
+      return it ? skinRowHtml(kind, it, `<button class="pick-equip skins-change" type="button" data-skins="${kind}">CHANGE</button>`, " skins-category", Economy.kindHasUndisplayedSkins(kind)) : "";
     }).join("");
   }
 
@@ -276,7 +279,7 @@ const Collection = (() => {
       );
     }
     const skin = skinItems(item.category).find((x) => x.id === item.id) || item; // a character / scenery / weather
-    return skinRowHtml(skin, action);
+    return skinRowHtml(item.category, skin, action);
   }
 
   // ---- BUFFS list: the buffs the player has (bought, waiting) or is running. Same cards as the projectiles list without
@@ -433,7 +436,7 @@ const Collection = (() => {
       titleEl.textContent = SKIN_TITLES[kind];
       scrollEl.innerHTML =
         sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
-          .map((it) => skinRowHtml(it, null, "", Economy.isNewSkin(kind, it.id)))
+          .map((it) => skinRowHtml(kind, it, null, "", Economy.isNewSkin(kind, it.id)))
           .join("") + `<div class="list-soon">More coming soon!</div>`; // (under the last card: the default one)
       fitNames();
       centerOn(Economy.getEquipped(kind)); // opens on what is equipped

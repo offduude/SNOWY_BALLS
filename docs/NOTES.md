@@ -2273,3 +2273,39 @@ else in that batch lands as its own commit.
   only W20's window; granted a buff via `Economy.addBuffs`/`Buffs.use` to confirm the buff-hud card sits flush
   against the new bezel.
 - `src/main.js?v=188`.
+
+## Skins are now stackable (CS2-style), and pulled from the shop's roll pool (2026-09-27)
+
+**Asked directly** (as part of designing the new BOXES feature, still to come): *"I have made 5 skins in each
+category, we will split them into rarities so there's always a reason to buy the box again... the skins will
+now have an amount under the equip button, so they're not one-time-unlock now... think like CS2 skins: you can
+have as many as you want, but having 0 means you don't have it anymore."* Also: *"we'll remove skins from the
+shop tab"* - characters/sceneries/weathers are no longer sold from the SHOP button's roll at all; a BOXES
+feature to buy them from is next.
+
+- `Economy`'s three boolean-unlock arrays (`unlockedCharacters`/`unlockedSceneries`/`unlockedWeathers`) are
+  replaced by one count map, `state.skinCounts = { character: {}, scenery: {}, weather: {} }` - the same shape
+  as `state.projectiles`/`state.buffItems`. `isUnlocked`/`unlock` are replaced by `getSkinCount(kind, id)` /
+  `addSkin(kind, id, n)`; equipping never decrements anything (still "never consumed"), and the same "new skin"
+  red-dot machinery fires the first time a kind/id count goes from 0 to owned - untouched on top of the new
+  count model.
+- Save migration: `clean()` converts an old save's `unlockedCharacters`/etc. id arrays into counts of 1 each
+  (unioned with a fresh save's defaults), so nobody who already owns a skin loses it on their next load. A save
+  already on the new model just has its `skinCounts` cleaned the same way every other id->count map here is.
+- `collection.js`: `skinRowHtml()` now takes a `kind` and renders the owned count under the EQUIP/CHANGE button
+  (`Economy.getSkinCount`), the same `pick-regen` sub-pattern the BUFFS list already uses for its "x3" - not a
+  new one. `isListed()`'s skin filter switched from `isUnlocked` to `getSkinCount(...) > 0` (same behavior: an
+  unowned skin still doesn't appear in its menu at all, so there's no separate "greyed out, can't equip" state
+  to build - a skin with 0 copies simply isn't listed).
+- `shop.js`: skins are gone from `eligible()`/the rarity draw entirely - `CATEGORY_LABEL`, `SKIN_CATEGORIES`,
+  `ownedSkin()`, the half-weight-for-skins rule in `itemWeight()`, and the whole skin-unlock branch of `buy()`
+  are removed (all now-dead code once no shop item can have category character/scenery/weather).
+  `economy.json`'s `shop.items` had its 6 skin entries (`pryk`, `banan`, `frosty_night`, `sunny`, `rain`,
+  `blizzard`) deleted outright - the master `characters`/`sceneries`/`weathers` lists these skins still come
+  from are untouched (still used by the SKINS menu, and will be the BOXES feature's draw pool next).
+- Verified live (test origin): fresh tab, no console errors. SKINS > CHARACTERS shows Andek (default) with
+  "x1" under EQUIPPED; granted Banan via `Economy.addSkin("character","banan",2)` - it appeared with "x2",
+  legendary styling and its new-skin dot, equipped without the count changing. Opened SHOP: only
+  PROJECTILE/BUFF cards roll (no character/scenery/weather cards); bought a buff normally (coins deducted,
+  slot went SOLD OUT with its restock timer) to confirm `buy()` still works with the skin branch gone.
+- `src/economy.js?v=44`, `src/collection.js?v=77`, `src/shop.js?v=34`.

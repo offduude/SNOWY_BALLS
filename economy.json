@@ -33,7 +33,7 @@
     "_tankNote": "TANK event (2026-09-23, see main.js updateTankEvent/eventDefs): legendary, from its summon buff (Toy Tank) - it has no block of its own here, unlike the song events: it has no face to hit and no coinMultiplier-style payout, it is pure spectacle plus a utility (rerolls the entire shop the instant it 'fires'). The tank slides in from the right over tank_moving.mp3's own real length, pauses half a second, fires (a directional explosion, the shop reroll, and the player flung off the left edge, spinning), then reverses out over the same length again, fading the player back in from its halfway point. Throwing is disabled for the WHOLE event (handleFreezeInput's own gate) - the only event that does this; every other event still lets the player throw (that's how they're scored). UNLIKE every other event, this one is marked `natural: false` in eventDefs() and can NEVER spawn on its own, only via the buff (the owner's explicit call, 2026-09-23) - rerolling the whole shop at random, uninvited, would be far more disruptive than a song or the banana face."
   },
 
-  "_skinsNote": "SKINS (the SKINS button, between PROJECTILES and OPTIONS): characters, sceneries and weather (see _weatherNote) are equipped, and each may carry `effects` [{type, value}] that are on for as long as it is equipped (coinMultiplier and offsetCenter, read like a buff's by buffs.js modifiers() - none uses them today; shopSpeed: the shop's timers - the item's availability timer and the sold-out timer - run value x as fast, on a clock that goes on while the app is closed: Economy.shopNow(), e.g. value 1.2 = a 30 minute timer takes 25 - Frosty Night had this until 2026-09-23, removed at the owner's request; nothing uses shopSpeed today, but the mechanism is still live for whatever does next), never consumed, never unequipped (only by equipping another one), and listed by rarity, the rarest first. characters: the thrower; `character` names its entry in CHARACTERS (main.js: the empty-handed pictures and hand numbers), `image` is the face on its card, `detail` will describe the bonus it gives (empty for the default one). sceneries: the picture behind the game; `background` is the wall texture - it must be EXACTLY the size of assets/building/background.png (704x1000) with the windows in the same places, so a scenery is only a visual change; `image` is its card picture. rarity: one of the rarities below (default = free, always owned); others must be unlocked (Economy.unlock).",
+  "_skinsNote": "SKINS (the SKINS button, between PROJECTILES and OPTIONS): characters, sceneries and weather (see _weatherNote) are equipped, and each may carry `effects` [{type, value}] that are on for as long as it is equipped (coinMultiplier and offsetCenter, read like a buff's by buffs.js modifiers() - none uses them today; shopSpeed: the shop's timers - the item's availability timer and the sold-out timer - run value x as fast, on a clock that goes on while the app is closed: Economy.shopNow(), e.g. value 1.2 = a 30 minute timer takes 25 - Frosty Night had this until 2026-09-23, removed at the owner's request; nothing uses shopSpeed today, but the mechanism is still live for whatever does next), never consumed, never unequipped (only by equipping another one), and listed by rarity, the rarest first. characters: the thrower; `character` names its entry in CHARACTERS (main.js: the empty-handed pictures and hand numbers), `image` is the face on its card, `detail` will describe the bonus it gives (empty for the default one). sceneries: the picture behind the game; `background` is the wall texture - it must be EXACTLY the size of assets/building/background.png (704x1000) with the windows in the same places, so a scenery is only a visual change; `image` is its card picture. rarity: one of the rarities below (default = free, always owned); others must be owned (Economy.addSkin - stackable and count-based since 2026-09-27, not a one-time unlock; bought from the BOXES feature, not the shop tab, which dropped skins from its pool the same day).",
   "characters": [
     {
       "id": "andek",
@@ -584,66 +584,6 @@
         "image": "assets/snowball/egg.png",
         "effect": { "type": "givesProjectile", "value": "egg" },
         "description": "No chickens inside. Enough for a 'basic' omelette."
-      },
-      {
-        "id": "pryk",
-        "name": "Pryk",
-        "category": "character",
-        "rarity": "common",
-        "priceRange": { "min": 350, "max": 600 },
-        "ignorePriceOverride": true,
-        "image": "assets/character/pryk_face.png",
-        "description": "Isn't as old as you might think!"
-      },
-      {
-        "id": "banan",
-        "name": "Banan",
-        "category": "character",
-        "rarity": "legendary",
-        "priceRange": { "min": 5000, "max": 8000 },
-        "ignorePriceOverride": true,
-        "image": "assets/character/banan_face.png",
-        "description": "So he's joined us now?"
-      },
-      {
-        "id": "frosty_night",
-        "name": "Frosty Night",
-        "category": "scenery",
-        "rarity": "rare",
-        "priceRange": { "min": 900, "max": 1500 },
-        "ignorePriceOverride": true,
-        "image": "assets/scenery/frosty_night.png",
-        "description": "The same wall, after dark."
-      },
-      {
-        "id": "sunny",
-        "name": "Sunny",
-        "category": "weather",
-        "rarity": "common",
-        "priceRange": { "min": 250, "max": 450 },
-        "ignorePriceOverride": true,
-        "image": "assets/weather/sunny.png",
-        "description": "Clear as day. Nothing falls from the sky."
-      },
-      {
-        "id": "rain",
-        "name": "Rain",
-        "category": "weather",
-        "rarity": "common",
-        "priceRange": { "min": 300, "max": 500 },
-        "ignorePriceOverride": true,
-        "image": "assets/weather/rain_item.png",
-        "description": "Calming rain to help you hit your throws."
-      },
-      {
-        "id": "blizzard",
-        "name": "Blizzard",
-        "category": "weather",
-        "rarity": "epic",
-        "priceRange": { "min": 2200, "max": 3600 },
-        "ignorePriceOverride": true,
-        "image": "assets/weather/blizzard_item.png",
-        "description": "Hold on to your hat!"
       }
     ]
   }

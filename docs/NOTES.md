@@ -2514,3 +2514,28 @@ is in the boxes.
   14850 coins for a Scenery Box, `getSkinCount("scenery","frosty_night")` -> 2). Drained coins to 100 and
   confirmed all three buttons show their unaffordable look (`.cant`, dimmed).
 - `src/boxes.js?v=3`, `src/collection.js?v=80` (exports `skinRowHtml`).
+
+## Price ranges collapsed to a single fixed price each - highest point (2026-09-27)
+
+Resolves the "pending a decision" entry just above. Presented the full price-range table (20 buffs'
+`priceRange`, 10 projectiles' `unitPrice`) with both the average and the highest point of each; **the owner
+picked the highest point** for all of them.
+
+- economy.json: every `"priceRange": {"min":X,"max":Y}` (20 buffs) became a plain `"price": Y`; every
+  `"unitPrice": {"min":X,"max":Y}` (10 projectiles) became a plain `"unitPrice": Y` - a mechanical, regexed
+  substitution (`"priceRange":\s*\{\s*"min":\s*\d+,\s*"max":\s*(\d+)\s*\}` -> `"price": $1`, same shape for
+  unitPrice), verified afterwards (0 `priceRange` left, 10 `unitPrice` fields, JSON still parses). `amount`
+  ranges (a stack's quantity) are untouched - still rolled per the owner's explicit "still affected by quantity".
+  `_itemsNote` reworded to match (no more "rolled in that range").
+- `shop.js` simplification that falls out of this: `rollOffer()` no longer rolls a price at all, only a stack's
+  `amount` - an offer is now just `{ amount }` (or `null` for a non-stack item, which has nothing to roll any
+  more). `price(item, offer)` for a stack is now `item.unitPrice * (offer ? offer.amount : item.amount.min)`
+  instead of reading a rolled `offer.unitPrice`. `needsOffer()`/`offerValid()` are gone entirely - they were
+  already dead code (leftover from the per-item-timer model removed earlier this session, `ensureStock()` was
+  their only caller and it's gone too) as well as no longer conceptually needed (nothing about a price can be
+  "invalid" any more, there's nothing rolled to validate).
+- Verified live (test origin): a projectile stack (Stone, unitPrice 30, rolled amount x3) prices correctly at 90
+  (30 x 3); a buff (Blue Skyr) shows a fixed 7 every time regardless of which slot/roll it's in (previously would
+  have varied 4-7) - confirmed by forcing it into a slot with a fresh (empty) offer and reading the rendered
+  price straight from the DOM. No console errors.
+- `economy.json`, `src/shop.js?v=38`.

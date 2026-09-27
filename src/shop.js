@@ -8,8 +8,8 @@
 // is closed and leaving/re-entering can not reroll anything.
 //
 // Item types: "consumable" (a timed buff, the same one can be on sale in several slots) and "projectile" (a
-// STACK of consumable projectiles: the amount and the price of one are rolled at random each time it is put
-// on sale, the slot's price is amount x unit price). Skins (character/scenery/weather) used to be a third,
+// STACK of consumable projectiles: the amount is rolled at random each time it is put on sale, the slot's price
+// is that amount x the item's fixed unitPrice - see rollOffer's own note, 2026-09-27). Skins (character/scenery/weather) used to be a third,
 // one-time-unlock type sold here too, but were pulled from the shop's pool entirely (2026-09-27, owner's call)
 // - they're bought from the new BOXES feature instead, as stackable items (see Economy.addSkin).
 // Any item can be on sale in several slots at once - each slot has its own offer.
@@ -35,34 +35,19 @@ const Shop = (() => {
     return min + Math.floor(Math.random() * (max - min + 1));
   }
 
-  // Items that come in stacks have an `amount` and a `unitPrice` range; each time one is put on sale a concrete
-  // offer is rolled: { amount, unitPrice }. Saved with the stock so leaving the shop can't reroll it.
-  // A single item can have a `priceRange` {min, max} instead of a fixed price: each time it is put on sale its price is
-  // rolled in that range (the offer is then { price }).
+  // Items that come in stacks have an `amount` range and a single fixed `unitPrice`; each time one is put on
+  // sale a concrete offer is rolled: { amount }. Saved with the stock so leaving the shop can't reroll it.
+  // (2026-09-27, the owner's call: every price used to be a rolled range - priceRange for a single item, unitPrice
+  // for one of a stack - collapsed to one fixed number each, at the old range's highest point. Only a stack's
+  // `amount` is still randomized - "still affected by quantity of course", the owner's own words.)
   function rollOffer(item) {
-    if (!item) return null;
-    if (item.amount && item.unitPrice) {
-      return { amount: randInt(item.amount.min, item.amount.max), unitPrice: randInt(item.unitPrice.min, item.unitPrice.max) };
-    }
-    if (item.priceRange) return { price: randInt(item.priceRange.min, item.priceRange.max) };
-    return null;
+    if (!item || !item.amount) return null;
+    return { amount: randInt(item.amount.min, item.amount.max) };
   }
 
-  function needsOffer(item) {
-    return !!(item && ((item.amount && item.unitPrice) || item.priceRange));
-  }
-
-  // Is the saved offer a usable one for this item (an old save, or an edited economy.json, may not match)?
-  function offerValid(offer, item) {
-    if (!offer) return false;
-    if (item.amount && item.unitPrice) return offer.amount > 0 && offer.unitPrice > 0;
-    return offer.price > 0;
-  }
-
-  // What the slot costs. `offer` is the rolled offer for stack items.
+  // What the slot costs. `offer` is the rolled offer for a stack item (its amount x the item's fixed unitPrice).
   function price(item, offer) {
-    if (offer && offer.price) return offer.price;
-    if (offer) return offer.amount * offer.unitPrice;
+    if (item.amount) return item.unitPrice * (offer ? offer.amount : item.amount.min);
     if (item.ignorePriceOverride) return item.price;
     const o = eco.shop.priceOverride; // placeholder pricing switch, see economy.json
     return o !== null && o !== undefined ? o : item.price;
@@ -70,8 +55,7 @@ const Shop = (() => {
 
   // The cheapest a stack item can be (for the "always show something affordable" safety net).
   function minPrice(item) {
-    if (item.amount && item.unitPrice) return item.amount.min * item.unitPrice.min;
-    if (item.priceRange) return item.priceRange.min;
+    if (item.amount) return item.unitPrice * item.amount.min;
     return price(item);
   }
 

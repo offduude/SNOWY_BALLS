@@ -2246,3 +2246,30 @@ back), just with a wider window than either of those already had.
 - Verified live (test origin): wrapped `window.setTimeout` while calling `Cloud.notePurchase()` directly -
   zero `setTimeout` calls recorded (the old code always scheduled exactly one). No console errors.
 - `src/cloud.js?v=26`.
+
+## W21 retired from scoring, top-left camera recentered on W20 (2026-09-27)
+
+**Asked directly**: "we'll remove w21 from scoring and center the top-left display on w20." W20/W21 are the
+two window hitboxes players throw at (image x 385-436 and 472-494, same row) - not calendar weeks, despite the
+name. This is the first section of this week's bigger shop-redesign batch (see the sections below); everything
+else in that batch lands as its own commit.
+
+- `WINDOWS` (main.js) dropped from a 2-entry array to just W20. Both scoring loops
+  (`for (const win of WINDOWS)`, the throw-landing check and `resolveMiracleThrow`'s Diamond Cross check) were
+  already generic over the array's length, so a throw landing in the old W21 box now just falls through to a
+  miss - no other scoring code touched.
+- `WALL_WINDOWS` (the decorative "any window thuds" list used by `hitsAnyWindow()`) is a fully separate list
+  and already had W21's box in it independently of `WINDOWS` - the thud sound at that wall position is
+  unaffected.
+- `createTargetCamera()`'s live top-left mini-camera used to span `w20.xFrom` to `w21.xTo` (viewW 125); now
+  spans `w20.xFrom` to `w20.xTo` (viewW 67), i.e. it's centered on/sized to W20 alone.
+- `#buff-hud`'s `left` (index.html) was hand-tuned to sit just past the camera's bezel edge - recalculated
+  from 31.7% to 18.3% for the new, narrower bezel (old bezel right edge 133/432px, new 75/432px, same ~0.9pp
+  gap preserved) and confirmed visually: an active buff card sits right up against the shrunk camera with no
+  dead gap.
+- No `economy.json` change needed - coin payout per hit was already a single `hitValue` regardless of which
+  window was hit, confirmed pre-existing and unrelated to this change.
+- Verified live (test origin): fresh tab, no console errors; screenshot confirms the mini-camera now frames
+  only W20's window; granted a buff via `Economy.addBuffs`/`Buffs.use` to confirm the buff-hud card sits flush
+  against the new bezel.
+- `src/main.js?v=188`.

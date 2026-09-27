@@ -19,7 +19,7 @@ const GAME_WIDTH = 432; // exactly 16:9 (432/243)
 const GAME_HEIGHT = 243;
 
 const GRAVITY = 900; // px/s^2
-const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right - needs to reach W21
+const MAX_SWING_SPEED = 180; // px/s horizontal drift at full left/right
 
 const ORIGIN_X = (385 + 436) / 2; // 410.5 - centered on W20 (its xFrom/xTo; WINDOWS is defined below)
 const ORIGIN_Y = 40; // world height where the character throws from (0 = ground)
@@ -59,7 +59,7 @@ const DEFAULT_OFFSET_ZONE = 0.25; // the moderate tier's (used if a projectile h
 const MARK_LIFETIME_MS = 10000; // marks start fading this long after they're placed
 const MARK_FADE_MS = 1500; // fade-out duration, then the mark is destroyed
 
-// Top-left "rear view camera" - a real second Phaser camera pointed at W20/W21, not a static
+// Top-left "rear view camera" - a real second Phaser camera pointed at W20, not a static
 // crop, so the live ball/marks show up in it too. Kept at zoom 1 (see the zoom-clipping gotcha
 // in docs/NOTES.md) - sized to exactly cover the world region instead of zooming into it.
 const TARGET_CAM_X = 6;
@@ -69,15 +69,14 @@ const TARGET_CAM_MARGIN_Y = 8; // world px of breathing room above/below the win
 const TARGET_CAM_RADIUS = 8; // corner radius of the live feed and its border
 const TARGET_CAM_BORDER_WIDTH = 2; // thickness of the solid-fill border ring around the live feed
 
-// W20 and W21 (see docs/background_annotated.png), converted from image pixels to world
-// "height climbed" (IMG_GROUND_Y - imageY). Both sit in the same window row (image y 273-316).
-const WINDOWS = [
-  { name: "W20", xFrom: 385, xTo: 436, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273 },
-  { name: "W21", xFrom: 472, xTo: 494, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273 },
-];
+// W20 (see docs/background_annotated.png), converted from image pixels to world "height
+// climbed" (IMG_GROUND_Y - imageY). W21 (image x 472-494, same window row) used to be a second
+// scoring target alongside it but was retired (2026-09-27, owner's call) - it's still a plain
+// wall window for the "any window thuds" effect below, just no longer in this scoring list.
+const WINDOWS = [{ name: "W20", xFrom: 385, xTo: 436, heightFrom: IMG_GROUND_Y - 316, heightTo: IMG_GROUND_Y - 273 }];
 
-// EVERY window of the building (the two goal windows above are among them), in IMAGE pixels [x from, x to, y from, y to]
-// (inclusive) - read from the red boxes of docs/background_annotated.png by tools/find_windows.py. Only W20 / W21 score;
+// EVERY window of the building (the scoring window above is among them), in IMAGE pixels [x from, x to, y from, y to]
+// (inclusive) - read from the red boxes of docs/background_annotated.png by tools/find_windows.py. Only WINDOWS score;
 // this list is for effects that react to ANY window (the stone's hard_impact sound).
 const WALL_WINDOWS = [
   [0, 26, 73, 116], [209, 231, 73, 116], [267, 318, 73, 116], [385, 436, 73, 116],
@@ -1051,9 +1050,9 @@ class MainScene extends Phaser.Scene {
   // building, rendering the same live world (background, ball, marks) as the main camera - not
   // a static crop, so a snowball flying past or a mark landing there actually shows up in it.
   createTargetCamera() {
-    const [w20, w21] = WINDOWS;
+    const [w20] = WINDOWS;
     const worldXFrom = w20.xFrom - TARGET_CAM_MARGIN_X;
-    const worldXTo = w21.xTo + TARGET_CAM_MARGIN_X;
+    const worldXTo = w20.xTo + TARGET_CAM_MARGIN_X;
     const heightFrom = w20.heightFrom - TARGET_CAM_MARGIN_Y;
     const heightTo = w20.heightTo + TARGET_CAM_MARGIN_Y;
     const viewW = worldXTo - worldXFrom;

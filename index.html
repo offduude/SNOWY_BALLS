@@ -771,12 +771,13 @@
     /* a USE button that cannot be used now (an event buff while an event runs) */
     .pick-use.off { opacity: 0.45; filter: grayscale(0.6); cursor: default; }
 
-    /* Buff cards: top of the screen, right of the live display (its frame spans 4..133 of 432 canvas
-       px across and 4..67 of 243 down - keep in step with createTargetCamera). Cards stack down until the
-       column is as tall as the live display, then wrap into a new column. Taps pass through to the game. */
+    /* Buff cards: top of the screen, right of the live display (its frame spans 4..75 of 432 canvas
+       px across and 4..67 of 243 down - keep in step with createTargetCamera, which shrank when W21
+       was retired from scoring, 2026-09-27). Cards stack down until the column is as tall as the live
+       display, then wrap into a new column. Taps pass through to the game. */
     #buff-hud {
       position: absolute;
-      left: 31.7%;
+      left: 18.3%;
       top: 1.65%;
       height: 25.9%;
       display: flex;
@@ -1601,7 +1602,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=292"></script>
+  <script src="src/version.js?v=293"></script>
   <script src="src/economy.js?v=43"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1636,7 +1637,7 @@
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=24"></script>
   <script src="src/collection.js?v=76"></script>
-  <script src="src/main.js?v=187"></script>
+  <script src="src/main.js?v=188"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

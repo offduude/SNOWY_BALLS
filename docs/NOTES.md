@@ -2849,3 +2849,52 @@ with both equipped from boot. Summer's card in SKINS > SCENERIES shows the reuse
 Restored the test save's prior equipped weather/scenery (Snow/Frosty) afterward - `banana_rain`/`summer`
 counts (1 each) left in place as further deliberately-granted test skins, same treatment as the other four.
 - `economy.json`, `src/main.js`, `assets/scenery/summer_bg.png`, `assets/weather/banana_rain.png`.
+
+## Banana Rain particle tuning, final rarities, and rarity-tinted box inspect icons (2026-09-27)
+
+Asked to make Banana Rain's particles "bigger, fall slower, be less dense and spin," then handed down the
+full, final rarity list for all 15 non-default skins (characters/sceneries/weather), and asked for the box
+inspect popup's item icons to get a background reflecting their own rarity colour (rainbow for legendary).
+
+**Banana Rain (`economy.json`):** `particleSize: 10 -> 20` (bigger), `fallSpeed: "moderate" -> "slow"`
+(200-300px/s -> 50-75px/s), `density: "heavy" -> "light"` (30 on screen -> 7), new `"spin": true`.
+
+**Weather particle spin - genuinely new, main.js.** No weather particle had ever rotated before (only
+thrown PROJECTILES do, via the unrelated `SPIN_RATE`/`projectiles.<id>.spins`). Added a parallel, much
+gentler mechanism: a new `WEATHER_SPIN_RATE` constant (3 rad/s baseline, vs. a projectile's 14), each
+particle rolls its own `spinRate` at spawn time (`spawnWeatherParticle`) - a random speed/direction around
+that baseline, only when `def.spin` is set - and `updateWeather` applies `p.img.rotation += p.spinRate * dt`
+every frame. Every other weather is untouched (`spinRate` is 0, the line is a no-op).
+
+**Final rarities (`economy.json`), all `_rarityNote` placeholders removed now that they're real:**
+| kind | common | rare | epic | legendary |
+|---|---|---|---|---|
+| characters | Black Andek | Cool Andek | Pryk | Banan |
+| sceneries | Summer, Desert | Frosty Night | Lollipop | Space |
+| weather | Sunny, Rain | Banana Rain | Blizzard | Acid Rain |
+
+(Andek/Frosty/Snow stay `default`, unaffected - always owned, never in a box's pool.)
+
+**Rarity-tinted box inspect icons (`src/boxes.js`, `index.html`):** new `tintAttrs(item)` in boxes.js -
+almost a line-for-line copy of buffs.js's own `tintAttrs` (same ~22% rarity-colour tint via a `--tint` CSS
+var, same animated rainbow background for legendary), adapted for a box-pool item's plain `item.rarity`
+field (no `Rarity.ofItem` category-lookup needed here - only shop items have a `category`, box items don't).
+`openInspect()`'s cell markup now wraps each `<img>` in a `<span class="box-inspect-icon">` (previously the
+img was a bare direct child) so the tint/rainbow background sits behind just the icon, not the chance% text
+below it. New CSS: `.box-inspect-icon` (a centred 10u square, `rgba(0,0,0,0.06)` default), `.tinted`
+(`background-image: linear-gradient(var(--tint), var(--tint))`, identical trick to `.buff-card.tinted`),
+`.rainbow` (the same travelling-rainbow + shine keyframes every other legendary card already uses -
+`rarity-wave`/`buff-card-shine`).
+
+Version bumps: `src/boxes.js?v=5 -> 6`, `src/main.js?v=193 -> 194`.
+
+Verified live (test origin): fresh tab, no console errors. Equipped Banana Rain from boot - particles
+visibly bigger, sparser (about a third as many on screen as before), falling much slower, and tumbling at
+different angles frame to frame (confirmed via zoomed screenshots showing several particles mid-rotation at
+once, which a static/non-spinning particle field never would). Held all three boxes (Character/Scenery/
+Weather) via a real hold gesture (dispatchEvent pointerdown, wait past HOLD_MS, matching how a real touch
+would fire it) and confirmed every icon's tint AND percentage together: characters common/rare/epic/
+legendary at 60/30/9/1%, weather 30/30/30/9/1% (two commons split the 60), scenery 30/30/30/9/1% (ditto) -
+exactly the rarity table above, with Banan/Space/Acid Rain's slots showing the shimmering rainbow
+background. Restored weather to Snow afterward (the only thing changed by this round of testing).
+- `economy.json`, `src/main.js`, `src/boxes.js`, `index.html`.

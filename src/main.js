@@ -449,6 +449,7 @@ const DEFAULT_BACKGROUND = "assets/building/background.png"; // the wall picture
 const WEATHER_MARGIN = 6; // px the sky the weather falls in reaches beyond each side of the picture
 const WEATHER_DEPTH = 9; // the weather's particles are drawn over the character (depth 2) - the same depth as the roses: over the building, over the marks (5), under the live ball (10)
 const SPIN_RATE = 14; // rad/s, a spinning projectile (~2.2 turns a second)
+const WEATHER_SPIN_RATE = 3; // rad/s baseline for a weather whose particles tumble (economy.json weather "spin": true) - each particle rolls its own speed and direction around this, much gentler than a thrown projectile's SPIN_RATE (a falling banana, not a flung snowball)
 // PERSPECTIVE (visual only): the projectile flies away from the player towards the wall, so it gets smaller as it approaches its
 // apex - full size (BALL_SIZE px) when thrown, BALL_APEX_SCALE of that at the apex - and the closer it gets to the apex the
 // FASTER it shrinks. A projectile that bounces off comes back towards the player and grows back to full size over
@@ -1574,6 +1575,10 @@ class MainScene extends Phaser.Scene {
       swayPx: (w.def.sway || 0) * Phaser.Math.FloatBetween(0.5, 1.2), // a gentle swing from side to side (`sway`, none by default)
       swayHz: Phaser.Math.FloatBetween(0.4, 0.9),
       phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
+      // economy.json weather `spin` (none by default, Banana Rain has it): each particle tumbles at its own random
+      // speed and direction around WEATHER_SPIN_RATE, not a fixed rate - a field of identical particles all
+      // spinning in lockstep would look mechanical.
+      spinRate: w.def.spin ? Phaser.Math.FloatBetween(0.5, 1.5) * WEATHER_SPIN_RATE * (Phaser.Math.Between(0, 1) ? 1 : -1) : 0,
     });
   }
 
@@ -1596,6 +1601,7 @@ class MainScene extends Phaser.Scene {
       p.age += dt;
       p.img.y += p.vy * dt;
       p.img.x = p.x0 + p.vx * p.age + Math.sin(p.age * p.swayHz * Math.PI * 2 + p.phase) * p.swayPx;
+      if (p.spinRate) p.img.rotation += p.spinRate * dt;
       if (p.img.y - p.img.displayHeight / 2 > w.bottom || p.img.x < w.left - 40 || p.img.x > w.right + 40) {
         p.img.destroy();
         return false;

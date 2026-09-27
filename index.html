@@ -209,9 +209,32 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    .box-inspect-cell img {
+    /* The icon's own background, reflecting the item's rarity colour (boxes.js tintAttrs) - a flat ~22% tint via
+       --tint (same trick as .buff-card.tinted), or the shared travelling rainbow for legendary (.rainbow). */
+    .box-inspect-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       width: 100%;
       height: calc(var(--u) * 10);
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .box-inspect-icon.tinted {
+      background-image: linear-gradient(var(--tint), var(--tint));
+    }
+
+    .box-inspect-icon.rainbow {
+      background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
+        rgba(77, 210, 255, 0.32), rgba(106, 107, 255, 0.32), rgba(193, 77, 255, 0.32), rgba(255, 77, 77, 0.32));
+      background-size: 200% 100%;
+      animation: rarity-wave 2.4s linear infinite, buff-card-shine 1.7s ease-in-out infinite;
+    }
+
+    .box-inspect-cell img {
+      width: 84%;
+      height: 84%;
       object-fit: contain;
       image-rendering: pixelated;
       pointer-events: none;
@@ -2023,7 +2046,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=306"></script>
+  <script src="src/version.js?v=307"></script>
   <script src="src/economy.js?v=46"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2055,11 +2078,11 @@
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
   <script src="src/shop.js?v=42"></script>
-  <script src="src/boxes.js?v=5"></script>
+  <script src="src/boxes.js?v=6"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=25"></script>
   <script src="src/collection.js?v=82"></script>
-  <script src="src/main.js?v=193"></script>
+  <script src="src/main.js?v=194"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

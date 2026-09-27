@@ -50,7 +50,7 @@
       "description": "Isn't as old as you might think!",
       "image": "assets/character/pryk_face.png",
       "character": "pryk",
-      "rarity": "common",
+      "rarity": "epic",
       "detail": ""
     },
     {
@@ -69,8 +69,7 @@
       "image": "assets/character/black_andek_face.png",
       "character": "black_andek",
       "rarity": "common",
-      "detail": "",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+      "detail": ""
     },
     {
       "id": "cool_andek",
@@ -78,9 +77,8 @@
       "description": "Ice cold, literally.",
       "image": "assets/character/cool_andek_face.png",
       "character": "cool_andek",
-      "rarity": "common",
-      "detail": "",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+      "rarity": "rare",
+      "detail": ""
     }
   ],
   "sceneries": [
@@ -109,8 +107,7 @@
       "image": "assets/scenery/desert.png",
       "background": "assets/scenery/desert_bg.png",
       "rarity": "common",
-      "detail": "",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+      "detail": ""
     },
     {
       "id": "lollipop",
@@ -118,9 +115,8 @@
       "description": "Sweet and colourful.",
       "image": "assets/scenery/lollipop.png",
       "background": "assets/scenery/lollipop_bg.png",
-      "rarity": "common",
-      "detail": "",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+      "rarity": "epic",
+      "detail": ""
     },
     {
       "id": "space",
@@ -128,9 +124,8 @@
       "description": "Out of this world.",
       "image": "assets/scenery/space.png",
       "background": "assets/scenery/space_bg.png",
-      "rarity": "common",
-      "detail": "",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+      "rarity": "legendary",
+      "detail": ""
     },
     {
       "id": "summer",
@@ -140,8 +135,7 @@
       "background": "assets/scenery/summer_bg.png",
       "rarity": "common",
       "detail": "",
-      "_imageNote": "The card thumbnail deliberately reuses Sunny's weather picture (assets/weather/sunny.png) - the owner's direct call, no separate scenery_summer_item.png exists.",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+      "_imageNote": "The card thumbnail deliberately reuses Sunny's weather picture (assets/weather/sunny.png) - the owner's direct call, no separate scenery_summer_item.png exists."
     }
   ],
 
@@ -225,9 +219,8 @@
       "angle": 0,
       "density": "very_heavy",
       "fallSpeed": "fast",
-      "rarity": "common",
-      "detail": "",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md. particleSize/density/fallSpeed borrowed from Rain as a starting point (no sound file supplied) - tweak once the owner has looked at it in motion."
+      "rarity": "legendary",
+      "detail": ""
     },
     {
       "id": "banana_rain",
@@ -235,16 +228,16 @@
       "description": "It's raining bananas!",
       "image": "assets/weather/banana_rain.png",
       "particle": "assets/weather/banana_rain.png",
-      "particleSize": 10,
+      "particleSize": 20,
       "sway": 0,
       "drift": 0,
       "angle": 0,
-      "density": "heavy",
-      "fallSpeed": "moderate",
-      "rarity": "common",
+      "spin": true,
+      "density": "light",
+      "fallSpeed": "slow",
+      "rarity": "rare",
       "detail": "",
-      "_imageNote": "The one file the owner supplied (banana_rain.png) is deliberately used for BOTH the card thumbnail (image) and the falling particle (particle) - the owner's direct call, there is no separate _item/_particle pair for this one.",
-      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md. particleSize/density/fallSpeed are a placeholder guess (no reference to match) - tweak once the owner has looked at it in motion."
+      "_imageNote": "The one file the owner supplied (banana_rain.png) is deliberately used for BOTH the card thumbnail (image) and the falling particle (particle) - the owner's direct call, there is no separate _item/_particle pair for this one."
     }
   ],
 

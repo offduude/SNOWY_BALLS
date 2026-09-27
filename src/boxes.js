@@ -40,6 +40,19 @@ const Boxes = (() => {
     return (eco.boxes || []).find((b) => b.kind === kind) || null;
   }
 
+  // The inspect popup's icon background, reflecting the item's own rarity colour (same convention as
+  // buffs.js's own tintAttrs for BUFF cards: a flat ~22% tint of the rarity's colour, or the shared animated
+  // rainbow background for legendary - concatenated straight into the class/style attributes, same trick).
+  function tintAttrs(item) {
+    const r = Rarity.info(item.rarity);
+    if (!r) return "";
+    if (r.color === "rainbow") return " rainbow";
+    const m = /^#([0-9a-f]{6})$/i.exec(r.color || "");
+    if (!m) return "";
+    const n = parseInt(m[1], 16);
+    return ` tinted" style="--tint: rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.22)`;
+  }
+
   // Every real (non-default) skin of a kind: the default one is always already owned for free, never a prize.
   function poolFor(kind) {
     return (eco[KIND_LIST[kind]] || []).filter((it) => it.rarity !== "default");
@@ -195,7 +208,9 @@ const Boxes = (() => {
       .map(
         ({ item, chance }) =>
           `<div class="box-inspect-cell" data-id="${esc(item.id)}">` +
+          `<span class="box-inspect-icon${tintAttrs(item)}">` +
           `<img src="${esc(item.image || "")}" alt="" draggable="false" />` +
+          `</span>` +
           `<div class="box-inspect-chance">${chance}%</div>` +
           `</div>`
       )

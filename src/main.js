@@ -2732,18 +2732,31 @@ class MainScene extends Phaser.Scene {
   }
 
   // The chance per throw that an event of this RARITY starts by itself, so that on average it takes as many throws as it takes to see an item
-  // of that rarity in the shop (see events._rarityNote in economy.json): 1 / (meanShopHours x throwsPerHour), where meanShopHours = 1 / (the
-  // rarity's share of the shop's rarity roll x slots x 3600 / shop.rerollSeconds). 0 if the rarity cannot come up in the shop.
+  // of that rarity in the shop (see events._rarityNote in economy.json): 1 / (meanShopHours x throwsPerHour), where meanShopHours = 1 / rollsPerHour.
+  // (2026-09-27: the shop no longer rolls one shared pool into a fixed number of slots - each category, projectile and consumable, independently
+  // rolls shop.rollsPerCategory times per shop.rerollSeconds from its own non-guaranteed items (shop.guaranteedIds never roll at all, so they
+  // don't count towards a category's rarity mix either). rollsPerHour is now the SUM, across both categories, of that rarity's share of each
+  // category's own rarity mix x that category's rolls/hour - a rarity missing from a category (or only present via guaranteed ids) just
+  // contributes 0 from it.) 0 if the rarity cannot come up in the shop at all.
   eventRarityChance(rarityId) {
     const ev = this.eco.events || {};
     if (ev.rarityChances && typeof ev.rarityChances[rarityId] === "number") return ev.rarityChances[rarityId];
     const rarities = this.eco.rarities || [];
-    const has = new Set((this.eco.shop.items || []).filter((it) => !it.godOnly).map((it) => (it.category === "projectile" ? (this.eco.projectiles[it.id] || {}).rarity : it.rarity)));
-    const total = rarities.filter((r) => r.chance > 0 && has.has(r.id)).reduce((a, r) => a + r.chance, 0);
-    const r = rarities.find((x) => x.id === rarityId);
-    if (!r || !(r.chance > 0) || !has.has(rarityId) || total <= 0) return 0;
-    const rollsPerHour = (this.eco.shop.slots * 3600) / (this.eco.shop.rerollSeconds || 1800);
-    const meanShopHours = 1 / ((r.chance / total) * rollsPerHour);
+    const shop = this.eco.shop || {};
+    const guaranteed = new Set(shop.guaranteedIds || []);
+    const rarityOf = (it) => (it.category === "projectile" ? (this.eco.projectiles[it.id] || {}).rarity : it.rarity);
+    const attemptsPerHour = ((shop.rollsPerCategory || 1) * 3600) / (shop.rerollSeconds || 1800);
+    let rollsPerHour = 0;
+    for (const cat of ["projectile", "consumable"]) {
+      const pool = (shop.items || []).filter((it) => !it.godOnly && it.category === cat && !guaranteed.has(it.id));
+      const present = rarities.filter((r) => r.chance > 0 && pool.some((it) => rarityOf(it) === r.id));
+      const total = present.reduce((a, r) => a + r.chance, 0);
+      const match = present.find((r) => r.id === rarityId);
+      if (!match || total <= 0) continue;
+      rollsPerHour += (match.chance / total) * attemptsPerHour;
+    }
+    if (rollsPerHour <= 0) return 0;
+    const meanShopHours = 1 / rollsPerHour;
     return 1 / (meanShopHours * this.throwsPerHour());
   }
 

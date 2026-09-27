@@ -199,11 +199,14 @@
 
 
   "shop": {
-    "slots": 6,
+    "_guaranteedIdsNote": "These ids are ALWAYS in stock, every reroll, forever - they never enter the RNG pool at all (2026-09-27, the owner's 'grow a garden' ask, replacing the old fixed-6-slots model). Everything else rolls independently per category, see rollsPerCategory below.",
+    "guaranteedIds": ["chestnut", "stone", "skyr_blue", "water_bottle", "snowy_cube"],
+    "_rollsPerCategoryNote": "Each reroll, EACH category (projectile, consumable) independently runs this many draws from the existing rarity-chance table below (rarities[].chance) among its own non-guaranteed items, deduped into the stock (2026-09-27: replaces the old 'exactly 6 shared slots' cap - stock length is now variable, could in principle be as few as 5 (just the guaranteed ids) or, with very low odds, most of the catalog at once). Calibrated so a legendary (drone, or any of the 5 legendary buffs) shows up roughly once per ~4h play session on average - see docs/NOTES.md.",
+    "rollsPerCategory": 2,
     "_priceOverrideNote": "PLACEHOLDER: while priceOverride is a number, EVERY item costs that many coins in the shop (so we can test buying). Set it to null to use each item's real 'price' below.",
     "priceOverride": 1,
-    "_rerollNote": "ALL slots reroll together on this fixed cadence (by the device clock, so it also counts while the app is closed) - whether or not they were bought, and regardless of how long an item has been on sale (2026-09-27: replaced the old per-item availability timer + per-slot sold-out timer, which used to let a slot reroll early on its own; now nothing rerolls except this one clock). A slot that's been bought out just stays empty until the next reroll. 1800 = 30 minutes (60 = 1 minute is handy for testing; 3600 = 1 hour).",
-    "rerollSeconds": 1800,
+    "_rerollNote": "The WHOLE shop rerolls together on this fixed cadence (by the device clock, so it also counts while the app is closed) - whether or not items were bought. A slot that's been bought out just stays empty until the next reroll. 300 = 5 minutes (2026-09-27: sped up from 1800/30 minutes now that stock isn't capped at 6 slots any more - see guaranteedIds/rollsPerCategory above).",
+    "rerollSeconds": 300,
     "_buffMaxNote": "Optional: the most copies of ONE buff the player can hold; buying one they are already maxed on is refused like too little money (the card shakes, nothing is charged). Not set now = no limit. Add \"buffMax\": 99 to bring the old cap back.",
 
     "refill": {

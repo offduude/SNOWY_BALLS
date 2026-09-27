@@ -1,19 +1,19 @@
 // Shop: a plain list of every projectile/buff, greyed out when not currently in the roll (2026-09-27 redesign -
-// it used to be a 3x2 grid of 6 rolled slots pinned to the cork board; see docs/NOTES.md). Underneath, the roll
-// itself is unchanged: 6 "slots" still exist (Economy.getShopState().stock), each still independently timed and
-// rerolled - the list just shows every catalog item and looks up whether it's in that stock right now, instead of
-// rendering the stock array directly as cards. Buying empties an item's slot ("SOLD OUT") for
-// economy.json shop.restockSeconds; when the timer ends the slot restocks (with a fresh pick, possibly a
-// different item). Timers are device-clock timestamps saved with the stock, so they keep running while the app
-// is closed and leaving/re-entering can not reroll anything.
+// it used to be a 3x2 grid of 6 rolled slots pinned to the cork board; see docs/NOTES.md). The stock itself is no
+// longer a fixed 6-slot array either (2026-09-27, second pass, "grow a garden" style): economy.json
+// shop.guaranteedIds are always in stock, and every other item independently rolls per category
+// (shop.rollsPerCategory draws each) every shop.rerollSeconds - stock length is variable, could in principle be
+// anywhere from just the guaranteed ids up to (with very low odds) most of the catalog at once. The list shows
+// every catalog item and looks up whether it's currently in Economy.getShopState().stock, instead of rendering
+// the stock array directly as cards. Timers are device-clock timestamps saved with the stock, so they keep
+// running while the app is closed.
 //
-// Item types: "consumable" (a timed buff, the same one can be on sale in several slots) and "projectile" (a
-// STACK of consumable projectiles: the amount is rolled at random each time it is put on sale, the slot's price
+// Item types: "consumable" (a timed buff, the same one can be in stock more than once at a time) and "projectile"
+// (a STACK of consumable projectiles: the amount is rolled at random each time it is put on sale, the slot's price
 // is that amount x the item's fixed unitPrice - see rollOffer's own note, 2026-09-27). Skins (character/scenery/weather) used to be a third,
 // one-time-unlock type sold here too, but were pulled from the shop's pool entirely (2026-09-27, owner's call)
 // - they're bought from the new BOXES feature instead, as stackable items (see Economy.addSkin).
-// Any item can be on sale in several slots at once - each slot has its own offer.
-// When a slot restocks while the shop is closed, the SHOP button gets a dot and a sound plays.
+// When the shop restocks while it's closed, the SHOP button gets a dot and a sound plays.
 //
 // Effects (coinMultiplier, aimSpeedMultiplier, ...) are NOT applied yet - buying currently just
 // spends coins and records the purchase.
@@ -59,11 +59,12 @@ const Shop = (() => {
     return eco.shop.items.find((it) => it.id === id) || null;
   }
 
-  // Items that may go into a slot: all of them - nothing is unique any more (the same item, projectiles included,
-  // can be on sale in any number of slots; every slot rolls its own amount and price).
-  // (An item with "godOnly" - a test buff - is never sold: a god mode save just has it, see Economy.fillGod.)
-  function eligible() {
-    return eco.shop.items.filter((it) => !it.godOnly);
+  // Items that may be rolled for the given category (2026-09-27: rolls are per-category now, not one shared pool).
+  // Excludes: a "godOnly" test buff (a god mode save just has it, see Economy.fillGod) and anything in
+  // shop.guaranteedIds - those are always in stock and never take a roll at all (see rerollAll).
+  function eligible(cat) {
+    const guaranteed = new Set(eco.shop.guaranteedIds || []);
+    return eco.shop.items.filter((it) => !it.godOnly && it.category === cat && !guaranteed.has(it.id));
   }
 
   function averageHitCoins() {
@@ -112,24 +113,23 @@ const Shop = (() => {
     return pickWeightedFrom(pool.filter((it) => rid(it) === chosen.id));
   }
 
-  // Choose an item for one slot. `shownOthers` = ids in the OTHER slots.
-  function pickFor(shownOthers) {
-    const refill = eco.shop.refill;
-    const pool = eligible();
-    if (!pool.length) return null;
+  // Roll `count` independent picks for one category (2026-09-27: replaces the old one-pick-per-shared-slot model -
+  // each category now runs its own draws from its own non-guaranteed pool; duplicates are expected and fine, they
+  // just dedup away when rerollAll() folds everything into a Set).
+  function pickForCategory(cat, count) {
+    const pool = eligible(cat);
+    if (!pool.length) return [];
+    const picks = [];
+    for (let i = 0; i < count; i++) picks.push(pickWeighted(pool));
 
-    let candidate = pickWeighted(pool);
-
-    // Safety net: never let the shop end up with nothing the player could reasonably afford.
-    const g = refill.guaranteeCheapItem;
-    if (g && g.enabled) {
-      const othersHaveCheap = shownOthers.some((id) => id && itemById(id) && isCheap(itemById(id), g));
-      if (!othersHaveCheap && !isCheap(candidate, g)) {
-        const cheap = pool.filter((it) => isCheap(it, g));
-        if (cheap.length) candidate = pickWeighted(cheap);
-      }
+    // Safety net: never let a category end up with nothing the player could reasonably afford (currently disabled,
+    // see economy.json shop.refill.guaranteeCheapItem.enabled - the guaranteed staples already cover this today).
+    const g = eco.shop.refill && eco.shop.refill.guaranteeCheapItem;
+    if (g && g.enabled && !picks.some((it) => isCheap(it, g))) {
+      const cheap = pool.filter((it) => isCheap(it, g));
+      if (cheap.length) picks[0] = pickWeightedFrom(cheap);
     }
-    return candidate.id;
+    return picks.map((it) => it.id);
   }
 
   // ---------- global reroll ----------
@@ -304,37 +304,35 @@ const Shop = (() => {
   function isDue(st, now) {
     return (
       !Array.isArray(st.stock) ||
-      st.stock.length !== eco.shop.slots ||
       typeof st.nextRerollAt !== "number" ||
       now >= st.nextRerollAt ||
-      st.nextRerollAt - now > rerollMs() + 1000 // the device clock was set back: never wait longer than one full cycle
+      st.nextRerollAt - now > rerollMs() + 1000 // the device clock was set back (or an old save's cadence was longer): never wait longer than one full cycle
     );
   }
 
-  // A full, unconditional reset of the shop - every slot gets a brand new item and amount/price right now, as if
-  // all six had just been freshly stocked, and the next reroll is scheduled a fresh rerollMs() from this moment
-  // (2026-09-23, extended 2026-09-27 to also be the scheduled 30-minute cadence, not just the Toy Tank's forced
-  // one - see the global-reroll note above). Used by the Toy Tank event (main.js fireTank) too - "the entire shop
-  // should reroll the exact time the tank fires", and its own cadence just restarts from that moment.
+  // A full, unconditional reset of the shop - the guaranteed staples (economy.json shop.guaranteedIds) go back in
+  // stock unconditionally, and each category (projectile, consumable) independently rolls shop.rollsPerCategory
+  // fresh picks from its own non-guaranteed items (2026-09-27: replaces the old "exactly 6 shared slots" model -
+  // stock is now a variable-length, deduped list, not a fixed array of card slots). The next reroll is scheduled a
+  // fresh rerollMs() from this moment. Used by the Toy Tank event (main.js fireTank) too - "the entire shop should
+  // reroll the exact time the tank fires", and its own cadence just restarts from that moment.
   //
-  // If this happens while the shop is closed, every freshly-stocked id is marked "unseen" (a red dot, same idea
-  // as a new projectile/buff's - the owner's ask, 2026-09-27) until its row is scrolled into view (checkDisplayed).
-  // A reroll while the shop is OPEN needs none of that - the player is looking straight at it happening.
+  // If this happens while the shop is closed, every freshly-stocked id (guaranteed ones included, in case they
+  // weren't in stock before - e.g. right after this feature first ships) is marked "unseen" (a red dot, same idea
+  // as a new projectile/buff's) until its row is scrolled into view (checkDisplayed). A reroll while the shop is
+  // OPEN needs none of that - the player is looking straight at it happening.
   function rerollAll() {
     const st = Economy.getShopState();
-    const slots = eco.shop.slots;
-    const stock = new Array(slots).fill(null);
-    const offers = new Array(slots).fill(null);
-    for (let i = 0; i < slots; i++) {
-      const others = stock.filter((id, j) => j !== i && id);
-      const id = pickFor(others);
-      stock[i] = id;
-      offers[i] = id !== null ? rollOffer(itemById(id)) : null;
+    const picked = new Set(eco.shop.guaranteedIds || []);
+    const rolls = eco.shop.rollsPerCategory || 1;
+    for (const cat of ["projectile", "consumable"]) {
+      for (const id of pickForCategory(cat, rolls)) picked.add(id);
     }
+    const stock = [...picked];
     st.stock = stock;
-    st.offers = offers;
+    st.offers = stock.map((id) => rollOffer(itemById(id)));
     st.nextRerollAt = shopNow() + rerollMs();
-    if (!isShopOpen()) st.unseenIds = [...new Set([...(st.unseenIds || []), ...stock.filter(Boolean)])];
+    if (!isShopOpen()) st.unseenIds = [...new Set([...(st.unseenIds || []), ...stock])];
     Economy.saveShop();
     if (isShopOpen()) {
       render();

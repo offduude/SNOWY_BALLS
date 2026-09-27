@@ -2665,4 +2665,71 @@ moves to the header's top-LEFT, vertically centred, bigger text.
   Frosty Night's picture and confirmed no quantity line on its card; reopened SHOP fresh and confirmed no
   leftover double-panel state from earlier ad hoc testing (a `.click()` on a hidden button bypasses
   pointer-events, which a real tap never would - not a reachable bug).
+
+## Shop economy: 5-minute reroll, unlimited stock via independent per-category rolls (2026-09-27)
+
+The owner's ask: speed the shop's global reroll up from 30 minutes to 5 minutes (6x), and get rid of
+the "exactly 6 shared slots" cap entirely - inspired by "Grow a Garden"'s seed shop, where every
+catalog item independently rolls whether it's in stock each cycle (so in principle, with very low
+odds, everything could be in stock at once). Two specific commons per category
+(`chestnut`/`stone`, `skyr_blue`/`water_bottle`/`snowy_cube`) become permanently, unconditionally
+in stock. Explicit target: ~1 legendary projectile stack (`drone`) and ~1 legendary buff (any of the
+5) per day on average, assuming ~4h of daily play.
+
+**Mechanic (`economy.json` `shop`):** `slots: 6` is gone. New fields: `guaranteedIds` (the 5 ids
+above - always in stock, never enter the RNG pool at all) and `rollsPerCategory: 2` - each reroll,
+EACH category (`projectile`, `consumable`) independently runs this many draws from the *existing,
+unmodified* `rarities[].chance` table (60/30/9/1) among its own non-guaranteed items, deduped into
+the stock. `rerollSeconds: 1800 -> 300`.
+
+**Why `rollsPerCategory: 2` hits the target:** the expected count of "legendary rarity rolled" in a
+single draw is exactly the table's legendary chance (1%), regardless of how many items share that
+rarity in a category (1 for projectiles - just `drone` - or 5 for buffs) - a legendary roll always
+produces exactly one appearance either way. Over 2 draws/category, over the ~48 reroll cycles a 4h
+session sees at 5-minute cadence: `48 x 2 x 1% ~= 0.96/day` for `drone`, and separately `~0.96/day`
+for "any of the 5 legendary buffs" - both land almost exactly on the owner's 1/day target, with no
+special-casing needed between the two categories. Verified live: forcing 5000 rerolls via
+`Shop.rerollAll()` in a console loop gave a 3.86% per-reroll rate of "drone or any legendary buff
+in stock", matching the ~3.94% analytical prediction (`1 - (1 - 0.0199)^2`, one category's ~1.99%
+"any legendary" chance combined across both).
+
+**Pricing - NO changes, on purpose.** An earlier draft of this pass also proposed a 1.75x price bump
+on common/rare tier items to compensate for the faster reroll. The owner caught the flaw before
+implementation: every projectile's `unitPrice` in `economy.json`'s `projectiles` table is already
+deliberately set to ~75-78% of its `hitValue` (e.g. chestnut 12/16=0.75, onion 100/128=0.781,
+drone 9400/12000=0.783, using the `projectiles.<id>.hitValue` override where one exists, else the
+rarity's default) - a built-in "a landed hit always profits" invariant. Raising price without
+raising `hitValue` in lockstep would have flipped several items (chestnut, potato, stone,
+rowan_berry, onion, pinecone, egg) to a price ABOVE their hitValue - a guaranteed loss even on a
+perfect hit ("no one's going to buy a drone for 10k if it returns 5k," the owner's own words,
+though drone itself was never at risk - its ratio was always fine). **Every price/unitPrice, for
+both projectiles and buffs, is unchanged.** The entire rebalance for the 6x-faster reroll is carried
+by the odds/frequency mechanism above, not by price.
+
+**Code (`src/shop.js`):** `eligible()` now takes a `cat` and excludes `guaranteedIds`.
+`pickFor(shownOthers)` became `pickForCategory(cat, count)` - runs `count` independent
+`pickWeighted()` draws against that category's pool (the disabled `guaranteeCheapItem` safety net,
+still dormant, now checks the whole batch of picks at once rather than one slot's neighbors).
+`rerollAll()` no longer builds a fixed-length array slot-by-slot - it seeds a `Set` with
+`guaranteedIds`, adds `rollsPerCategory` picks from each category, and turns the `Set` into the
+`stock` array (variable length - observed 7-9 across 500 live rerolls, versus always-exactly-6
+before). `isDue()` drops its `stock.length !== eco.shop.slots` check (no fixed length to compare
+against any more - the clock-based checks alone are enough, and self-heal an old save's stale
+30-minute-cadence `nextRerollAt` on the very next tick, no migration code needed).
+
+**Cross-file fix (`src/main.js` `eventRarityChance`):** this function sizes the chance of a NATURAL
+random event (banana face, disco/guitar songs) per throw, calibrated so a rarity's natural-event
+odds match "how often that rarity would've turned up in the shop anyway." It read `eco.shop.slots`
+directly - would have silently broken (undefined x 3600) the moment `slots` was removed. Rewrote it
+to sum, across both categories independently, that rarity's share of each category's own rarity mix
+x that category's rolls/hour (`rollsPerCategory x 3600 / rerollSeconds`) - the same per-category
+model as the shop itself, guaranteed ids excluded from each category's mix the same way.
+
+Version bumps: `src/shop.js?v=41 -> 42`, `src/main.js?v=190 -> 191`.
+
+Verified live (test origin): fresh tab, no console errors; `Economy.getShopState().stock` confirmed
+to contain all 5 guaranteed ids after every forced reroll; 500 forced rerolls showed stock length
+varying 7-9 (never a fixed 6); a live purchase (Chestnut, clicked through the real UI) still spent
+exactly 12 coins and granted 1 chestnut, same as before the rewrite - then reverted via
+`Economy.useProjectile`/`Economy.addCoins` to leave the test save as found, per standing practice.
 - `src/shop.js?v=41`, `src/boxes.js?v=5`, `src/collection.js?v=82`, `index.html`.

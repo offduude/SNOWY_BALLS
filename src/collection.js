@@ -247,39 +247,41 @@ const Collection = (() => {
     }).join("");
   }
 
-  // ---- The SHOP's inspect card (shop.js: holding a card down): the card the item has in its own list (PROJECTILES, BUFFS, a SKINS menu) with `action` - the
-  //      price button - in place of EQUIP / USE. A stack shows how many are on sale (x14) where the list shows how many the player has.
-  function shopCardHtml(item, offer, action) {
+  // ---- The SHOP's list row (shop.js): every projectile/buff, whether or not it's currently in the roll (item.category
+  // is only ever "projectile" or "consumable" - skins left the shop's pool entirely, 2026-09-27). `action` is the BUY
+  // button; `availText`, when given, is the "available: MM:SS" countdown shown under it for an item currently on
+  // sale; `extraClass` marks a row that isn't currently in stock so it can be greyed out (shop.js's own job - this
+  // just carries the class through). A stack shows how many are on sale (x14) where the owned list shows how many
+  // the player HAS instead.
+  function shopRowHtml(item, { offer, action, extraClass, availText } = {}) {
+    const avail = availText ? `<div class="shop-avail-row">${esc(availText)}</div>` : "";
     if (item.category === "projectile") {
       const cat = CATALOG.projectile.items.find((i) => i.id === item.id) || { id: item.id, name: item.name, description: item.description, image: item.image };
       const stats = statsHtml("projectile", cat);
       const p = eco && eco.projectiles && eco.projectiles[item.id];
       return (
-        `<div class="pick-row${stats ? " has-stats" : ""}${Rarity.cardClass(p && p.rarity)}" data-id="${esc(item.id)}">` +
+        `<div class="pick-row shop-row${stats ? " has-stats" : ""}${extraClass || ""}${Rarity.cardClass(p && p.rarity)}" data-id="${esc(item.id)}">` +
         `<img class="pick-pic" src="${esc(cat.image || "")}" alt="" draggable="false" />` +
         `<div class="pick-text"><div class="pick-name">${esc(cat.name)}</div><div class="pick-desc">${esc(cat.description || "")}</div></div>` +
-        `<div class="pick-action">${action}</div>` +
+        `<div class="pick-action">${action}${avail}</div>` +
         cornerHtml(p && p.rarity, offer && offer.amount ? `x${offer.amount}` : "") +
         stats +
         `</div>`
       );
     }
-    if (item.category === "consumable") {
-      const len = Buffs.summonMs(item);
-      const maxText = len ? clock(len) : Buffs.isCharge(item) ? "+1" : clock(Buffs.durationMs(item)); // (how long it lasts, under the button like in the BUFFS list)
-      const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
-      return (
-        `<div class="pick-row buff-row${item.detail ? " buff-detail" : ""}${Rarity.cardClass(Rarity.ofItem(item))}" data-id="${esc(item.id)}">` +
-        `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
-        `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div><div class="pick-desc">${esc(item.description || "")}</div></div>` +
-        `<div class="pick-action">${action}<div class="pick-regen"><span>${maxText}</span></div></div>` +
-        detail +
-        cornerHtml(Rarity.ofItem(item), "") +
-        `</div>`
-      );
-    }
-    const skin = skinItems(item.category).find((x) => x.id === item.id) || item; // a character / scenery / weather
-    return skinRowHtml(item.category, skin, action);
+    // "consumable": the shop never lists anything else now (see shop.js's own header comment)
+    const len = Buffs.summonMs(item);
+    const maxText = len ? clock(len) : Buffs.isCharge(item) ? "+1" : clock(Buffs.durationMs(item)); // (how long it lasts, under the button like in the BUFFS list)
+    const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
+    return (
+      `<div class="pick-row shop-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}${Rarity.cardClass(Rarity.ofItem(item))}" data-id="${esc(item.id)}">` +
+      `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
+      `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div><div class="pick-desc">${esc(item.description || "")}</div></div>` +
+      `<div class="pick-action">${action}${avail}<div class="pick-regen"><span>${maxText}</span></div></div>` +
+      detail +
+      cornerHtml(Rarity.ofItem(item), "") +
+      `</div>`
+    );
   }
 
   // ---- BUFFS list: the buffs the player has (bought, waiting) or is running. Same cards as the projectiles list without
@@ -572,7 +574,7 @@ const Collection = (() => {
 
   return {
     isOpen: () => openKind !== null,
-    shopCardHtml,
+    shopRowHtml,
     projectileImage: (id) => ((CATALOG.projectile.items.find((i) => i.id === id) || {}).image) || "", // (the counter under the top-right buttons)
     characterInfo: (id) => skinItems("character").find((c) => c.id === id) || null, // { id, name, description, image, ... } - the ACCOUNT card and the leaderboard's inspect popup (saves.js) use this for the picture + description
     close,

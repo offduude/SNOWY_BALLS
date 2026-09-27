@@ -80,7 +80,9 @@
 
     /* Shop screen: shop_board.png stretched over the whole game display (canvas + message),
        faded in/out. Sits under the SHOP/BACK button (z 4). */
-    #shop-board {
+    /* The corkboard look, freed up from the SHOP tab for the BOXES feature (2026-09-27) - see the body markup's
+       comment. Gated by .boxes-open, which nothing sets yet (no BOXES button exists until that feature lands). */
+    #boxes-board {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -94,7 +96,7 @@
       z-index: 3;
     }
 
-    #game-container.shop-open #shop-board {
+    #game-container.boxes-open #boxes-board {
       opacity: 1;
       pointer-events: auto; /* swallows taps so they can't reach the game underneath */
     }
@@ -106,7 +108,7 @@
     }
 
     /* Items pinned on the cork part of shop_board.png (cork is ~9%-91% across, ~9%-90% down). */
-    #shop-items {
+    #boxes-items {
       position: absolute;
       left: 9%;
       top: 9%;
@@ -126,7 +128,7 @@
       z-index: 3;
     }
 
-    #game-container.shop-open #shop-items {
+    #game-container.boxes-open #boxes-items {
       opacity: 1;
       pointer-events: auto;
     }
@@ -242,64 +244,131 @@
       }
     }
 
-    /* HOLD to INSPECT: under the cork board, in the style of the game's "TAP to AIM" (#message). */
-    #shop-hint {
+    /* The SHOP tab (2026-09-27): a plain scrollable list of every projectile/buff (Collection.shopRowHtml rows),
+       greyed out when not currently in the roll, instead of the old 3x2 grid of rolled slots - so a row already
+       shows the full description, and there's no separate hold-to-inspect popup any more. Styled distinctly from
+       #list-panel (a warm cream instead of solid brown) so it doesn't read as just another collection menu. */
+    #shop-backdrop,
+    #shop-panel,
+    #shop-cats {
       position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 2.4%;
-      text-align: center;
-      color: #ffffff;
-      font-family: "Press Start 2P", monospace;
-      font-size: 12px;
-      line-height: 1.8;
-      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
-        0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
-      pointer-events: none;
       opacity: 0;
-      transition: opacity 0.25s ease;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    #shop-backdrop {
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 3;
+    }
+
+    #shop-panel {
+      left: 15%;
+      top: 12%;
+      width: 56%;
+      height: 76%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 4px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+      font-family: "Press Start 2P", monospace;
+      color: #3b2412;
       z-index: 4;
     }
 
-    #game-container.shop-open #shop-hint { opacity: 1; }
-
-    /* On a phone (a touch screen, or a narrow window) the hint is smaller, so it stays clear of the BACK button and out of the way of the cards. */
-    @media (pointer: coarse), (max-width: 700px) {
-      #shop-hint { font-size: 9px; }
-    }
-
-    /* The inspect popup (shop.js): a dimmed backdrop over the shop with the item's card in the middle; a click outside the card closes it. */
-    #shop-inspect {
-      position: absolute;
-      inset: 0;
+    #shop-cats {
+      left: 73%;
+      top: 12%;
+      width: 17%;
+      height: 76%;
       display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
-      background: rgba(0, 0, 0, 0.55);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.15s ease;
-      z-index: 6;
+      gap: calc(var(--u) * 1.6);
+      z-index: 4;
     }
 
-    #game-container.shop-open #shop-inspect.show {
+    #game-container.shop-open #shop-backdrop,
+    #game-container.shop-open #shop-panel,
+    #game-container.shop-open #shop-cats {
       opacity: 1;
       pointer-events: auto;
     }
 
-    #shop-inspect-card {
-      width: 52%;
-      font-family: "Press Start 2P", monospace;
+    /* The gold header bar (vs #list-title's plain brown) is the shop's own visual signature - the coin price
+       buttons throughout the list carry the same gold. */
+    #shop-title {
+      flex: none;
+      padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6);
+      background: #d9a441;
+      border-bottom: 2px solid #7a5230;
       color: #3b2412;
+      font-size: calc(var(--u) * 1.5);
+      text-align: center;
     }
 
-    /* Every inspect card has the same fixed height, which fits the fullest card there is (a 3-line description with a bottom line: 13.7 units measured
-       over every item in the shop) - the picture, the text, the button and the bottom line always sit in the same places. */
-    #shop-inspect-card .pick-row {
-      box-sizing: border-box;
-      height: calc(var(--u) * 14);
+    #shop-scroll {
+      flex: 1;
       min-height: 0;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      scrollbar-width: none;
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--u) * 1.2);
+      padding: 8px calc(var(--u) * 1.2) calc(var(--u) * 1.2);
+    }
+
+    #shop-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* A row for an item not currently in the roll: no valid rolled price to show (see shop.js price()), so its
+       button shows the cheapest it COULD roll for ("from") and can't be clicked. */
+    .shop-row.unavailable {
+      opacity: 0.55;
+    }
+
+    .shop-row.unavailable .pick-equip {
+      pointer-events: none;
+    }
+
+    .shop-from {
+      font-size: calc(var(--u) * 0.85);
+    }
+
+    /* "available: MM:SS" under the BUY button for a row currently in stock - the list's equivalent of the old
+       grid card's countdown over its picture. */
+    .shop-avail-row {
+      font-size: calc(var(--u) * 0.85);
+      color: #8a6a44;
+      text-align: center;
+      margin-top: calc(var(--u) * 0.3);
+    }
+
+    .shop-cat-btn {
+      width: 100%;
+      height: 32px;
+      padding: 0;
+      background: #8b5a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 8px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .shop-cat-btn.active {
+      background: #74491f;
     }
 
     /* The buy button: the coin and the price (wider than EQUIP when the price needs it). */
@@ -330,7 +399,7 @@
     /* A held-down picture must not open the browser's image menu (save / share): the pictures take no touches at all, nothing is selectable or draggable. */
     img { -webkit-touch-callout: none; -webkit-user-drag: none; user-select: none; }
     .shop-pic img, .pick-pic { pointer-events: none; }
-    .shop-card, #shop-inspect { -webkit-touch-callout: none; }
+    .shop-card, #shop-scroll { -webkit-touch-callout: none; }
 
     /* Space for the item's picture: takes whatever height is left between the category and the name. */
     .shop-pic {
@@ -1432,8 +1501,8 @@
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
     }
 
-    /* The leaderboard's inspect popup (saves.js: clicking a card) - the same idea as the shop's #shop-inspect, but
-       lives over the LIST panel (list-open), not the shop. */
+    /* The leaderboard's inspect popup (saves.js: clicking a card) - lives over the LIST panel (list-open), not
+       the shop (the shop tab no longer has an inspect popup of its own since it became a plain list, 2026-09-27). */
     #board-inspect {
       position: absolute;
       inset: 0;
@@ -1564,11 +1633,20 @@
     <div id="loading-screen"><span id="loading-text">Loading - 0%</span></div>
     <div id="cleansing"><span>The grand cleansing has struck.</span></div>
     <div id="message"></div>
-    <img id="shop-board" src="assets/ui/shop_board.png" alt="" />
-    <div id="shop-items"></div>
-    <div id="shop-hint">HOLD to INSPECT</div>
-    <div id="shop-inspect"><div id="shop-inspect-card"></div></div>
+    <!-- The corkboard/3x2 grid look used to be the SHOP tab's own; it's reserved for the BOXES feature now
+         (2026-09-27) - not wired to a button yet, gated by .boxes-open which nothing sets yet either. -->
+    <img id="boxes-board" src="assets/ui/shop_board.png" alt="" />
+    <div id="boxes-items"></div>
     <div id="board-inspect"><div id="board-inspect-card"></div></div>
+    <div id="shop-backdrop"></div>
+    <div id="shop-panel">
+      <div id="shop-title">SHOP</div>
+      <div id="shop-scroll"></div>
+    </div>
+    <div id="shop-cats">
+      <button id="shop-cat-projectile" class="shop-cat-btn active" type="button" data-cat="projectile">PROJECTILES</button>
+      <button id="shop-cat-buff" class="shop-cat-btn" type="button" data-cat="buff">BUFFS</button>
+    </div>
     <div id="list-backdrop"></div>
     <div id="list-panel">
       <div id="list-title"></div>
@@ -1602,7 +1680,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=294"></script>
+  <script src="src/version.js?v=295"></script>
   <script src="src/economy.js?v=44"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1633,10 +1711,10 @@
   <script src="src/cloud.js?v=26"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
-  <script src="src/shop.js?v=34"></script>
+  <script src="src/shop.js?v=36"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=24"></script>
-  <script src="src/collection.js?v=77"></script>
+  <script src="src/collection.js?v=78"></script>
   <script src="src/main.js?v=188"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
@@ -1644,7 +1722,7 @@
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["shop-board", "shop-items", "shop-inspect", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["boxes-board", "boxes-items", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

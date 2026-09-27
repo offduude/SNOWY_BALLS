@@ -1,7 +1,11 @@
-// Shop: 6 slots pinned to the cork board. Buying an item spends coins and empties its slot ("SOLD OUT")
-// for economy.json shop.restockSeconds; when the timer ends the slot restocks.
-// Timers are device-clock timestamps saved with the stock (Economy.getShopState()), so they keep
-// running while the app is closed and leaving/re-entering can not reroll anything.
+// Shop: a plain list of every projectile/buff, greyed out when not currently in the roll (2026-09-27 redesign -
+// it used to be a 3x2 grid of 6 rolled slots pinned to the cork board; see docs/NOTES.md). Underneath, the roll
+// itself is unchanged: 6 "slots" still exist (Economy.getShopState().stock), each still independently timed and
+// rerolled - the list just shows every catalog item and looks up whether it's in that stock right now, instead of
+// rendering the stock array directly as cards. Buying empties an item's slot ("SOLD OUT") for
+// economy.json shop.restockSeconds; when the timer ends the slot restocks (with a fresh pick, possibly a
+// different item). Timers are device-clock timestamps saved with the stock, so they keep running while the app
+// is closed and leaving/re-entering can not reroll anything.
 //
 // Item types: "consumable" (a timed buff, the same one can be on sale in several slots) and "projectile" (a
 // STACK of consumable projectiles: the amount and the price of one are rolled at random each time it is put
@@ -24,11 +28,6 @@ const Shop = (() => {
   let eco = null;
   let root = null;
   let dotEl = null;
-
-  // The label in the top-left corner of a card, by the item's category. Skins (character/scenery/weather) were
-  // pulled from the shop's pool entirely (2026-09-27, owner's call) - they're bought from the new BOXES feature
-  // instead, so this only ever needs to label the two categories still sold here.
-  const CATEGORY_LABEL = { consumable: "BUFF", projectile: "PROJECTILE" };
 
   // ---------- rules ----------
 
@@ -277,10 +276,13 @@ const Shop = (() => {
     return item.category === "consumable" && Economy.getBuffCount(item.id) >= Economy.getBuffMax();
   }
 
-  function buy(slot) {
+  // The list (see render() below) shows every catalog item, not a slot - so buying is keyed by item id: it resolves
+  // to whichever slot currently has it in stock (the first one, if it somehow rolled into more than one at once).
+  function buy(itemId) {
     const st = Economy.getShopState();
-    const id = st.stock && st.stock[slot];
-    const item = id && itemById(id);
+    const slot = st.stock ? st.stock.indexOf(itemId) : -1;
+    if (slot === -1) return { ok: false, reason: "unavailable" }; // not currently in the roll: greyed out, can't be bought
+    const item = itemById(itemId);
     if (!item) return { ok: false, reason: "empty" };
     if (isMaxed(item)) return { ok: false, reason: "max" }; // already holding the most of this buff: nothing is charged
     const offer = (st.offers || [])[slot] || null;
@@ -302,123 +304,56 @@ const Shop = (() => {
     return { ok: true, item };
   }
 
-  function formatTime(ms) {
-    const total = Math.max(0, Math.ceil(ms / 1000 - 0.001));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    const mm = String(m).padStart(2, "0");
-    const ss = String(s).padStart(2, "0");
-    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
-  }
-
   // ---------- UI ----------
-
-  // HOLD TO INSPECT: holding a card down (HOLD_MS, without moving) opens an inspect popup - the item's card from its own list (Collection.shopCardHtml) with a
-  // button that shows the price and buys it - and a tap on a card still buys at once, as before. A click anywhere outside the popup's card closes it. The
-  // release of the hold must not count as a tap (holdFired), and the popup ignores clicks for a moment after it opens so the finger that is still on it can't buy.
-  const HOLD_MS = 450;
-  const HOLD_SLOP = 10; // px the finger may move and still be a hold
-  let holdTimer = null;
-  let holdFrom = null;
-  let holdFired = false;
-  let inspectEl = null;
-  let inspecting = null; // { slot, id } of the card in the popup
-  let inspectOpenedAt = 0;
-
-  function cancelHold() {
-    clearTimeout(holdTimer);
-    holdTimer = null;
-  }
-
-  function closeInspect() {
-    inspecting = null;
-    if (inspectEl) inspectEl.classList.remove("show");
-  }
-
-  function openInspect(slot) {
-    const st = Economy.getShopState();
-    const id = st.stock && st.stock[slot];
-    const item = id && itemById(id);
-    if (!item || !inspectEl) return;
-    const offer = (st.offers || [])[slot] || null;
-    const p = price(item, offer);
-    const afford = Economy.getCoins() >= p && !isMaxed(item);
-    inspecting = { slot, id };
-    inspectOpenedAt = Date.now();
-    inspectEl.querySelector("#shop-inspect-card").innerHTML = Collection.shopCardHtml(
-      item,
-      offer,
-      `<button class="pick-equip shop-buy${afford ? "" : " cant"}" type="button"><i class="coin"></i><span>${p}</span></button>`
-    );
-    inspectEl.classList.add("show");
-  }
-
-  function onInspectClick(e) {
-    if (Date.now() - inspectOpenedAt < 350) return;
-    const btn = e.target.closest(".shop-buy");
-    if (!btn) {
-      if (!e.target.closest(".pick-row")) closeInspect(); // outside the card
-      return;
-    }
-    if (!inspecting) return;
-    const { slot, id } = inspecting;
-    const st = Economy.getShopState();
-    if (!st.stock || st.stock[slot] !== id) {
-      closeInspect(); // the slot changed meanwhile (its timer ran out): not the item that was inspected any more
-      render();
-      return;
-    }
-    const result = buy(slot);
-    if (result.ok) {
-      playUiClick();
-      if (typeof Cloud !== "undefined") Cloud.notePurchase();
-      closeInspect();
-      render();
-    } else {
-      btn.classList.remove("shake");
-      void btn.offsetWidth;
-      btn.classList.add("shake");
-    }
-  }
+  // The SHOP tab is a plain list of every projectile/buff (2026-09-27) - one row per catalog item, not one card per
+  // rolled slot. An item currently in the roll (Economy.getShopState().stock) shows its real rolled price and a
+  // working BUY button; one that isn't shows a greyed row instead (its cheapest possible price, as a "from" hint,
+  // via minPrice - there's no rolled offer to show an exact one). PROJECTILES / BUFFS is which catalog is showing.
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
 
-  // The availability timer in the top-left of the picture rectangle: how long until this item is replaced.
-  function availHtml(slot) {
-    const at = (Economy.getShopState().expires || [])[slot];
-    return typeof at === "number" ? `<span class="shop-avail" data-at="${at}">${availText(realMs(at - shopNow()))}</span>` : "";
+  let openCat = "projectile"; // the shop always opens on this (the owner's ask), then follows the category buttons
+
+  function categoryItems(cat) {
+    return eco.shop.items.filter((it) => it.category === cat);
   }
 
-  function cardHtml(id, slot) {
-    const item = id && itemById(id);
-    if (!item) {
-      const t = (Economy.getShopState().restock || [])[slot];
-      const timer = t && typeof t.at === "number" ? `<span class="shop-timer" data-at="${t.at}">${formatTime(realMs(t.at - shopNow()))}</span>` : "";
-      // A slot with a timer is SOLD OUT; a slot with nothing to sell at all is (TBD) - there are no items for it yet.
-      return `<div class="shop-card empty"><span class="shop-name">${timer ? "SOLD OUT" : "(TBD)"}</span>${timer}</div>`;
-    }
-    const offer = (Economy.getShopState().offers || [])[slot] || null;
-    const p = price(item, offer);
-    const afford = Economy.getCoins() >= p && !isMaxed(item); // a maxed-out buff looks unbuyable, like a too-expensive one
-    // Bottom row: the price at the left, the amount of a stack ("x14") at the right (a single item has no amount).
-    const amountHtml = offer && offer.amount ? `<span class="shop-amount">x${offer.amount}</span>` : `<span></span>`;
-    return (
-      `<button class="shop-card ${afford ? "" : "cant"}${Rarity.cardClass(Rarity.ofItem(item))}" data-slot="${slot}" type="button">` +
-      `<span class="shop-top"><span class="shop-cat">${CATEGORY_LABEL[item.category] || ""}</span>${Rarity.labelHtml(Rarity.ofItem(item), "shop-rarity", true)}</span>` +
-      `<span class="shop-pic">${availHtml(slot)}${item.image ? `<img src="${esc(item.image)}" alt="" draggable="false" />` : ""}</span>` +
-      `<span class="shop-name">${esc(item.name)}</span>` +
-      `<span class="shop-bottom"><span class="shop-price"><i class="coin"></i>${p}</span>${amountHtml}</span>` +
-      `</button>`
-    );
+  // One row. `slot` is the item's first matching slot in the current roll, or -1 if it isn't in stock right now.
+  function rowHtml(item) {
+    const st = Economy.getShopState();
+    const slot = st.stock ? st.stock.indexOf(item.id) : -1;
+    const available = slot !== -1;
+    const offer = available ? (st.offers || [])[slot] || null : null;
+    const p = available ? price(item, offer) : minPrice(item);
+    const afford = available && Economy.getCoins() >= p && !isMaxed(item); // a maxed-out buff looks unbuyable, like a too-expensive one
+    const at = available ? (st.expires || [])[slot] : null;
+    const avail = typeof at === "number" ? availText(realMs(at - shopNow())) : null;
+    const action =
+      `<button class="pick-equip shop-buy${afford ? "" : " cant"}" type="button" data-id="${esc(item.id)}">` +
+      (available ? "" : `<span class="shop-from">from </span>`) +
+      `<i class="coin"></i><span>${p}</span></button>`;
+    return Collection.shopRowHtml(item, { offer, action, extraClass: available ? "" : " unavailable", availText: avail });
   }
 
   function render() {
     if (!root) return;
-    const stock = Economy.getShopState().stock || [];
-    root.innerHTML = `<div class="shop-grid">${stock.map(cardHtml).join("")}</div>`;
+    root.innerHTML = categoryItems(openCat).map(rowHtml).join("");
+  }
+
+  function updateCatButtons() {
+    const p = document.getElementById("shop-cat-projectile");
+    const b = document.getElementById("shop-cat-buff");
+    if (p) p.classList.toggle("active", openCat === "projectile");
+    if (b) b.classList.toggle("active", openCat === "consumable");
+  }
+
+  function setCat(cat) {
+    if (openCat === cat) return;
+    openCat = cat;
+    updateCatButtons();
+    render();
   }
 
   function isShopOpen() {
@@ -478,8 +413,10 @@ const Shop = (() => {
     if (live && game && !alreadyAnnounced) game.sound.play("shop_restock", { volume: 0.9 });
   }
 
-  // Once a second (and when the app returns to the foreground): restock any slot whose time is up,
-  // and while the shop is on screen count the timers down.
+  // Once a second (and when the app returns to the foreground): restock any slot whose time is up, and while the
+  // shop is on screen just re-render - the list is small and nothing here needs the finer-grained "update just the
+  // timer text nodes" approach the old per-slot grid used (that existed to not disturb an in-progress hold-to-inspect,
+  // which this list doesn't have any more).
   function tick() {
     if (!eco) return;
     const st = Economy.getShopState();
@@ -491,36 +428,18 @@ const Shop = (() => {
       (st.restock || []).some((t) => t && typeof t.at === "number" && (t.at <= now || t.at - now > limit)) ||
       // ... or an item's availability ran out (the slot rerolls), or that clock was set back too
       (st.expires || []).some((x) => typeof x === "number" && (x <= now || x - now > 4 * 3600 * 1000 + 1000));
-    if (due) {
-      announceRestock(ensureStock(), true);
-      if (open) render();
-    }
-    if (open) {
-      root.querySelectorAll(".shop-timer").forEach((el) => {
-        el.textContent = formatTime(realMs(Number(el.dataset.at) - now));
-      });
-      root.querySelectorAll(".shop-avail").forEach((el) => {
-        el.textContent = availText(realMs(Number(el.dataset.at) - now));
-      });
-    }
+    if (due) announceRestock(ensureStock(), true);
+    if (open) render(); // keeps the "available: MM:SS" countdowns live, not just on a reroll
   }
 
   function onClick(e) {
-    if (holdFired) {
-      holdFired = false; // the click that ends a hold (the inspect popup opened): not a purchase
-      return;
-    }
-    const btn = e.target.closest(".shop-card[data-slot]");
+    const btn = e.target.closest(".shop-buy[data-id]");
     if (!btn) return;
-    // A just-bought card lingers ~220ms while it fades; a quick double-tap on it must not count as
-    // another purchase attempt.
-    if (btn.classList.contains("bought")) return;
-    const result = buy(Number(btn.dataset.slot));
+    const result = buy(btn.dataset.id);
     if (result.ok) {
       playUiClick();
       if (typeof Cloud !== "undefined") Cloud.notePurchase();
-      btn.classList.add("bought");
-      setTimeout(render, 220); // let the "bought" flash play, then show SOLD OUT + its timer
+      render();
     } else if (result.reason === "funds" || result.reason === "max") {
       btn.classList.remove("shake");
       void btn.offsetWidth; // restart the animation if they tap repeatedly
@@ -538,28 +457,10 @@ const Shop = (() => {
       const syncRate = () => Economy.setShopRate(Economy.skinEffects(eco).filter((e) => e.type === "shopSpeed").reduce((a, e) => a * e.value, 1));
       Economy.setEquippedHook(syncRate);
       syncRate();
-      root = document.getElementById("shop-items");
+      root = document.getElementById("shop-scroll");
       root.addEventListener("click", onClick);
-      inspectEl = document.getElementById("shop-inspect");
-      inspectEl.addEventListener("click", onInspectClick);
-      // hold to inspect; and no browser menu for an image / a card that is held down (it offered to save or share the picture)
-      root.addEventListener("pointerdown", (e) => {
-        holdFired = false;
-        const card = e.target.closest(".shop-card[data-slot]");
-        cancelHold();
-        if (!card) return;
-        holdFrom = { x: e.clientX, y: e.clientY };
-        holdTimer = setTimeout(() => {
-          holdTimer = null;
-          holdFired = true;
-          openInspect(Number(card.dataset.slot));
-        }, HOLD_MS);
-      });
-      root.addEventListener("pointermove", (e) => {
-        if (holdTimer && holdFrom && Math.hypot(e.clientX - holdFrom.x, e.clientY - holdFrom.y) > HOLD_SLOP) cancelHold();
-      });
-      ["pointerup", "pointercancel", "pointerleave"].forEach((t) => root.addEventListener(t, cancelHold));
-      [root, inspectEl].forEach((el) => el.addEventListener("contextmenu", (e) => e.preventDefault()));
+      document.getElementById("shop-cat-projectile").addEventListener("click", () => setCat("projectile"));
+      document.getElementById("shop-cat-buff").addEventListener("click", () => setCat("consumable")); // economy.json's own category id for a buff
       dotEl = document.getElementById("shop-dot");
       // generate / repair / restock the saved stock right away, before the shop is ever opened
       announceRestock(ensureStock(), false); // timers that ran out while the app was closed: dot, no sound
@@ -569,11 +470,13 @@ const Shop = (() => {
         if (!document.hidden) tick();
       });
     },
-    // Called every time the shop screen opens.
+    // Called every time the shop screen opens. Always opens on PROJECTILES (the owner's ask) - the BUFFS tab, if it
+    // was open last time, is not remembered across visits.
     onOpen() {
       if (!eco) return;
-      closeInspect();
       ensureStock();
+      openCat = "projectile";
+      updateCatButtons();
       // The player is looking at the shop now, so whatever the dot was about is seen.
       Economy.getShopState().unseen = false;
       Economy.saveShop();

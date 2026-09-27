@@ -2309,3 +2309,50 @@ feature to buy them from is next.
   PROJECTILE/BUFF cards roll (no character/scenery/weather cards); bought a buff normally (coins deducted,
   slot went SOLD OUT with its restock timer) to confirm `buy()` still works with the skin branch gone.
 - `src/economy.js?v=44`, `src/collection.js?v=77`, `src/shop.js?v=34`.
+
+## SHOP tab redesigned: a full list instead of a 3x2 grid of 6 rolled slots (2026-09-27)
+
+**Asked directly**: *"we'll redesign the shop tab, with every projectile/buff being in a list, just those items
+that aren't available at the current roll will be greyed out. projectiles and buffs will be two different
+categories."* Clarified further: opens straight on PROJECTILES; PROJECTILES/BUFFS are two buttons to the RIGHT
+of the list, not tabs above it; the panel should look distinctly like a shop, not just another collection
+menu; **"this is only a design change, the way the economy works we will update later"** - the actual roll
+(rarity odds, timers, restocking) is untouched, only how it's displayed.
+
+- The rolling engine in `shop.js` (`pickWeighted`/`pickFor`/`ensureStock`/`rollFrom`/`restockMs`/`availMs`,
+  `Economy.getShopState().stock` etc.) is completely unchanged - the shop still has 6 independently-timed
+  slots underneath. What changed is only how they're shown: `render()` now lists every catalog item in the
+  active category (`eco.shop.items.filter(it => it.category === cat)`) rather than mapping the 6 stock slots
+  to 6 cards. For each item, `stock.indexOf(item.id)` says whether it's currently on sale - in stock, it gets
+  its real rolled price, a working BUY button and an "available: MM:SS" countdown; not in stock, it gets a
+  greyed row showing `minPrice(item)` as a "from" hint (there's no rolled offer to show an exact price for
+  something not currently on sale) and a disabled button. Buying is now keyed by item id
+  (`buy(itemId)`, resolves to whichever slot has it - the first one, if a rarity roll happened to put the same
+  item in two slots at once, which does happen and is harmless: the row just becomes buyable from the other
+  slot's own separately-rolled price).
+- Dropped entirely: the old "SOLD OUT + restock timer" empty-card state (a list row can't show "empty," it
+  just flips back to greyed - the underlying restock timer still runs, just isn't displayed any more), and the
+  whole hold-to-inspect popup (`#shop-inspect`, `Collection.shopCardHtml`) - a list row already shows the full
+  description a card used to need a popup to fit, so there was nothing left for the popup to add. `shopCardHtml`
+  is renamed `Collection.shopRowHtml` and simplified (its skin-fallback branch is dead code now that shop items
+  are never skins, see the stackable-skins entry above) rather than kept as a second, unused code path.
+- New markup: `#shop-panel`/`#shop-title`/`#shop-scroll` (a plain scrollable list, cream background instead of
+  `#list-panel`'s solid brown, and its own BUY-button gold accent, so it doesn't read as just another
+  collection menu) plus `#shop-cats` (`PROJECTILES`/`BUFFS`, styled like the existing `.side-btn`s but placed to
+  the list's right, per the ask). `Shop.onOpen()` always resets to the `"projectile"` category first, per the
+  ask ("opens immediately on projectiles").
+- The old `#shop-board`/`#shop-items` (the corkboard + 3x2 grid) are renamed `#boxes-board`/`#boxes-items` and
+  now gated by a `.boxes-open` class instead of `.shop-open` - nothing sets that class yet (no BOXES button
+  exists), so they just sit inert until the BOXES feature (next) wires them up. This avoids ever having
+  actually-dead CSS: the `.shop-grid`/`.shop-card` classes themselves are untouched and BOXES will use them
+  as-is under the new ids.
+- Verified live (test origin): fresh tab, no console errors. SHOP opens straight on PROJECTILES; scrolled the
+  full list - in-stock rows show a real price + "available: MM:SS", out-of-stock rows show a greyed "from X".
+  Switched to BUFFS (caught and fixed a bug here: the BUFFS button was passing the category id `"buff"`, but
+  economy.json's own category id for a buff is `"consumable"` - the list came up empty until that was
+  corrected to match); bought a Blue Skyr for its rolled price (7 coins: `Economy.getCoins()` dropped
+  995 -> 988, `Economy.getBuffCount("skyr_blue")` -> 1) - the row stayed available afterwards, from a second
+  slot that had separately rolled the same item at its own price (6), confirming the "first matching slot"
+  behavior works as intended rather than looking like a bug. Reopened the shop fresh to confirm it always
+  lands back on PROJECTILES.
+- `src/shop.js?v=36`, `src/collection.js?v=78`.

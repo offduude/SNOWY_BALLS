@@ -58,20 +58,26 @@ const Boxes = (() => {
     return (eco[KIND_LIST[kind]] || []).filter((it) => it.rarity !== "default");
   }
 
-  // Weighted by economy.json's shared rarity chances - roll a rarity, then pick uniformly among this kind's
-  // items at that rarity (an item with no rarity counts as the most common one, same convention as shop.js).
+  // A box's own rarity odds (economy.json boxOdds, 2026-09-27) - deliberately separate from the shop's own
+  // rarities[].chance, so boxes can feel different from the shop without touching shop/event odds.
+  function boxChance(rarityId) {
+    return (eco.boxOdds || {})[rarityId] || 0;
+  }
+
+  // Weighted by boxOdds - roll a rarity, then pick uniformly among this kind's items at that rarity (an item
+  // with no rarity counts as the most common one, same convention as shop.js).
   function draw(kind) {
     const pool = poolFor(kind);
     if (!pool.length) return null;
-    const rarities = (eco.rarities || []).filter((r) => r.chance > 0);
+    const rarities = (eco.rarities || []).filter((r) => boxChance(r.id) > 0);
     if (!rarities.length) return pool[Math.floor(Math.random() * pool.length)];
     const rid = (it) => (rarities.some((r) => r.id === it.rarity) ? it.rarity : rarities[0].id);
     const present = rarities.filter((r) => pool.some((it) => rid(it) === r.id));
-    const total = present.reduce((sum, r) => sum + r.chance, 0);
+    const total = present.reduce((sum, r) => sum + boxChance(r.id), 0);
     let roll = Math.random() * total;
     let chosen = present[present.length - 1];
     for (const r of present) {
-      roll -= r.chance;
+      roll -= boxChance(r.id);
       if (roll < 0) {
         chosen = r;
         break;
@@ -82,25 +88,26 @@ const Boxes = (() => {
   }
 
   // The exact same math as draw() above, but as a percentage per item instead of one random pick - for the
-  // inspect popup ("chance% below each item's picture"). Sorted biggest chance first (easiest to scan).
+  // inspect popup ("chance% below each item's picture"). Sorted by rarity ASCENDING, common first (left),
+  // legendary last (right) - the owner's ask, 2026-09-27 (was: biggest chance first).
   function oddsFor(kind) {
     const pool = poolFor(kind);
-    const rarities = (eco.rarities || []).filter((r) => r.chance > 0);
+    const rarities = (eco.rarities || []).filter((r) => boxChance(r.id) > 0);
     if (!rarities.length) {
       const each = pool.length ? 100 / pool.length : 0;
       return pool.map((it) => ({ item: it, chance: each }));
     }
     const rid = (it) => (rarities.some((r) => r.id === it.rarity) ? it.rarity : rarities[0].id);
     const present = rarities.filter((r) => pool.some((it) => rid(it) === r.id));
-    const total = present.reduce((sum, r) => sum + r.chance, 0);
+    const total = present.reduce((sum, r) => sum + boxChance(r.id), 0);
     return pool
       .map((it) => {
         const r = present.find((x) => x.id === rid(it));
         const sameRarityCount = pool.filter((x) => rid(x) === rid(it)).length;
-        const chance = r && total > 0 ? (r.chance / total / sameRarityCount) * 100 : 0;
+        const chance = r && total > 0 ? (boxChance(r.id) / total / sameRarityCount) * 100 : 0;
         return { item: it, chance: Math.round(chance * 10) / 10 };
       })
-      .sort((a, b) => b.chance - a.chance);
+      .sort((a, b) => Rarity.rank(a.item.rarity) - Rarity.rank(b.item.rarity));
   }
 
   // Per-kind animation state: "shaking" while a purchase is resolving (bought, drawing), then the won item

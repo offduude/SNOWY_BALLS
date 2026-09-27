@@ -2898,3 +2898,30 @@ legendary at 60/30/9/1%, weather 30/30/30/9/1% (two commons split the 60), scene
 exactly the rarity table above, with Banan/Space/Acid Rain's slots showing the shimmering rainbow
 background. Restored weather to Snow afterward (the only thing changed by this round of testing).
 - `economy.json`, `src/main.js`, `src/boxes.js`, `index.html`.
+
+## Box inspect: sort by rarity ascending, own box odds (2026-09-27)
+
+Asked to always sort the inspect popup left-to-right by rarity ascending (common left, legendary right,
+regardless of chance%), and to give boxes their OWN rarity odds - common 80 / rare 15 / epic 4 / legendary
+1 - instead of continuing to piggyback on the shop's `rarities[].chance` (60/30/9/1).
+
+**`economy.json`:** new `boxOdds: { common: 80, rare: 15, epic: 4, legendary: 1 }`, separate from
+`rarities[].chance`. Deliberately its own table, not a rename or override of the shop's, so the shop's own
+rolls and `eventRarityChance`'s natural-event calibration (both still keyed off `rarities[].chance`) are
+completely untouched by this.
+
+**`src/boxes.js`:** new `boxChance(rarityId)` reads `eco.boxOdds`, used everywhere `draw()`/`oddsFor()`
+previously read `r.chance` straight off a `rarities` entry - the rarity LIST (ids, presence-per-kind) still
+comes from `eco.rarities` as before, only the weight per rarity changed source. `oddsFor()`'s final `.sort()`
+changed from `chance descending` to `Rarity.rank(item.rarity) ascending` - rank is a rarity's position in
+`economy.json`'s own `rarities` array (0 = default/lowest, rising with rarity), so this reliably sorts
+common -> rare -> epic -> legendary regardless of what any rarity's odds happen to be that day.
+
+Version bump: `src/boxes.js?v=6 -> 7`.
+
+Verified live (test origin): fresh tab, no console errors. Held all three boxes again via a real hold
+gesture - Character Box now reads 80/15/4/1% left to right (Black Andek/Cool Andek/Pryk/Banan); Weather Box
+reads 40/40/15/4/1% (Sunny/Rain split the 80, then Banana Rain/Blizzard/Acid Rain ascending) - confirming
+both the new odds and the new sort order together. No equip/coin state was changed this round (inspect-only
+testing), so nothing needed restoring.
+- `economy.json`, `src/boxes.js`, `index.html`.

@@ -586,5 +586,12 @@
         "description": "No chickens inside. Enough for a 'basic' omelette."
       }
     ]
-  }
+  },
+
+  "_boxesNote": "BOXES (the BOXES button, between SHOP and the coin counter, 2026-09-27): three always-available mystery boxes, one per skin kind (characters / sceneries / weathers) - PLACEHOLDER price, like the rest of the shop. Opening one spends `price` and draws one item from that kind's own list above, weighted by the shared 'rarities' chances below (same idea as a shop slot's rarity roll, just scoped to one kind's pool) - the default item of a kind is never a possible draw (see boxes.js poolFor). Skins are stackable (Economy.addSkin) so a duplicate draw is still a real reward, not a dead end. Seasonal boxes (a second row) are 'for later' - not represented here yet.",
+  "boxes": [
+    { "id": "character_box", "kind": "character", "name": "Character Box", "price": 250 },
+    { "id": "scenery_box", "kind": "scenery", "name": "Scenery Box", "price": 250 },
+    { "id": "weather_box", "kind": "weather", "name": "Weather Box", "price": 250 }
+  ]
 }

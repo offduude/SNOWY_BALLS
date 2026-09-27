@@ -623,6 +623,7 @@ class MainScene extends Phaser.Scene {
     }
     Economy.setRegenConfig(regen);
     Shop.init(this.eco);
+    Boxes.init(this.eco);
     Buffs.init(this.eco);
     Collection.setEconomy(this.eco);
 

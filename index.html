@@ -436,6 +436,18 @@
       image-rendering: pixelated;
     }
 
+    /* A BOXES card before it's opened: no art exists for the boxes themselves yet, and a big "?" reads as
+       "mystery box" on its own without needing any. */
+    .box-mystery {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+      font-size: calc(var(--u) * 6);
+      color: #7a5230;
+    }
+
     .shop-name {
       align-self: stretch;
       text-align: center;
@@ -475,8 +487,10 @@
       box-sizing: border-box;
     }
 
-    /* One button, label swaps SHOP <-> BACK, so position and size are identical by construction. */
-    #shop-btn {
+    /* One button, label swaps SHOP <-> BACK, so position and size are identical by construction. BOXES sits
+       directly above it (same look, own bottom offset) - the owner's ask, "between shop and coin counter". */
+    #shop-btn,
+    #boxes-btn {
       position: absolute;
       right: 10px;
       bottom: 10px;
@@ -494,9 +508,21 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    #boxes-btn {
+      bottom: 48px; /* 10px margin + 32px SHOP button + 6px gap */
+    }
+
     #shop-btn:active,
+    #boxes-btn:active,
     .side-btn:active {
       background: #74491f;
+    }
+
+    /* BOXES and SHOP hide each other while either is open - only one full-screen panel at a time. */
+    #game-container.shop-open #boxes-btn,
+    #game-container.boxes-open #shop-btn {
+      opacity: 0;
+      pointer-events: none;
     }
 
     /* PROJECTILES / CHARACTERS buttons: middle of the left edge, same look as the SHOP button.
@@ -513,7 +539,8 @@
       transition: opacity 0.25s ease;
     }
 
-    #game-container.shop-open #side-buttons {
+    #game-container.shop-open #side-buttons,
+    #game-container.boxes-open #side-buttons {
       opacity: 0;
       pointer-events: none;
     }
@@ -575,7 +602,9 @@
     }
 
     #game-container.shop-open #list-backdrop,
-    #game-container.shop-open #list-panel {
+    #game-container.shop-open #list-panel,
+    #game-container.boxes-open #list-backdrop,
+    #game-container.boxes-open #list-panel {
       opacity: 0;
       pointer-events: none;
     }
@@ -931,7 +960,8 @@
       transition: opacity 0.25s ease;
     }
 
-    #game-container.shop-open #leaderboard-btn {
+    #game-container.shop-open #leaderboard-btn,
+    #game-container.boxes-open #leaderboard-btn {
       opacity: 0;
       pointer-events: none;
     }
@@ -1032,7 +1062,8 @@
       image-rendering: pixelated;
     }
 
-    #game-container.shop-open #buffs-btn {
+    #game-container.shop-open #buffs-btn,
+    #game-container.boxes-open #buffs-btn {
       opacity: 0;
       pointer-events: none;
     }
@@ -1092,6 +1123,17 @@
       bottom: 32px; /* vertically centered on the button's top edge (10px margin + 32px tall) */
     }
 
+    /* Same idea, one button up (BOXES sits above SHOP - see #boxes-btn). */
+    #boxes-dot {
+      right: 86px;
+      bottom: 80px; /* boxes-btn's own top edge: 48px margin + 32px tall */
+    }
+
+    #game-container.boxes-open #shop-dot,
+    #game-container.shop-open #boxes-dot {
+      display: none;
+    }
+
     /* Same dot on the top-right corner of the PROJECTILES button (inside #side-buttons, whose box is the button). */
     #projectiles-dot {
       right: -8px;
@@ -1119,7 +1161,8 @@
       top: 64px; /* 72 - half the dot */
     }
 
-    #game-container.shop-open #buffs-dot {
+    #game-container.shop-open #buffs-dot,
+    #game-container.boxes-open #buffs-dot {
       display: none;
     }
 
@@ -1158,11 +1201,12 @@
       50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(255, 59, 48, 0); }
     }
 
-    /* Coin counter: sits right above the SHOP/BACK button; in the shop it moves to the top centre (see below). */
+    /* Coin counter: sits right above the BOXES button (which sits above SHOP/BACK, see #boxes-btn); over the
+       corkboard (BOXES open) it moves to the top centre (see below). */
     #coin-counter {
       position: absolute;
       right: 10px;
-      bottom: 48px; /* 10px margin + 32px button + 6px gap */
+      bottom: 86px; /* 10px margin + 32px SHOP button + 6px gap + 32px BOXES button + 6px gap */
       width: 84px;
       height: 22px;
       box-sizing: border-box;
@@ -1180,8 +1224,9 @@
       z-index: 4;
     }
 
-    /* In the shop the counter moves to the top centre of the screen, in the middle of the board's top frame. */
-    #game-container.shop-open #coin-counter {
+    /* Over the corkboard (BOXES open - the only tab with that board any more, since the SHOP tab became a plain
+       list, 2026-09-27) the counter moves to the top centre, in the middle of the board's top frame. */
+    #game-container.boxes-open #coin-counter {
       right: auto;
       bottom: auto;
       left: 50%;
@@ -1633,8 +1678,7 @@
     <div id="loading-screen"><span id="loading-text">Loading - 0%</span></div>
     <div id="cleansing"><span>The grand cleansing has struck.</span></div>
     <div id="message"></div>
-    <!-- The corkboard/3x2 grid look used to be the SHOP tab's own; it's reserved for the BOXES feature now
-         (2026-09-27) - not wired to a button yet, gated by .boxes-open which nothing sets yet either. -->
+    <!-- The corkboard/3x2 grid look used to be the SHOP tab's own; it's the BOXES feature's now (2026-09-27). -->
     <img id="boxes-board" src="assets/ui/shop_board.png" alt="" />
     <div id="boxes-items"></div>
     <div id="board-inspect"><div id="board-inspect-card"></div></div>
@@ -1669,6 +1713,8 @@
       <span id="options-dot" class="notif-dot"></span>
     </div>
     <div id="coin-counter"><i class="coin"></i><span id="coin-count">0</span></div>
+    <button id="boxes-btn" type="button">BOXES</button>
+    <span id="boxes-dot" class="notif-dot"></span>
     <button id="shop-btn" type="button">SHOP</button>
     <span id="shop-dot" class="notif-dot"></span>
   </div>
@@ -1680,7 +1726,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=295"></script>
+  <script src="src/version.js?v=296"></script>
   <script src="src/economy.js?v=44"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1712,17 +1758,18 @@
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
   <script src="src/shop.js?v=36"></script>
+  <script src="src/boxes.js?v=1"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=24"></script>
   <script src="src/collection.js?v=78"></script>
-  <script src="src/main.js?v=188"></script>
+  <script src="src/main.js?v=189"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["boxes-board", "boxes-items", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["boxes-board", "boxes-items", "boxes-btn", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());
@@ -1758,6 +1805,21 @@
         if (scene && scene.onShopOpened) scene.onShopOpened(); // drop an aim in progress
       }
       if (open && typeof Shop !== "undefined") Shop.onOpen();
+    });
+
+    // BOXES <-> BACK: same idea as SHOP/BACK just above, its own class/button/module.
+    document.getElementById("boxes-btn").addEventListener("click", () => {
+      playUiClick();
+      const container = document.getElementById("game-container");
+      const open = container.classList.toggle("boxes-open");
+      document.getElementById("boxes-btn").textContent = open ? "BACK" : "BOXES";
+      if (open) {
+        Collection.close();
+        const game = window.snowyBallsGame;
+        const scene = game && game.scene.getScene("main");
+        if (scene && scene.onShopOpened) scene.onShopOpened(); // drop an aim in progress - same reasoning as the shop
+      }
+      if (open && typeof Boxes !== "undefined") Boxes.onOpen();
     });
   </script>
 </body>

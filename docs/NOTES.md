@@ -2356,3 +2356,51 @@ menu; **"this is only a design change, the way the economy works we will update 
   behavior works as intended rather than looking like a bug. Reopened the shop fresh to confirm it always
   lands back on PROJECTILES.
 - `src/shop.js?v=36`, `src/collection.js?v=78`.
+
+## New BOXES feature: three always-available mystery boxes (2026-09-27)
+
+**Asked directly**: *"between shop and coin counter we'll add a 'BOXES' button, which will have the same
+layout as the current shop tab has, with that board background. 3x2 grid like we have right now, top 3 slots
+will be 3 always-available boxes, each for characters, scenery and weather. each box will have an open
+animation and different chances for each item it contains... bottom row should be greyed out for now and
+should say 'Coming Soon...'"*. Clarified further: bought with coins (a free daily box is a good idea, kept for
+later); no special handling needed for a duplicate draw since skins are stackable now (see the entry above) -
+every draw is a real reward, new or a top-up.
+
+- New `#boxes-btn` sits between `#coin-counter` and `#shop-btn` in the bottom-right stack (its own `#boxes-dot`
+  too, unused for now - there's no "something changed while you were away" concept for an always-available
+  box, only relevant once the free-daily-box idea lands). Opens/closes the exact same way SHOP does, its own
+  `.boxes-open` class - and each hides the other's button while it's open, same idea as SHOP already had with
+  the side buttons/list panel.
+- Reuses the corkboard + 3x2 grid `#boxes-board`/`#boxes-items`/`.shop-grid`/`.shop-card` freed up by the SHOP
+  redesign above - no new grid/card CSS needed, just a new `.box-mystery` "?" glyph in place of a picture
+  (there's no box art yet, and a plain "?" already reads as a mystery box on its own).
+- New module `src/boxes.js`, structurally parallel to `shop.js` but much simpler: no rolling stock or timers,
+  just three fixed boxes (`economy.json boxes[]`, kind: character/scenery/weather, a flat placeholder `price`
+  like the rest of the shop's test data). Opening one draws from that kind's own master list (the same one the
+  SKINS menu equips from), weighted by the *shared* rarity chances (economy.json `rarities[].chance`) - the
+  same weighted-pick idea `shop.js`'s `pickWeighted` already uses for a shop slot, just scoped to one kind's
+  pool instead of the whole shop catalog (not literally shared code - boxes.js has its own small `draw()`,
+  since shop.js's version is tangled up with its stock/eligibility rules that don't apply here). The default
+  skin of a kind (Andek, Frosty, Snow) is excluded from the draw pool - it's always already owned for free,
+  never a prize.
+- On a winning draw: `Economy.addSkin(kind, id, 1)` - since skins are stackable now, there's no "already owned"
+  case to handle specially; every draw is useful, exactly like a shop projectile stack.
+- Open animation (genuinely new, no gacha/reveal UI existed anywhere before): tap a box -> it shakes for 500ms
+  (reusing the existing `.shop-card.shake` keyframe) -> the won item's own card (picture, rarity, name) shows
+  in its place for 1.8s, picking up the existing legendary rainbow-shine automatically via `Rarity.cardClass`
+  -> reverts to the normal "?" box, ready to buy again. The coins are spent and the skin is granted the moment
+  the draw is decided (mid-shake), not when the reveal times out, so a reload mid-animation never loses or
+  duplicates anything - it just shows the box normally on the next load.
+- Tried and discarded: porting `createMiracleGlow()`'s Phaser-world glow effect (main.js) into the reveal - it's
+  built entirely on in-game sprite coordinates and can't be dropped into a DOM card; a plain CSS reveal is the
+  pragmatic first version, porting a real shine effect is a stretch goal for later.
+- Verified live (test origin): fresh tab, no console errors. Opened BOXES - the coin counter relocates to the
+  board's top centre, same as the old shop grid used to (that relocation rule moved from `.shop-open` to
+  `.boxes-open` since the SHOP tab has no board any more - see the redesign entry above). Bought a Character
+  Box (`Economy.getSkinCount("character","pryk")` went 0 -> 1); watched the shake -> reveal -> revert sequence
+  by reading the card's HTML mid-animation (confirmed the reveal shows the drawn item's real picture/rarity/
+  name, e.g. a Weather Box drawing common Rain); drained coins to 100 and confirmed all three boxes show
+  unaffordable (red price) and a tap does nothing (no coins spent, no shake-then-buy).
+- `economy.json` gains a `boxes` array (3 entries) and a `_boxesNote`. `src/main.js?v=189` (added
+  `Boxes.init(this.eco)` alongside `Shop.init`), `src/boxes.js?v=1` (new file).

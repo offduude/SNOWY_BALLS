@@ -131,6 +131,17 @@
       "rarity": "common",
       "detail": "",
       "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+    },
+    {
+      "id": "summer",
+      "name": "Summer",
+      "description": "Finally, some warmth.",
+      "image": "assets/weather/sunny.png",
+      "background": "assets/scenery/summer_bg.png",
+      "rarity": "common",
+      "detail": "",
+      "_imageNote": "The card thumbnail deliberately reuses Sunny's weather picture (assets/weather/sunny.png) - the owner's direct call, no separate scenery_summer_item.png exists.",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
     }
   ],
 
@@ -217,6 +228,23 @@
       "rarity": "common",
       "detail": "",
       "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md. particleSize/density/fallSpeed borrowed from Rain as a starting point (no sound file supplied) - tweak once the owner has looked at it in motion."
+    },
+    {
+      "id": "banana_rain",
+      "name": "Banana Rain",
+      "description": "It's raining bananas!",
+      "image": "assets/weather/banana_rain.png",
+      "particle": "assets/weather/banana_rain.png",
+      "particleSize": 10,
+      "sway": 0,
+      "drift": 0,
+      "angle": 0,
+      "density": "heavy",
+      "fallSpeed": "moderate",
+      "rarity": "common",
+      "detail": "",
+      "_imageNote": "The one file the owner supplied (banana_rain.png) is deliberately used for BOTH the card thumbnail (image) and the falling particle (particle) - the owner's direct call, there is no separate _item/_particle pair for this one.",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md. particleSize/density/fallSpeed are a placeholder guess (no reference to match) - tweak once the owner has looked at it in motion."
     }
   ],
 

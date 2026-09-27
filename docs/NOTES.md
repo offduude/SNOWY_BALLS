@@ -2809,3 +2809,43 @@ restored is the drawn `cool_andek` skin itself (count 1): skins are "never consu
 decrement API by design, only `Economy.addSkin`. Left as a harmless leftover on the test save.
 - `economy.json`, `src/main.js`, plus the new asset files under `assets/character/`, `assets/scenery/`,
   `assets/weather/` listed above.
+
+## The 2 flagged files, resolved by direct answer (2026-09-27)
+
+Asked about the two files held back above - answered directly: "banana rain thumbnail is also the
+particle" (one file, both `image` and `particle` point at it) and "summer scenery same picture as the
+sunny weather" (Summer's card thumbnail deliberately REUSES `assets/weather/sunny.png`, no separate
+scenery file for it).
+
+- Copied `scenery_summer.png -> assets/scenery/summer_bg.png` (its background - the only file it had).
+  Added a `summer` entry to `sceneries`: `image: "assets/weather/sunny.png"` (a cross-folder reuse, not a
+  duplicate file - an `_imageNote` in the entry says why), `background: "assets/scenery/summer_bg.png"`.
+- Copied `banana_rain.png` as-is (no rename needed - it doesn't follow the `_item`/`_particle` suffix
+  convention, same as Sunny's own file). Added a `banana_rain` entry to `weathers` with BOTH `image` and
+  `particle` pointing at the same `assets/weather/banana_rain.png` - a first for this codebase (every
+  existing weather's image and particle are different files, even when two DIFFERENT weathers share a
+  particle, like Blizzard reusing Snow's).
+
+**Found and fixed a real latent bug this surfaced.** The reactive skin-thumbnail preloader (main.js
+`filecomplete-json-economy` handler) keyed every `image` it preloaded as `"skin_preload_" + n++` - an
+arbitrary incrementing key, not the file's own path. Banana Rain's `image` and `particle` being the exact
+same file meant that same URL would get loaded TWICE under two DIFFERENT keys: once here (as
+`skin_preload_N`, for the card thumbnail), and again later by `applyWeather()`'s own lazy load (keyed by
+`def.particle`, i.e. the path itself) the first time the player equips it. That is exactly the failure mode
+already documented and fixed once before, for Blizzard/Snow sharing a particle file (see the
+`assets/weather/snowflake.png` preload comment, 2026-09-22): "loading the SAME URL under a SECOND key
+while the first was already loaded reproducibly hung Phaser's loader forever." Fixed the SAME way - the
+reactive preloader now keys by `item.image` itself (`this.load.image(item.image, item.image)`), matching
+the particle convention exactly, so a shared file always shares a key everywhere it's loaded from, and
+`applyWeather()`'s own `!this.textures.exists(w.key)` check correctly finds it already loaded and skips
+re-loading it.
+
+Version bump: `src/main.js?v=192 -> 193`.
+
+Verified live (test origin): fresh tab, no console errors. Granted and equipped Banana Rain + Summer
+directly (the exact scenario that used to be able to hang the loader) - bananas fall correctly over the
+Summer scenery (grass, not the default snowy pavement), no hang, no console errors on a full page reload
+with both equipped from boot. Summer's card in SKINS > SCENERIES shows the reused sun icon correctly.
+Restored the test save's prior equipped weather/scenery (Snow/Frosty) afterward - `banana_rain`/`summer`
+counts (1 each) left in place as further deliberately-granted test skins, same treatment as the other four.
+- `economy.json`, `src/main.js`, `assets/scenery/summer_bg.png`, `assets/weather/banana_rain.png`.

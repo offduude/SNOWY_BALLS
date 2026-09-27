@@ -590,13 +590,18 @@ class MainScene extends Phaser.Scene {
     // would break the game for anyone with a non-default scenery/weather equipped, which is far worse than the
     // flash it was meant to fix. Left as a known limitation - see docs/NOTES.md.
     this.load.on("filecomplete-json-economy", (key, type, data) => {
+      // Keyed by the image's OWN PATH, not an incrementing "skin_preload_N" (2026-09-27, from adding Banana Rain,
+      // a weather whose `image` and `particle` are the SAME file) - same fix as the particle-loading convention
+      // above (see the snowflake.png comment): a file loaded here under one key, then loaded AGAIN later under a
+      // different key by applyWeather()'s own lazy load, is exactly the "same URL under a second key" pattern that
+      // hangs Phaser's loader forever. Keying both by path means applyWeather() finds the texture already loaded
+      // (this.textures.exists(w.key)) and skips loading it again entirely.
       const seen = new Set();
-      let n = 0;
       ["characters", "sceneries", "weathers"].forEach((listKey) => {
         (data[listKey] || []).forEach((item) => {
           if (item.image && !seen.has(item.image)) {
             seen.add(item.image);
-            this.load.image("skin_preload_" + n++, item.image);
+            this.load.image(item.image, item.image);
           }
         });
       });

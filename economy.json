@@ -61,6 +61,26 @@
       "character": "banan",
       "rarity": "legendary",
       "detail": ""
+    },
+    {
+      "id": "black_andek",
+      "name": "Black Andek",
+      "description": "Sleek and stealthy.",
+      "image": "assets/character/black_andek_face.png",
+      "character": "black_andek",
+      "rarity": "common",
+      "detail": "",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+    },
+    {
+      "id": "cool_andek",
+      "name": "Cool Andek",
+      "description": "Ice cold, literally.",
+      "image": "assets/character/cool_andek_face.png",
+      "character": "cool_andek",
+      "rarity": "common",
+      "detail": "",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
     }
   ],
   "sceneries": [
@@ -81,6 +101,36 @@
       "background": "assets/scenery/frosty_night_bg.png",
       "rarity": "rare",
       "detail": ""
+    },
+    {
+      "id": "desert",
+      "name": "Desert",
+      "description": "Sandy and warm.",
+      "image": "assets/scenery/desert.png",
+      "background": "assets/scenery/desert_bg.png",
+      "rarity": "common",
+      "detail": "",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+    },
+    {
+      "id": "lollipop",
+      "name": "Lollipop",
+      "description": "Sweet and colourful.",
+      "image": "assets/scenery/lollipop.png",
+      "background": "assets/scenery/lollipop_bg.png",
+      "rarity": "common",
+      "detail": "",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
+    },
+    {
+      "id": "space",
+      "name": "Space",
+      "description": "Out of this world.",
+      "image": "assets/scenery/space.png",
+      "background": "assets/scenery/space_bg.png",
+      "rarity": "common",
+      "detail": "",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md."
     }
   ],
 
@@ -151,6 +201,22 @@
       "soundVolume": 0.3,
       "rarity": "epic",
       "detail": ""
+    },
+    {
+      "id": "acid_rain",
+      "name": "Acid Rain",
+      "description": "Stings a little.",
+      "image": "assets/weather/acid_rain_item.png",
+      "particle": "assets/weather/acid_rain_particle.png",
+      "particleSize": 12,
+      "sway": 0,
+      "drift": 0,
+      "angle": 0,
+      "density": "very_heavy",
+      "fallSpeed": "fast",
+      "rarity": "common",
+      "detail": "",
+      "_rarityNote": "PLACEHOLDER (2026-09-27, from /upcoming) - the owner will decide the real rarity later, see docs/NOTES.md. particleSize/density/fallSpeed borrowed from Rain as a starting point (no sound file supplied) - tweak once the owner has looked at it in motion."
     }
   ],
 

@@ -2753,3 +2753,59 @@ potato, or stone from stock; Toy Tank now sorts among the RARE items (between Ch
 Mints) and shows a real `150` coin buy button when in stock, appearing at ~14% per reroll (rare-tier
 rate, consistent with 5 rare buffs now sharing that 30% pool instead of 4); no console errors.
 - `economy.json`.
+
+## New skins from /upcoming: 2 characters, 3 sceneries, 1 weather (2026-09-27)
+
+Asked "where do I put new skin files" (answered: `assets/character/<id>_{idle,aiming,throwing,face}.png`,
+`assets/scenery/<id>.png` + `<id>_bg.png`, `assets/weather/<id>_item.png` + `<id>_particle.png`, matching
+the existing file convention exactly), then asked to extract and wire up everything already sitting in
+`C:\Users\CLEANSPACE\Desktop\upcoming\` (sceneries/skins/weather subfolders) - rarity to be decided "later,"
+just get each one implemented into its box now.
+
+**Copied in (renamed to match the existing convention):**
+- Characters (`assets/character/`): `black_andek_*` and `cool_andek_*` (idle/aiming/throwing/face) - already
+  matched the naming convention verbatim, straight copy.
+- Sceneries (`assets/scenery/`): `scenery_desert_item.png -> desert.png` (card), `scenery_desert.png ->
+  desert_bg.png` (background); same pattern for `lollipop` and `space`.
+- Weather (`assets/weather/`): `acid_rain_item.png`, `acid_rain_particle.png` - already matched.
+
+**NOT implemented - two incomplete drops, flagged to the owner rather than guessed at:**
+- `scenery_summer.png` (a background) has no matching `scenery_summer_item.png` (card thumbnail) - every
+  existing scenery needs both files, so this one has no card art yet.
+- `banana_rain.png` doesn't match either half of the `<id>_item.png` / `<id>_particle.png` pair every other
+  weather uses, and there's no second file alongside it - unclear whether it's the card, the falling
+  particle, or something else; asking rather than assuming.
+
+**economy.json:** added `black_andek`/`cool_andek` to `characters`, `desert`/`lollipop`/`space` to
+`sceneries`, `acid_rain` to `weathers` - all six at `rarity: "common"` as an explicit placeholder (each
+carries its own `_rarityNote` saying so) since the owner will decide real rarities later. Acid Rain borrows
+Rain's particleSize/density/fallSpeed as a starting point (no sound file was supplied) - also flagged as
+tunable. Flavor `description` text is placeholder too, easy to swap.
+
+**src/main.js:** Black Andek / Cool Andek need manual `this.load.image()` preload calls for their
+idle/aiming/throwing POSE sprites (unlike a skin's card thumbnail, which loads reactively from
+economy.json's own `image` field with no code change - see the existing Pryk/Banan comment at
+preload()). Added a `CHARACTERS` entry for each, reusing Andek's own hand-rig position (`hands.idle`/
+`hands.aiming`) since they're recolors of the same character model, same as Pryk/Banan already do.
+Sceneries' `background` and weathers' `particle`/`sound` need NO preload changes - `applyScenery()`/
+`applyWeather()` already lazy-load those on demand when equipped, confirmed by the existing comment on
+why eagerly preloading them was tried and reverted.
+
+**boxes.js needed zero changes** - it already draws from the SAME master `characters`/`sceneries`/
+`weathers` arrays this edit appended to, filtered only by `rarity !== "default"` (see its own `poolFor()`
+comment: "every non-default skin that exists today is in one of these three pools already"). Adding the
+economy.json entries was the whole box-side integration.
+
+Version bump: `src/main.js?v=191 -> 192`.
+
+Verified live (test origin): fresh tab, no console errors; confirmed all 6 new entries load with the
+right ids/rarities via `eco.characters`/`sceneries`/`weathers`. Opening BOXES and tapping (a plain click,
+not a hold - see the round-3 note above on why a `.click()` isn't a hold) the Character Box for real spent
+250 coins and drew `cool_andek` (confirmed via `Economy.getSkinCount`) - it then rendered correctly in the
+SKINS > CHARACTERS list (face thumbnail, description, rarity tag, owned count) and equipped cleanly
+in-game (idle sprite + hand rig, no missing-texture/console errors). Refunded the 250 coins afterward and
+re-equipped Banan to restore the test save's prior state, per standing practice - the one thing NOT
+restored is the drawn `cool_andek` skin itself (count 1): skins are "never consumed," so there is no
+decrement API by design, only `Economy.addSkin`. Left as a harmless leftover on the test save.
+- `economy.json`, `src/main.js`, plus the new asset files under `assets/character/`, `assets/scenery/`,
+  `assets/weather/` listed above.

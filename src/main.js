@@ -420,6 +420,21 @@ const CHARACTERS = {
       aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
     },
   },
+  // Black Andek / Cool Andek (2026-09-27): recolors of Andek, same rig - same hand position as character1.
+  black_andek: {
+    sprites: { idle: "black_andek_idle", aiming: "black_andek_aiming", throwing: "black_andek_throwing" },
+    hands: {
+      idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
+      aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
+    },
+  },
+  cool_andek: {
+    sprites: { idle: "cool_andek_idle", aiming: "cool_andek_aiming", throwing: "cool_andek_throwing" },
+    hands: {
+      idle: { x: 43.5, y: 33.5, size: 5, rotation: Math.PI, behind: false },
+      aiming: { x: 42, y: 6, size: 6, rotation: 0, behind: true, rest: 6 },
+    },
+  },
   // Banan (2026-09-23): same hand position too (the owner's call, "same as other characters").
   banan: {
     sprites: { idle: "banan_idle", aiming: "banan_aiming", throwing: "banan_throwing" },
@@ -517,6 +532,14 @@ class MainScene extends Phaser.Scene {
     this.load.image("banan_idle", "assets/character/banan_idle.png");
     this.load.image("banan_aiming", "assets/character/banan_aiming.png");
     this.load.image("banan_throwing", "assets/character/banan_throwing.png");
+    // Black Andek / Cool Andek (2026-09-27, from /upcoming, rarity TBD - see economy.json _rarityNote and
+    // docs/NOTES.md): recolors of Andek, same rig - empty-handed poses only, same as Pryk/Banan above.
+    this.load.image("black_andek_idle", "assets/character/black_andek_idle.png");
+    this.load.image("black_andek_aiming", "assets/character/black_andek_aiming.png");
+    this.load.image("black_andek_throwing", "assets/character/black_andek_throwing.png");
+    this.load.image("cool_andek_idle", "assets/character/cool_andek_idle.png");
+    this.load.image("cool_andek_aiming", "assets/character/cool_andek_aiming.png");
+    this.load.image("cool_andek_throwing", "assets/character/cool_andek_throwing.png");
     this.load.image("chestnut", "assets/snowball/chestnut.png");
     this.load.image("onion", "assets/snowball/onion.png");
     // Keyed by its OWN PATH, not "weather_snow" - a real bug found and fixed 2026-09-22: Blizzard's particle happens to

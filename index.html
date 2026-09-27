@@ -488,8 +488,11 @@
       z-index: 3;
     }
 
+    /* Centered on screen (left: 22% + width: 56% = 78%, so its own middle sits at 50% - the owner's ask, 2026-09-27:
+       "move both the shop list and those side buttons so that the shop list is centred in the middle"). #shop-cats
+       sits in the room freed up to its right, slimmed down (12% instead of 17% wide) rather than widened to fill it. */
     #shop-panel {
-      left: 15%;
+      left: 22%;
       top: 12%;
       width: 56%;
       height: 76%;
@@ -506,9 +509,9 @@
     }
 
     #shop-cats {
-      left: 73%;
+      left: 80%;
       top: 12%;
-      width: 17%;
+      width: 12%;
       height: 76%;
       display: flex;
       flex-direction: column;
@@ -552,14 +555,14 @@
 
     .shop-cat-btn {
       width: 100%;
-      height: 32px;
+      height: 26px; /* slimmer than the standard 32px side button (the owner's ask, 2026-09-27) */
       padding: 0;
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 8px;
+      font-size: 7px;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
@@ -591,9 +594,11 @@
        the owner didn't want the old heavier grayscale treatment); its BUY button always shows the item's real
        (fixed) price, just greyed out and disabled like an unaffordable one - see .pick-equip.shop-buy.cant below.
        There is no separate "NOT IN STOCK" label any more (2026-09-27, the owner's ask - one consistent look for
-       "can't buy this right now", whatever the reason). */
+       "can't buy this right now", whatever the reason). The row's own background is greyed (not just dimmed via
+       opacity - the owner's follow-up ask, "visibly unavailable... somewhat greying out their backgrounds") so
+       it reads as unavailable even at a glance, before reading the button. */
     .shop-row.unavailable {
-      opacity: 0.8;
+      background: #b8b0a4;
     }
 
     /* "xN" left in this slot's offer for a stack currently on sale - replaces the old (removed 2026-09-27)
@@ -784,6 +789,11 @@
     #game-container.boxes-open #side-buttons {
       opacity: 0;
       pointer-events: none;
+      /* #side-buttons' own z-index (5) is normally ABOVE the shop/boxes panel (4) - so are the other buttons
+         still hidden below - so without this they'd render on TOP of the panel for the length of the opacity
+         fade instead of fading out behind it (the owner's bug report, 2026-09-27: "other buttons disappearing
+         behind the shop tab" - they were briefly disappearing IN FRONT of it instead). */
+      z-index: 1;
     }
 
     .side-btn {
@@ -1135,6 +1145,7 @@
     #game-container.shop-open #buff-hud,
     #game-container.boxes-open #buff-hud {
       opacity: 0;
+      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
     }
 
     .buff-card {
@@ -1214,6 +1225,7 @@
     #game-container.boxes-open #leaderboard-btn {
       opacity: 0;
       pointer-events: none;
+      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
     }
 
     /* The LEADERBOARD button's own background reflects the signed-in player's CURRENT LEADERBOARD PLACE (saves.js
@@ -1277,6 +1289,7 @@
     #game-container.boxes-open #ammo-box {
       opacity: 0;
       pointer-events: none;
+      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
     }
 
     /* The counter's background reflects the equipped projectile's rarity (main.js tintAmmoBox): its colour over the brown (--tint), or for a LEGENDARY one
@@ -1322,6 +1335,7 @@
     #game-container.boxes-open #buffs-btn {
       opacity: 0;
       pointer-events: none;
+      z-index: 1; /* fades out BEHIND the panel, not in front of it - see #side-buttons' own note */
     }
 
     /* The running timer sits exactly where the USE / EQUIP button is (same width), so nothing shifts when a button
@@ -1993,7 +2007,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=300"></script>
+  <script src="src/version.js?v=301"></script>
   <script src="src/economy.js?v=46"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2024,7 +2038,7 @@
   <script src="src/cloud.js?v=26"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
-  <script src="src/shop.js?v=39"></script>
+  <script src="src/shop.js?v=40"></script>
   <script src="src/boxes.js?v=4"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=25"></script>

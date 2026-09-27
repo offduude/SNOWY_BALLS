@@ -133,6 +133,213 @@
       pointer-events: auto;
     }
 
+    /* HOLD to INSPECT: under the cork board, in the style of the game's own "TAP to AIM" (#message) - same look,
+       same convention the old shop had before it became a plain list (2026-09-27: BOXES inherited it instead). */
+    #boxes-hint {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 2.4%;
+      text-align: center;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+        0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: 4;
+    }
+
+    #game-container.boxes-open #boxes-hint { opacity: 1; }
+
+    @media (pointer: coarse), (max-width: 700px) {
+      #boxes-hint { font-size: 9px; }
+    }
+
+    /* The odds grid (boxes.js openInspect): a dimmed backdrop over the boxes screen with just each possible
+       item's picture and its chance% - no other text at all (the owner's ask), captioned in the exact same
+       white/black-outline style as #boxes-hint/#message above, not a card of its own. */
+    #boxes-inspect {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 6;
+    }
+
+    #game-container.boxes-open #boxes-inspect.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #boxes-inspect-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: calc(var(--u) * 2.4);
+      width: 70%;
+    }
+
+    .box-inspect-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: calc(var(--u) * 0.6);
+      width: calc(var(--u) * 14);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .box-inspect-cell img {
+      width: 100%;
+      height: calc(var(--u) * 14);
+      object-fit: contain;
+      image-rendering: pixelated;
+      pointer-events: none;
+    }
+
+    .box-inspect-chance {
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: calc(var(--u) * 1.1);
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+        0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
+    }
+
+    /* One item's own card, tapped from the odds grid above - the exact same look the SKINS menu uses
+       (Collection.skinRowHtml), on top of the odds grid rather than replacing it. */
+    #boxes-inspect-item {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 7; /* above #boxes-inspect (6) */
+    }
+
+    #game-container.boxes-open #boxes-inspect-item.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #boxes-inspect-item-card {
+      width: 52%;
+      font-family: "Press Start 2P", monospace;
+      color: #3b2412;
+    }
+
+    #boxes-inspect-item-card .pick-row {
+      box-sizing: border-box;
+      height: calc(var(--u) * 14);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .box-owned-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      color: #8a6a44;
+      font-size: calc(var(--u) * 0.9);
+    }
+
+    /* BOXES (2026-09-27): bright colour buttons instead of the shop's old pinned-leaflet look - no category
+       label, box.png as the closed-box picture, price centered under the name. Shares the 3x2 .shop-grid layout
+       the corkboard already provides (see #boxes-items above). */
+    .box-btn {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: calc(var(--u) * 0.5);
+      min-width: 0;
+      min-height: 0;
+      padding: calc(var(--u) * 1) calc(var(--u) * 0.6);
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+      color: #ffffff;
+      font-family: inherit;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.08s ease, opacity 0.2s ease;
+      text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+    }
+
+    .box-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+    .box-btn.cant { opacity: 0.65; }
+    .box-btn.shake { animation: shop-shake 0.3s linear; }
+
+    .box-btn.box-soon {
+      background: #7a6a58;
+      color: #d9c9a8;
+      cursor: default;
+      box-shadow: none;
+      text-shadow: none;
+    }
+
+    .box-pic {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      align-self: stretch;
+    }
+
+    .box-pic img {
+      width: 55%;
+      height: 55%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+    }
+
+    .box-name {
+      font-size: calc(var(--u) * 1.3);
+    }
+
+    .box-price {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: calc(var(--u) * 0.5);
+      font-size: calc(var(--u) * 1.4);
+    }
+
+    .box-price .coin {
+      display: inline-block;
+      width: calc(var(--u) * 1.4);
+      height: calc(var(--u) * 1.4);
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
+
+    /* The revealed item after a box opens: same bright card, its own rarity label at the top and picture/name in
+       place of the box.png/price - picks up the shared legendary rainbow shine below via Rarity.cardClass. */
+    .box-reveal-rarity {
+      font-size: calc(var(--u) * 0.95);
+      text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000;
+    }
+
     .shop-grid {
       flex: 1;
       display: grid;
@@ -1485,7 +1692,8 @@
     .board-card.legendary,
     .account-card.legendary,
     .pick-row.legendary,
-    .shop-card.legendary {
+    .shop-card.legendary,
+    .box-btn.legendary {
       background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
         rgba(77, 210, 255, 0.32), rgba(106, 107, 255, 0.32), rgba(193, 77, 255, 0.32), rgba(255, 77, 77, 0.32));
       background-size: 200% 100%;
@@ -1716,6 +1924,9 @@
     <!-- The corkboard/3x2 grid look used to be the SHOP tab's own; it's the BOXES feature's now (2026-09-27). -->
     <img id="boxes-board" src="assets/ui/shop_board.png" alt="" />
     <div id="boxes-items"></div>
+    <div id="boxes-hint">HOLD to INSPECT</div>
+    <div id="boxes-inspect"><div id="boxes-inspect-grid"></div></div>
+    <div id="boxes-inspect-item"><div id="boxes-inspect-item-card"></div></div>
     <div id="board-inspect"><div id="board-inspect-card"></div></div>
     <div id="shop-backdrop"></div>
     <div id="shop-panel">
@@ -1761,7 +1972,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=297"></script>
+  <script src="src/version.js?v=298"></script>
   <script src="src/economy.js?v=45"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -1793,10 +2004,10 @@
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
   <script src="src/shop.js?v=37"></script>
-  <script src="src/boxes.js?v=1"></script>
+  <script src="src/boxes.js?v=3"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=24"></script>
-  <script src="src/collection.js?v=79"></script>
+  <script src="src/collection.js?v=80"></script>
   <script src="src/main.js?v=190"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
@@ -1804,7 +2015,7 @@
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["boxes-board", "boxes-items", "boxes-btn", "shop-panel", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["boxes-board", "boxes-items", "boxes-hint", "boxes-inspect", "boxes-inspect-item", "boxes-btn", "shop-panel", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

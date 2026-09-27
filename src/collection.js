@@ -575,6 +575,7 @@ const Collection = (() => {
   return {
     isOpen: () => openKind !== null,
     shopRowHtml,
+    skinRowHtml, // the BOXES inspect popup's item detail card (boxes.js) reuses the same card the SKINS menu itself uses
     projectileImage: (id) => ((CATALOG.projectile.items.find((i) => i.id === id) || {}).image) || "", // (the counter under the top-right buttons)
     characterInfo: (id) => skinItems("character").find((c) => c.id === id) || null, // { id, name, description, image, ... } - the ACCOUNT card and the leaderboard's inspect popup (saves.js) use this for the picture + description
     close,

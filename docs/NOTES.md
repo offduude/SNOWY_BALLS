@@ -2469,3 +2469,48 @@ highest point, because i want to remove the ranges and make each item have a sin
 quantity of course price*amount)."* Presented the full price-range table (20 buffs' `priceRange`, 10 projectiles'
 `unitPrice`) back to the owner in chat for this decision - not resolved yet as of this entry. `amount` ranges
 (projectile stack sizes) are NOT part of this - those stay randomized regardless of what's decided for price.
+
+## BOXES redesign: bright buttons, hold-to-inspect odds (2026-09-27)
+
+**Asked directly**, a batch of six: (1) a placeholder `box.png` was dropped at the project root for the closed-box
+picture; (2) center the price; (3) remove the CHARACTER/SCENERY/WEATHER label from the top-left corner; (4)
+redesign the slots from the shop's old pinned-leaflet look into bright colour buttons; (5) make it possible to
+inspect a box - just each possible item's picture with a "chance%" caption below, styled like "TAP to AIM", no
+other text, and tapping one of those opens ITS OWN full card on top; (6) confirm every current non-default skin
+is in the boxes.
+
+- `box.png` moved to `assets/ui/box.png` (the project's convention for shared UI art) - it's the ONE closed-box
+  picture for all three boxes; they're told apart by colour, not a different picture each.
+- (6) needed no code change: `Boxes.poolFor(kind)` already excludes only the `default` rarity per kind (Andek,
+  Frosty, Snow - each always owned for free) - EVERY other skin that exists today (Pryk, Banan, Frosty Night,
+  Sunny, Rain, Blizzard) was already in its kind's box pool from the original BOXES build. Confirmed, not
+  changed.
+- New `.box-btn` class replaces `.shop-card` for the three real boxes - a bright rounded button
+  (`background: linear-gradient(...)`, one distinct colour per kind: pink/red for character, green/teal for
+  scenery, blue/indigo for weather) instead of the cream pinned-corkboard-leaflet look, no category label drawn
+  on it at all (3), `box.png` centered above the name, the price on its own centered line below (2) instead of
+  the old leaflet's left/right-split bottom row. The "Coming Soon" placeholders get their own muted `.box-soon`
+  modifier of the same shape, so the whole grid still reads as one family of buttons.
+  `.box-btn.legendary` was added to the shared rainbow-shine selector list (index.html) so a legendary reveal
+  still gets the same shine every other legendary card does.
+- **Inspect** (5): tap a box to open/buy it as before; HOLD one (same convention + timing as the old shop's
+  hold-to-inspect, `#boxes-hint` shows "HOLD to INSPECT" the same way the old `#shop-hint` did) to open
+  `#boxes-inspect` instead - a dimmed backdrop with just that kind's possible items, each a plain picture and a
+  white, black-outlined "43.5%" caption (the same text style `#message`'s "TAP to AIM" already uses) - no name,
+  no description, nothing else, per the ask. The percentage is computed by `Boxes.oddsFor()`, the exact same
+  rarity-weighted math `draw()` uses to actually pick a prize (a rarity's shared chance, split evenly among
+  however many items share it), just expressed as a number instead of used to roll one outcome - so what's shown
+  is always literally accurate, not a separate approximation.
+- Tapping a picture in that odds grid opens `#boxes-inspect-item` ON TOP of it (its own layer, z-index above the
+  odds grid, not a replacement) - that item's own full card, reusing `Collection.skinRowHtml` (now exported;
+  it used to be private to collection.js) exactly as the SKINS menu itself renders it, with an empty action slot
+  in place of an EQUIP button (equipping something not owned yet from a preview would be an exploit) - the
+  count already shown under it (`x0`, `x2`, ...) reads as ownership on its own, no separate "OWNED"/"NOT OWNED"
+  label needed (tried that first, cut it - redundant with the count).
+- Verified live (test origin): fresh tab, no console errors. Confirmed a synthetic hold (pointerdown, wait past
+  the hold threshold) opens the odds grid with correct images/percentages (e.g. Weather: Sunny 43.5%, Rain
+  43.5%, Blizzard 13%); tapping Blizzard opened its own card on top (epic, description, count); closing it
+  returned to the grid, closing the grid returned to the boxes screen. A plain tap still buys normally (15100 ->
+  14850 coins for a Scenery Box, `getSkinCount("scenery","frosty_night")` -> 2). Drained coins to 100 and
+  confirmed all three buttons show their unaffordable look (`.cant`, dimmed).
+- `src/boxes.js?v=3`, `src/collection.js?v=80` (exports `skinRowHtml`).

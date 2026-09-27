@@ -379,12 +379,178 @@
       box-sizing: border-box;
     }
 
-    /* The revealed item after a box opens: same bright card, its own rarity label at the top and picture/name in
-       place of the box.png/price - picks up the shared legendary rainbow shine below via Rarity.cardClass. */
-    .box-reveal-rarity {
-      font-size: calc(var(--u) * 0.95);
-      text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000;
+    /* Case-opening popup (2026-09-27, boxes.js runReel): a full-screen dim backdrop, same family as
+       #boxes-inspect, holding a fixed-size "window" the item strip scrolls through. Above every other BOXES
+       popup (#boxes-inspect-item is 7) since it can be triggered while either of those is still up. */
+    #box-open {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: calc(var(--u) * 1.8);
+      background: rgba(0, 0, 0, 0.72);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 9;
     }
+
+    #game-container.boxes-open #box-open.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #box-open-window {
+      position: relative;
+      width: calc(var(--u) * 62);
+      height: calc(var(--u) * 13);
+      overflow: hidden;
+      background: #241407;
+      border: 2px solid #7a5230;
+      border-radius: 6px;
+      box-shadow: inset 0 0 calc(var(--u) * 3) rgba(0, 0, 0, 0.65), 0 3px 0 rgba(0, 0, 0, 0.4);
+    }
+
+    /* The fixed centre pointer the reel scrolls under - two inward-pointing carets plus a thin line, same idea
+       as a real case-opening animation's marker. */
+    #box-open-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+      background: rgba(255, 209, 102, 0.9);
+      box-shadow: 0 0 6px rgba(255, 209, 102, 0.8);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    #box-open-marker::before,
+    #box-open-marker::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: calc(var(--u) * 0.9) solid transparent;
+      border-right: calc(var(--u) * 0.9) solid transparent;
+    }
+
+    #box-open-marker::before {
+      top: 0;
+      border-top: calc(var(--u) * 0.9) solid rgba(255, 209, 102, 0.95);
+    }
+
+    #box-open-marker::after {
+      bottom: 0;
+      border-bottom: calc(var(--u) * 0.9) solid rgba(255, 209, 102, 0.95);
+    }
+
+    /* The scrolling strip itself - boxes.js sets its transform frame-by-frame (runReel), never via a CSS
+       transition, so it can fire ticks exactly when a cell crosses the marker above. */
+    #box-open-reel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: calc(var(--u) * 1);
+      padding: 0 calc(var(--u) * 1);
+      will-change: transform;
+    }
+
+    .box-open-cell {
+      flex: none;
+      width: calc(var(--u) * 11);
+      height: calc(var(--u) * 11);
+    }
+
+    /* Same tint/rainbow convention as .box-inspect-icon (boxes.js tintAttrs) - every cell in the strip is
+       coloured by its own rarity as it scrolls past, not just the winner. */
+    .box-open-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .box-open-icon.tinted { background-image: linear-gradient(var(--tint), var(--tint)); }
+
+    .box-open-icon.rainbow {
+      background-image: linear-gradient(90deg, rgba(255, 77, 77, 0.32), rgba(255, 168, 77, 0.32), rgba(255, 240, 77, 0.32), rgba(91, 255, 110, 0.32),
+        rgba(77, 210, 255, 0.32), rgba(106, 107, 255, 0.32), rgba(193, 77, 255, 0.32), rgba(255, 77, 77, 0.32));
+      background-size: 200% 100%;
+      animation: rarity-wave 2.4s linear infinite, buff-card-shine 1.7s ease-in-out infinite;
+    }
+
+    .box-open-icon img {
+      width: 78%;
+      height: 78%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      pointer-events: none;
+    }
+
+    /* Only the winning cell gets this, added once the reel actually stops (runReel) - a pulsing glow on top of
+       its already-tinted background, in that same rarity's colour (legendary gets the shared white shine instead,
+       since its "colour" is the travelling rainbow, not one flat tint). */
+    .box-open-icon.landed.tinted { animation: rarity-wave 2.4s linear infinite, box-open-glow 0.9s ease-in-out infinite; }
+    .box-open-icon.landed.rainbow { animation: rarity-wave 2.4s linear infinite, buff-card-shine 1.7s ease-in-out infinite, box-open-glow-legendary 0.9s ease-in-out infinite; }
+
+    @keyframes box-open-glow {
+      0%, 100% { box-shadow: 0 0 6px var(--tint); }
+      50% { box-shadow: 0 0 30px var(--tint), 0 0 46px var(--tint); }
+    }
+
+    @keyframes box-open-glow-legendary {
+      0%, 100% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.55); }
+      50% { box-shadow: 0 0 36px rgba(255, 255, 255, 0.95); }
+    }
+
+    #box-open-result {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: calc(var(--u) * 0.4);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #box-open-result.show { opacity: 1; }
+
+    #box-open-rarity,
+    #box-open-caption {
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+        0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
+    }
+
+    #box-open-rarity { font-size: calc(var(--u) * 1.1); }
+
+    #box-open-name {
+      display: block;
+      color: #f4ead0;
+      font-family: "Press Start 2P", monospace;
+      font-size: calc(var(--u) * 1.6);
+      text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6);
+    }
+
+    #box-open-caption {
+      font-size: calc(var(--u) * 1.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    #box-open-caption.show { opacity: 1; }
 
     .shop-grid {
       flex: 1;
@@ -2000,6 +2166,13 @@
     <div id="boxes-hint">HOLD to INSPECT</div>
     <div id="boxes-inspect"><div id="boxes-inspect-grid"></div><div id="boxes-inspect-caption">TAP to INSPECT</div></div>
     <div id="boxes-inspect-item"><div id="boxes-inspect-item-card"></div></div>
+    <!-- Case-opening popup (2026-09-27, CS:GO-style reel) - boxes.js runReel scrolls #box-open-reel under the
+         fixed #box-open-marker, then reveals the prize's rarity/name here. -->
+    <div id="box-open">
+      <div id="box-open-window"><div id="box-open-marker"></div><div id="box-open-reel"></div></div>
+      <div id="box-open-result"><span id="box-open-rarity"></span><span id="box-open-name"></span></div>
+      <div id="box-open-caption">TAP to CONTINUE</div>
+    </div>
     <div id="board-inspect"><div id="board-inspect-card"></div></div>
     <div id="shop-backdrop"></div>
     <div id="shop-panel">
@@ -2046,7 +2219,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=308"></script>
+  <script src="src/version.js?v=309"></script>
   <script src="src/economy.js?v=46"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2078,7 +2251,7 @@
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
   <script src="src/shop.js?v=42"></script>
-  <script src="src/boxes.js?v=7"></script>
+  <script src="src/boxes.js?v=8"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=25"></script>
   <script src="src/collection.js?v=82"></script>
@@ -2089,7 +2262,7 @@
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["boxes-board", "boxes-items", "boxes-hint", "boxes-inspect", "boxes-inspect-item", "boxes-btn", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["boxes-board", "boxes-items", "boxes-hint", "boxes-inspect", "boxes-inspect-item", "box-open", "boxes-btn", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

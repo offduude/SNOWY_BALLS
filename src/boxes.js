@@ -21,6 +21,13 @@ const Boxes = (() => {
   let inspectGridEl = null;
   let itemEl = null; // #boxes-inspect-item (one item's own card, on top of the odds grid)
   let itemCardEl = null;
+  let openEl = null; // #box-open (the case-opening popup)
+  let windowEl = null; // #box-open-window (the reel's fixed viewport)
+  let reelEl = null; // #box-open-reel (the scrolling strip)
+  let resultEl = null; // #box-open-result (rarity + name, shown once landed)
+  let rarityEl = null;
+  let nameEl = null;
+  let captionEl = null; // #box-open-caption ("TAP to CONTINUE")
 
   const KINDS = ["character", "scenery", "weather"];
   const KIND_LIST = { character: "characters", scenery: "sceneries", weather: "weathers" };
@@ -110,26 +117,16 @@ const Boxes = (() => {
       .sort((a, b) => Rarity.rank(a.item.rarity) - Rarity.rank(b.item.rarity));
   }
 
-  // Per-kind animation state: "shaking" while a purchase is resolving (bought, drawing), then the won item
-  // shows in its place for a moment before the box reverts to its normal look. Both are transient (never saved)
-  // - a reload mid-animation just shows the box normally, nothing is lost (the coins were already spent and the
-  // skin already added the moment the reveal is decided, not when its display times out).
+  // Per-kind animation state: "shaking" is just the quick can't-afford nudge. A real purchase instead opens the
+  // full-screen case-opening popup below (currentKind) - the box button itself goes straight back to its normal
+  // look, since the popup covers the whole screen anyway. Neither is saved - a reload mid-popup just shows the
+  // box normally, nothing is lost (the coins were already spent and the skin already added the moment the draw
+  // is decided, not when the popup finishes).
   let shaking = {};
-  let reveal = {}; // kind -> { item }
 
   function boxCardHtml(kind) {
     const def = boxDef(kind);
     if (!def) return `<div class="box-btn box-soon"><span class="box-name">(TBD)</span></div>`;
-    if (reveal[kind]) {
-      const it = reveal[kind].item;
-      return (
-        `<div class="box-btn box-reveal${Rarity.cardClass(it.rarity)}" data-kind="${esc(kind)}" style="background:${KIND_COLOR[kind]}">` +
-        Rarity.labelHtml(it.rarity, "box-reveal-rarity", true) +
-        `<span class="box-pic">${it.image ? `<img src="${esc(it.image)}" alt="" draggable="false" />` : ""}</span>` +
-        `<span class="box-name">${esc(it.name)}</span>` +
-        `</div>`
-      );
-    }
     const afford = Economy.getCoins() >= def.price;
     return (
       `<button class="box-btn${afford ? "" : " cant"}${shaking[kind] ? " shake" : ""}" data-kind="${esc(kind)}" type="button" style="background:${KIND_COLOR[kind]}">` +
@@ -146,11 +143,8 @@ const Boxes = (() => {
     root.innerHTML = `<div class="shop-grid">${KINDS.map(boxCardHtml).join("")}${soon}${soon}${soon}</div>`;
   }
 
-  const SHAKE_MS = 500; // matches .shop-card.shake's own 0.3s animation with a little room to read as "something's happening"
-  const REVEAL_MS = 1800; // how long the won item's card stays up before the box resets
-
   function openBox(kind) {
-    if (shaking[kind] || reveal[kind]) return; // already mid-animation: ignore a second tap
+    if (shaking[kind] || currentKind) return; // already mid-animation: ignore a second tap
     const def = boxDef(kind);
     if (!def) return;
     if (!Economy.spendCoins(def.price)) {
@@ -167,18 +161,109 @@ const Boxes = (() => {
       Economy.addCoins(def.price); // refund: this kind's pool is empty (shouldn't happen with real content)
       return;
     }
-    shaking[kind] = true;
+    Economy.addSkin(kind, item.id, 1); // granted the instant the draw is decided, not when the popup finishes
+    currentKind = kind;
+    runReel(kind, item);
+  }
+
+  // ---------- CASE-OPENING POPUP (2026-09-27, CS:GO-style reel) ----------
+  // The prize was already decided in openBox above - this is pure presentation. A long horizontal strip is built
+  // out of random filler items (drawn the exact same weighted way as the real prize, just never granted - draw()
+  // has no side effects, so calling it purely for looks is free) with the one real prize placed near the end,
+  // then the strip is scrolled left under a fixed centre marker with a decelerating ease (easeOutQuint) so it
+  // settles on the prize. Ticks fire exactly when a cell's centre crosses the marker - computed from the strip's
+  // own actual on-screen position each frame, not a guessed timer, so they always match what's drawn even if a
+  // slow device drops frames. A small random offset inside the winning cell (bounded well short of a neighbour)
+  // keeps every reveal from framing dead-centre, the same trick real case-opening animations use.
+  const REEL_FILLER_COUNT = 34;
+  const REEL_WIN_INDEX = 28; // ~6 more cells after the prize, so the strip doesn't just stop dead at the end
+  const REEL_DURATION_MS = 4200;
+  let currentKind = null; // the kind whose popup is open, or null
+  let landed = false; // true once the reel has actually stopped - a tap only closes the popup once this is true
+
+  function easeOutQuint(x) {
+    return 1 - Math.pow(1 - x, 5);
+  }
+
+  function reelCellHtml(item, isWin) {
+    return (
+      `<div class="box-open-cell${isWin ? " win-cell" : ""}">` +
+      `<span class="box-open-icon${tintAttrs(item)}">` +
+      `<img src="${esc(item.image || "")}" alt="" draggable="false" />` +
+      `</span></div>`
+    );
+  }
+
+  function runReel(kind, item) {
+    const cellsHtml = [];
+    for (let i = 0; i < REEL_FILLER_COUNT; i++) {
+      cellsHtml.push(reelCellHtml(i === REEL_WIN_INDEX ? item : draw(kind) || item, i === REEL_WIN_INDEX));
+    }
+    reelEl.innerHTML = cellsHtml.join("");
+    reelEl.style.transition = "none";
+    reelEl.style.transform = "translateX(0)";
+    landed = false;
+    resultEl.classList.remove("show");
+    captionEl.classList.remove("show");
+    openEl.classList.add("show");
+
+    // Measure only after the popup is actually visible (.show is what gives #box-open-window its real size).
+    requestAnimationFrame(() => {
+      const winCellEl = reelEl.querySelector(".win-cell");
+      const winIcon = winCellEl.querySelector(".box-open-icon");
+      const windowW = windowEl.clientWidth;
+      const cellW = winCellEl.offsetWidth;
+      const jitter = (Math.random() - 0.5) * cellW * 0.5; // stays well inside the winning cell, never near a neighbour
+      const targetCenter = winCellEl.offsetLeft + cellW / 2 + jitter;
+      const distance = targetCenter - windowW / 2;
+      const crossPoints = Array.from(reelEl.querySelectorAll(".box-open-cell"))
+        .map((c) => c.offsetLeft + c.offsetWidth / 2 - windowW / 2)
+        .filter((p) => p > 0 && p <= distance);
+      let tickPtr = 0;
+      const start = performance.now();
+      function frame(now) {
+        const x = Math.min(1, (now - start) / REEL_DURATION_MS);
+        const travelled = distance * easeOutQuint(x);
+        reelEl.style.transform = `translateX(${-travelled}px)`;
+        while (tickPtr < crossPoints.length && crossPoints[tickPtr] <= travelled) {
+          tickSound();
+          tickPtr++;
+        }
+        if (x < 1) {
+          requestAnimationFrame(frame);
+          return;
+        }
+        landed = true;
+        winIcon.classList.add("landed");
+        rarityEl.innerHTML = Rarity.labelHtml(item.rarity, "", true);
+        nameEl.textContent = item.name;
+        resultEl.classList.add("show");
+        captionEl.classList.add("show");
+        revealSound(item.rarity);
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function tickSound() {
+    const game = window.snowyBallsGame;
+    if (game) game.sound.play("click", { volume: 0.16 });
+  }
+
+  function revealSound(rarityId) {
+    const game = window.snowyBallsGame;
+    if (!game) return;
+    // epic/legendary get the same "something good just happened" chime a shop restock uses; common/rare just a
+    // slightly louder confirmation click, so the flourish itself signals how good the pull was before you even read it.
+    if (rarityId === "epic" || rarityId === "legendary") game.sound.play("shop_restock", { volume: 0.7 });
+    else game.sound.play("click", { volume: 0.5 });
+  }
+
+  function closeReel() {
+    if (!landed || !currentKind) return; // still mid-spin: a tap doesn't skip it
+    openEl.classList.remove("show");
+    currentKind = null;
     render();
-    setTimeout(() => {
-      shaking[kind] = false;
-      Economy.addSkin(kind, item.id, 1); // granted the moment the draw is decided, not when the reveal times out
-      reveal[kind] = { item };
-      render();
-      setTimeout(() => {
-        delete reveal[kind];
-        render();
-      }, REVEAL_MS);
-    }, SHAKE_MS);
   }
 
   // ---------- HOLD to INSPECT (same convention as the old shop's hold-to-inspect) ----------
@@ -289,13 +374,23 @@ const Boxes = (() => {
       itemCardEl = document.getElementById("boxes-inspect-item-card");
       inspectEl.addEventListener("click", onInspectClick);
       itemEl.addEventListener("click", onItemClick);
-      [root, inspectEl].forEach((el) => el.addEventListener("contextmenu", (e) => e.preventDefault()));
+      openEl = document.getElementById("box-open");
+      windowEl = document.getElementById("box-open-window");
+      reelEl = document.getElementById("box-open-reel");
+      resultEl = document.getElementById("box-open-result");
+      rarityEl = document.getElementById("box-open-rarity");
+      nameEl = document.getElementById("box-open-name");
+      captionEl = document.getElementById("box-open-caption");
+      openEl.addEventListener("click", closeReel);
+      [root, inspectEl, openEl].forEach((el) => el.addEventListener("contextmenu", (e) => e.preventDefault()));
     },
     // Called every time the BOXES screen opens.
     onOpen() {
       if (!eco) return;
       shaking = {};
-      reveal = {};
+      currentKind = null;
+      landed = false;
+      if (openEl) openEl.classList.remove("show");
       closeInspect();
       render();
     },

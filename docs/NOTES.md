@@ -2925,3 +2925,65 @@ reads 40/40/15/4/1% (Sunny/Rain split the 80, then Banana Rain/Blizzard/Acid Rai
 both the new odds and the new sort order together. No equip/coin state was changed this round (inspect-only
 testing), so nothing needed restoring.
 - `economy.json`, `src/boxes.js`, `index.html`.
+
+## Case-opening popup: CS:GO-style reel (2026-09-27)
+
+Opening a box used to just shake the button, then swap its face for the won item's picture for 1.8s
+(`shaking`/`reveal` state in `boxes.js`, `SHAKE_MS`/`REVEAL_MS`). Replaced with a full-screen popup
+(`#box-open`) the owner asked for by name ("inspire yourself with the counter strike series' case
+opening animation"): a horizontal strip of item icons scrolls left under a fixed centre marker and
+decelerates to a stop on the real prize, same shape as a CS:GO/Rust-style case opening.
+
+**How the strip is built (`boxes.js` `runReel`):** the prize was already decided and granted the instant
+coins were spent (`openBox` - unchanged principle, just no longer paired with a same-tick shake). The
+strip itself is 34 cells of pure filler - each one a real weighted `draw(kind)` call, just never granted,
+since `draw()` has no side effects - with the actual prize dropped in at a fixed index (28), leaving a
+few more cells of "runway" after it so the strip doesn't visibly dead-end.
+
+**How it lands exactly on the prize:** measured from the real DOM after the popup is shown (so it works
+at any screen size, not just one assumed layout) - `winCellEl.offsetLeft + offsetWidth/2` plus a small
+random jitter (bounded to half a cell width, so it can never drift into a neighbour) gives the target
+point; the distance from there to the window's own centre is how far the strip has to travel. A small
+random jitter keeps every reveal from framing dead-centre, the same trick real case openings use.
+
+**How the ticks stay in sync:** rather than a CSS transition (which can't tell you where it currently is
+mid-flight) the scroll is driven by a `requestAnimationFrame` loop applying `easeOutQuint` by hand each
+frame - fast at first, slowing hard near the end, which alone gives the "rapid-fire ticks slowing down"
+feel with no extra tuning. Every cell's own "crossing point" (where its centre passes the fixed marker)
+is precomputed once; the loop just watches how far the strip has actually travelled each frame and fires
+a tick (`click` sound, quiet) the moment it passes each crossing point in turn - so ticks always match
+what's on screen exactly, even on a slow device that drops frames, instead of drifting out of sync the
+way a fixed-interval timer would.
+
+**Landing:** the winning icon gets a `.landed` class - a pulsing glow keyframe in that item's own rarity
+tint (`box-open-glow`), or the shared white pulse (`box-open-glow-legendary`) for the rainbow rarity,
+reusing the exact same tint/rainbow convention `tintAttrs` already gave every cell in the strip. Rarity
+label + item name fade in below the window, then a "TAP to CONTINUE" caption - tapping only closes the
+popup once `landed` is true, so an impatient tap mid-spin can't skip the animation. `shop_restock` (the
+same chime a shop restock uses) plays for epic/legendary; a plain confirmation click for common/rare, so
+the sound alone signals how good the pull was.
+
+Removed as dead weight: `SHAKE_MS`/`REVEAL_MS`/the `reveal` state map, the `.box-reveal-rarity` CSS and
+the button-swaps-to-show-the-prize markup branch in `boxCardHtml` - the box button itself now always
+just shows the closed box, since the popup covers the whole screen anyway.
+
+Version bump: `src/boxes.js?v=7 -> 8`.
+
+**Odds integrity, flagged not fixed:** the owner also asked to note that box odds "cannot be anyhow
+manipulated" - right now they very much can be: `boxOdds` and the whole draw live in `economy.json` and
+`boxes.js`, both loaded straight to the client, so anyone with devtools can edit either and guarantee a
+legendary. Recorded as `_boxOddsSecurityNote` in `economy.json` rather than silently living only in this
+file - the real fix is a server-side draw (a Cloud Function holding the odds + RNG, client only requests
+a result), which is exactly what the already-planned Blaze/Firebase economy migration is for. Deliberately
+did NOT bolt on a partial client-side deterrent here (obfuscation, checksums, etc.) - it would give a
+false sense of security and just be thrown away once the real migration happens.
+
+Verified live (test origin): fresh tab, no console errors. Opened a Character Box (250 coins) - reel
+scrolled, ticked, landed exactly on the item under the marker (Black Andek, common, blue glow), name/
+rarity/caption faded in, tap-to-continue closed back to the normal box grid. Opened a Weather Box the same
+way - landed on Banana Rain (rare, orange glow), tint visibly differed per cell by rarity mid-scroll.
+Hold-to-inspect (untouched code path) still works on top of this - held the Scenery Box afterwards and got
+the same correct 40/40/15/4/1% breakdown as before. Refunded the 500 coins spent testing (5072 -> 4572 ->
+back to 5072); did not touch equipped scenery/weather (space/acid_rain), which were already set from
+outside this session and were never mine to change.
+- `economy.json`, `src/boxes.js`, `index.html`.

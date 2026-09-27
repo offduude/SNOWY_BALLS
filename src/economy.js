@@ -52,9 +52,8 @@ const Economy = (() => {
         stock: null, // array of item ids currently on sale, one per slot; null = not generated yet
         owned: [], // ids of permanent items bought
         consumables: {}, // id -> how many bought and not yet used
-        restock: [], // per slot: null, or { at: ms timestamp (device clock) the slot restocks, prev: id sold there }
-        expires: [], // per slot: null (sold out), or the timestamp (device clock) at which the item on sale there runs out and the slot REROLLS
-        unseen: false, // a slot restocked while the shop was closed and the player has not looked yet (SHOP button dot)
+        nextRerollAt: null, // ms timestamp (SHOP clock, see shopNow) at which every slot rerolls together, bought or not (see shop.js) - null = not generated yet
+        unseen: false, // the shop rerolled while closed and the player has not looked yet (SHOP button dot)
       },
     };
   }
@@ -186,8 +185,10 @@ const Economy = (() => {
         offers: Array.isArray(shop.offers) ? shop.offers : [],
         owned: Array.isArray(shop.owned) ? shop.owned.map(rn) : [],
         consumables: shop.consumables && typeof shop.consumables === "object" ? rnCounts(shop.consumables) : {},
-        restock: Array.isArray(shop.restock) ? shop.restock.map((t) => (t && typeof t === "object" ? { ...t, prev: rn(t.prev) } : t)) : [],
-        expires: Array.isArray(shop.expires) ? shop.expires.map((x) => (typeof x === "number" ? x : null)) : [],
+        // An old save (from before the 2026-09-27 global-reroll redesign) has no nextRerollAt - null carries
+        // over, which shop.js's isDue() reads as "generate a fresh reroll right away" (its stock/offers above are
+        // stale relative to the new model anyway, so that immediate reroll overwrites them within the same tick).
+        nextRerollAt: typeof shop.nextRerollAt === "number" ? shop.nextRerollAt : null,
         unseen: shop.unseen === true,
       },
     };

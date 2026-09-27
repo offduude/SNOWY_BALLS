@@ -249,12 +249,12 @@ const Collection = (() => {
 
   // ---- The SHOP's list row (shop.js): every projectile/buff, whether or not it's currently in the roll (item.category
   // is only ever "projectile" or "consumable" - skins left the shop's pool entirely, 2026-09-27). `action` is the BUY
-  // button; `availText`, when given, is the "available: MM:SS" countdown shown under it for an item currently on
-  // sale; `extraClass` marks a row that isn't currently in stock so it can be greyed out (shop.js's own job - this
-  // just carries the class through). A stack shows how many are on sale (x14) where the owned list shows how many
-  // the player HAS instead.
-  function shopRowHtml(item, { offer, action, extraClass, availText } = {}) {
-    const avail = availText ? `<div class="shop-avail-row">${esc(availText)}</div>` : "";
+  // button (or a plain "NOT IN STOCK" label - shop.js's own job to decide which); `amountText`, when given, is a
+  // stack's "x14" for the CURRENT offer, shown under the button in the spot the old (now-removed) availability
+  // countdown used to have; `extraClass` marks a row that isn't currently in stock so it can be greyed out. A stack
+  // shows how many are ON SALE right now where the owned list shows how many the player HAS instead.
+  function shopRowHtml(item, { offer, action, extraClass, amountText } = {}) {
+    const amount = amountText ? `<div class="shop-avail-row">${esc(amountText)}</div>` : "";
     if (item.category === "projectile") {
       const cat = CATALOG.projectile.items.find((i) => i.id === item.id) || { id: item.id, name: item.name, description: item.description, image: item.image };
       const stats = statsHtml("projectile", cat);
@@ -263,8 +263,8 @@ const Collection = (() => {
         `<div class="pick-row shop-row${stats ? " has-stats" : ""}${extraClass || ""}${Rarity.cardClass(p && p.rarity)}" data-id="${esc(item.id)}">` +
         `<img class="pick-pic" src="${esc(cat.image || "")}" alt="" draggable="false" />` +
         `<div class="pick-text"><div class="pick-name">${esc(cat.name)}</div><div class="pick-desc">${esc(cat.description || "")}</div></div>` +
-        `<div class="pick-action">${action}${avail}</div>` +
-        cornerHtml(p && p.rarity, offer && offer.amount ? `x${offer.amount}` : "") +
+        `<div class="pick-action">${action}${amount}</div>` +
+        cornerHtml(p && p.rarity, "") + // the amount used to sit here too (redundant with the one under the button now) - just the rarity label
         stats +
         `</div>`
       );
@@ -277,7 +277,7 @@ const Collection = (() => {
       `<div class="pick-row shop-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}${Rarity.cardClass(Rarity.ofItem(item))}" data-id="${esc(item.id)}">` +
       `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div><div class="pick-desc">${esc(item.description || "")}</div></div>` +
-      `<div class="pick-action">${action}${avail}<div class="pick-regen"><span>${maxText}</span></div></div>` +
+      `<div class="pick-action">${action}${amount}<div class="pick-regen"><span>${maxText}</span></div></div>` +
       detail +
       cornerHtml(Rarity.ofItem(item), "") +
       `</div>`

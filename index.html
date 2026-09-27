@@ -247,10 +247,11 @@
     /* The SHOP tab (2026-09-27): a plain scrollable list of every projectile/buff (Collection.shopRowHtml rows),
        greyed out when not currently in the roll, instead of the old 3x2 grid of rolled slots - so a row already
        shows the full description, and there's no separate hold-to-inspect popup any more. Styled distinctly from
-       #list-panel (a warm cream instead of solid brown) so it doesn't read as just another collection menu. */
+       #list-panel (a warm cream instead of solid brown) so it doesn't read as just another collection menu.
+       Centered on screen (not offset by a side column any more - PROJECTILES/BUFFS moved inside the panel as
+       tabs, see #shop-tabs) with its own header row carrying the reroll countdown, per the owner's redesign ask. */
     #shop-backdrop,
-    #shop-panel,
-    #shop-cats {
+    #shop-panel {
       position: absolute;
       opacity: 0;
       pointer-events: none;
@@ -264,10 +265,10 @@
     }
 
     #shop-panel {
-      left: 15%;
-      top: 12%;
-      width: 56%;
-      height: 76%;
+      left: 20%;
+      top: 10%;
+      width: 60%;
+      height: 80%;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
@@ -280,35 +281,66 @@
       z-index: 4;
     }
 
-    #shop-cats {
-      left: 73%;
-      top: 12%;
-      width: 17%;
-      height: 76%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: calc(var(--u) * 1.6);
-      z-index: 4;
-    }
-
     #game-container.shop-open #shop-backdrop,
-    #game-container.shop-open #shop-panel,
-    #game-container.shop-open #shop-cats {
+    #game-container.shop-open #shop-panel {
       opacity: 1;
       pointer-events: auto;
     }
 
     /* The gold header bar (vs #list-title's plain brown) is the shop's own visual signature - the coin price
-       buttons throughout the list carry the same gold. */
-    #shop-title {
+       buttons throughout the list carry the same gold. The reroll countdown sits at its top-right (the owner's
+       ask) - see shop.js updateTimerText. */
+    #shop-header {
       flex: none;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      position: relative;
       padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6);
       background: #d9a441;
       border-bottom: 2px solid #7a5230;
       color: #3b2412;
+    }
+
+    #shop-title {
       font-size: calc(var(--u) * 1.5);
-      text-align: center;
+    }
+
+    #shop-timer {
+      position: absolute;
+      right: calc(var(--u) * 1.6);
+      font-size: calc(var(--u) * 0.95);
+      color: #5a3d1c;
+    }
+
+    /* PROJECTILES / BUFFS, moved inside the panel as a segmented control under the header (redesigned 2026-09-27
+       - used to be two separate buttons floating beside the list). Centers the whole panel as one unit instead of
+       needing room for a side column. */
+    #shop-tabs {
+      flex: none;
+      display: flex;
+      border-bottom: 2px solid #7a5230;
+    }
+
+    .shop-tab {
+      flex: 1;
+      padding: calc(var(--u) * 1) 0;
+      background: #8b5a2b;
+      border: none;
+      border-right: 2px solid #7a5230;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: calc(var(--u) * 1);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .shop-tab:last-child {
+      border-right: none;
+    }
+
+    .shop-tab.active {
+      background: #74491f;
     }
 
     #shop-scroll {
@@ -330,45 +362,30 @@
       display: none;
     }
 
-    /* A row for an item not currently in the roll: no valid rolled price to show (see shop.js price()), so its
-       button shows the cheapest it COULD roll for ("from") and can't be clicked. */
+    /* Available/unaffordable vs. unavailable are now unmistakably different looks (the owner's ask, 2026-09-27):
+       an unaffordable row is still fully in stock, just too pricey right now (red price, muted button); an
+       unavailable one is greyscale AND dimmed, with no price at all - there's nothing to buy until the next
+       reroll (see shop.js rowHtml). */
     .shop-row.unavailable {
-      opacity: 0.55;
+      opacity: 0.5;
+      filter: grayscale(0.85);
     }
 
-    .shop-row.unavailable .pick-equip {
-      pointer-events: none;
+    .shop-not-in-stock {
+      display: inline-block;
+      padding: calc(var(--u) * 0.5) calc(var(--u) * 0.9);
+      color: #7a5230;
+      font-size: calc(var(--u) * 0.95);
+      letter-spacing: 0.05em;
     }
 
-    .shop-from {
-      font-size: calc(var(--u) * 0.85);
-    }
-
-    /* "available: MM:SS" under the BUY button for a row currently in stock - the list's equivalent of the old
-       grid card's countdown over its picture. */
+    /* "xN" under the BUY button for a stack currently on sale - replaces the old (removed 2026-09-27) per-item
+       availability countdown in that same spot. */
     .shop-avail-row {
       font-size: calc(var(--u) * 0.85);
       color: #8a6a44;
       text-align: center;
       margin-top: calc(var(--u) * 0.3);
-    }
-
-    .shop-cat-btn {
-      width: 100%;
-      height: 32px;
-      padding: 0;
-      background: #8b5a2b;
-      border: 2px solid #4a2f14;
-      border-radius: 4px;
-      color: #ffffff;
-      font-family: "Press Start 2P", monospace;
-      font-size: 8px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .shop-cat-btn.active {
-      background: #74491f;
     }
 
     /* The buy button: the coin and the price (wider than EQUIP when the price needs it). */
@@ -393,7 +410,10 @@
       box-sizing: border-box;
     }
 
-    .pick-equip.shop-buy.cant { opacity: 0.7; }
+    /* Unaffordable (in stock, too expensive right now): the price itself turns red, same convention the old
+       shop grid used (.shop-card.cant .shop-price), not just a dimmer button. */
+    .pick-equip.shop-buy.cant { opacity: 0.8; }
+    .pick-equip.shop-buy.cant span { color: #a3261c; }
     .pick-equip.shop-buy.shake { animation: shop-shake 0.3s linear; }
 
     /* A held-down picture must not open the browser's image menu (save / share): the pictures take no touches at all, nothing is selectable or draggable. */
@@ -885,6 +905,15 @@
       gap: calc(var(--u) * 0.5);
       pointer-events: none;
       z-index: 2;
+      transition: opacity 0.2s ease;
+    }
+
+    /* All in-game HUD hides behind the SHOP/BOXES panels while either is open (the owner's ask, 2026-09-27 -
+       "all the other buttons disappear behind it"): buff cards and the ammo count (#ammo-box, further down)
+       were the two left showing through, everything else already had its own hide-while-open rule. */
+    #game-container.shop-open #buff-hud,
+    #game-container.boxes-open #buff-hud {
+      opacity: 0;
     }
 
     .buff-card {
@@ -1021,7 +1050,13 @@
       z-index: 2;
     }
 
-    #ammo-box { top: 44px; } /* 10px margin + 28px buttons + 6px gap */
+    #ammo-box { top: 44px; transition: opacity 0.2s ease; } /* 10px margin + 28px buttons + 6px gap */
+
+    #game-container.shop-open #ammo-box,
+    #game-container.boxes-open #ammo-box {
+      opacity: 0;
+      pointer-events: none;
+    }
 
     /* The counter's background reflects the equipped projectile's rarity (main.js tintAmmoBox): its colour over the brown (--tint), or for a LEGENDARY one
        the travelling rainbow with a glow that pulses (the same waves as the buff cards). */
@@ -1684,12 +1719,12 @@
     <div id="board-inspect"><div id="board-inspect-card"></div></div>
     <div id="shop-backdrop"></div>
     <div id="shop-panel">
-      <div id="shop-title">SHOP</div>
+      <div id="shop-header"><span id="shop-title">SHOP</span><span id="shop-timer"></span></div>
+      <div id="shop-tabs">
+        <button id="shop-cat-projectile" class="shop-tab active" type="button" data-cat="projectile">PROJECTILES</button>
+        <button id="shop-cat-buff" class="shop-tab" type="button" data-cat="buff">BUFFS</button>
+      </div>
       <div id="shop-scroll"></div>
-    </div>
-    <div id="shop-cats">
-      <button id="shop-cat-projectile" class="shop-cat-btn active" type="button" data-cat="projectile">PROJECTILES</button>
-      <button id="shop-cat-buff" class="shop-cat-btn" type="button" data-cat="buff">BUFFS</button>
     </div>
     <div id="list-backdrop"></div>
     <div id="list-panel">
@@ -1726,8 +1761,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=296"></script>
-  <script src="src/economy.js?v=44"></script>
+  <script src="src/version.js?v=297"></script>
+  <script src="src/economy.js?v=45"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -1757,19 +1792,19 @@
   <script src="src/cloud.js?v=26"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
-  <script src="src/shop.js?v=36"></script>
+  <script src="src/shop.js?v=37"></script>
   <script src="src/boxes.js?v=1"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=24"></script>
-  <script src="src/collection.js?v=78"></script>
-  <script src="src/main.js?v=189"></script>
+  <script src="src/collection.js?v=79"></script>
+  <script src="src/main.js?v=190"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["boxes-board", "boxes-items", "boxes-btn", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["boxes-board", "boxes-items", "boxes-btn", "shop-panel", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

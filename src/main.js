@@ -2733,7 +2733,7 @@ class MainScene extends Phaser.Scene {
 
   // The chance per throw that an event of this RARITY starts by itself, so that on average it takes as many throws as it takes to see an item
   // of that rarity in the shop (see events._rarityNote in economy.json): 1 / (meanShopHours x throwsPerHour), where meanShopHours = 1 / (the
-  // rarity's share of the shop's rarity roll x slots x 3600 / availabilitySeconds). 0 if the rarity cannot come up in the shop.
+  // rarity's share of the shop's rarity roll x slots x 3600 / shop.rerollSeconds). 0 if the rarity cannot come up in the shop.
   eventRarityChance(rarityId) {
     const ev = this.eco.events || {};
     if (ev.rarityChances && typeof ev.rarityChances[rarityId] === "number") return ev.rarityChances[rarityId];
@@ -2742,7 +2742,7 @@ class MainScene extends Phaser.Scene {
     const total = rarities.filter((r) => r.chance > 0 && has.has(r.id)).reduce((a, r) => a + r.chance, 0);
     const r = rarities.find((x) => x.id === rarityId);
     if (!r || !(r.chance > 0) || !has.has(rarityId) || total <= 0) return 0;
-    const rollsPerHour = (this.eco.shop.slots * 3600) / (r.availabilitySeconds || 1800);
+    const rollsPerHour = (this.eco.shop.slots * 3600) / (this.eco.shop.rerollSeconds || 1800);
     const meanShopHours = 1 / ((r.chance / total) * rollsPerHour);
     return 1 / (meanShopHours * this.throwsPerHour());
   }

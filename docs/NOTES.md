@@ -2404,3 +2404,68 @@ every draw is a real reward, new or a top-up.
   unaffordable (red price) and a tap does nothing (no coins spent, no shake-then-buy).
 - `economy.json` gains a `boxes` array (3 entries) and a `_boxesNote`. `src/main.js?v=189` (added
   `Boxes.init(this.eco)` alongside `Shop.init`), `src/boxes.js?v=1` (new file).
+
+## SHOP polish pass: global reroll, sorting, centered layout, clearer states (2026-09-27)
+
+**Asked directly**, a batch of ten: (1) sort the list by rarity ascending, common at the top; (2) a reroll
+countdown in the header's top-right; (3) center the list, redesign the side buttons; (4) hide every other button
+behind the shop while it's open; (5) fix legendary cards "flashing colours in a weird way"; (7) show the stack's
+x-amount where the availability timer used to be; (8) remove the per-item timer entirely - reroll everything
+every 30 minutes regardless of purchases; (9) make available/unavailable and affordable/unaffordable clearly
+different looks; (10) clicking outside the shop closes it. (6, the price-range question, is its own thing - see
+below.)
+
+- **Global reroll, replacing the whole per-item-timer system** (8): `economy.json shop.restockSeconds` becomes
+  `shop.rerollSeconds` (still 1800 = 30 min); `rarities[].availabilitySeconds` is gone (every rarity had the same
+  value anyway, so nothing about the event-spawn-chance math in `main.js eventRarityChance` actually changes -
+  just reads `shop.rerollSeconds` now instead of a per-rarity field, see its updated comment). `Economy`'s saved
+  shop state drops `restock`/`expires` (per-slot timers) for one `nextRerollAt` timestamp. `shop.js` loses
+  `ensureStock`/`rollFrom`/`availMs`/`restockMs` entirely (~120 lines) - `rerollAll()` (already existed, for the
+  Toy Tank event) is now ALSO the thing a plain 30-minute cadence calls, and a bought-out slot just stays empty
+  until that next reroll, no independent per-slot countdown any more. An old save with no `nextRerollAt` (i.e.
+  every save from before this) is read as "due right now" and gets a fresh reroll on its very next load - its
+  stale `stock`/`offers` from the old model are simply overwritten within that same tick.
+- **The header countdown** (2): `#shop-timer`, top-right of `#shop-header`, ticks down to `nextRerollAt` every
+  second via a plain `textContent` update (`shop.js updateTimerText`) - NOT a full list re-render.
+- **Fixed the legendary flashing** (5): root cause was `tick()` calling the list's full `render()` every single
+  second (to keep the old per-item countdowns live) - replacing a `.pick-row`'s DOM node restarts its CSS
+  animation from frame 0, so the legendary rainbow-wave/shine restarted every ~1000ms, which doesn't divide
+  evenly into its own 2.4s/1.7s cycles - a visible strobe, not a smooth wave. Now that there's no per-item timer
+  to keep live (see above), the list only re-renders on an actual change (open, category switch, buy, a real
+  reroll) - confirmed via a `MutationObserver` on `#shop-scroll`: zero DOM mutations over 4 idle seconds with the
+  shop open, where the old code would have shown one every second.
+- **Sorting** (1): `categoryItems()` sorts ascending by `Rarity.rank` - common at the top, legendary at the
+  bottom (verified: Blue Skyr/Water Bottle/Snowy Cube/Salt Triangles - all common - ahead of Orange Skyr/Kaiser
+  Roll, both rare, in the BUFFS tab).
+- **Centered layout, tabs instead of side buttons** (3): `#shop-cats` (two buttons floating beside the list) is
+  gone - PROJECTILES/BUFFS are now `#shop-tabs`, a segmented control INSIDE `#shop-panel` under the header. With
+  no side column to make room for, the panel itself is centered (`left:20%; width:60%`).
+- **Hiding everything else** (4): `#ammo-box` and `#buff-hud` were the two pieces of in-game HUD that stayed
+  visible/interactive over the shop (everything else - side buttons, LEADERBOARD, BUFFS, the list panel - already
+  had its own hide-while-`shop-open` rule) - both now fade out under `.shop-open`/`.boxes-open` too.
+- **x-amount instead of a timer** (7): the "available: MM:SS" line under the BUY button is gone; a stack's
+  current offer amount ("x14") shows there instead (`amountText` in `Collection.shopRowHtml`, was `availText`).
+  The rarity corner no longer ALSO shows that amount (it used to, redundantly) - just the rarity label now.
+- **Clearer available/afford states** (9): unavailable rows are now grayscale + dimmed (`filter: grayscale(0.85)`,
+  not just lower opacity) with a plain "NOT IN STOCK" label and no price at all - there's nothing to preview any
+  more now that unavailable just means "wait for the next reroll", not "here's roughly what it'll cost". A row
+  still in stock but too expensive keeps its real button, just with the price text itself turned red (matching
+  the old grid's convention) instead of only a dimmer button - available-but-unaffordable now reads clearly
+  differently from genuinely-unavailable.
+- **Click-outside-to-close** (10): `#shop-backdrop`'s click just re-clicks `#shop-btn`, so it goes through the
+  exact same open/close/onOpen logic a real BACK tap does - not a separate close path to keep in sync.
+- Verified live (test origin): fresh tab, no console errors. Forced Drone (legendary) into stock to confirm its
+  card renders correctly (rainbow shine, real price, "x1" amount) and stays static while idle; bought it
+  (20100 -> 15100 coins, `getProjectileCount("drone")` -> 1), confirmed its row immediately reads "NOT IN STOCK"
+  and grayscale (no independent restock timer any more - it just waits for the next global reroll); clicked
+  well outside the panel (inside the game canvas, not the screenshot's letterboxed black bars) and confirmed the
+  shop closed.
+- `economy.json`, `src/economy.js?v=45`, `src/shop.js?v=37`, `src/collection.js?v=79`, `src/main.js?v=190`.
+
+## Price ranges: reminder pending a decision (2026-09-27)
+
+**Asked directly**: *"i want you to remind me price ranges and we'll decide if we're keeping the average or the
+highest point, because i want to remove the ranges and make each item have a singular price (still affected by
+quantity of course price*amount)."* Presented the full price-range table (20 buffs' `priceRange`, 10 projectiles'
+`unitPrice`) back to the owner in chat for this decision - not resolved yet as of this entry. `amount` ranges
+(projectile stack sizes) are NOT part of this - those stay randomized regardless of what's decided for price.

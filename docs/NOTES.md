@@ -2665,6 +2665,7 @@ moves to the header's top-LEFT, vertically centred, bigger text.
   Frosty Night's picture and confirmed no quantity line on its card; reopened SHOP fresh and confirmed no
   leftover double-panel state from earlier ad hoc testing (a `.click()` on a hidden button bypasses
   pointer-events, which a real tap never would - not a reachable bug).
+- `src/shop.js?v=41`, `src/boxes.js?v=5`, `src/collection.js?v=82`, `index.html`.
 
 ## Shop economy: 5-minute reroll, unlimited stock via independent per-category rolls (2026-09-27)
 
@@ -2732,4 +2733,23 @@ to contain all 5 guaranteed ids after every forced reroll; 500 forced rerolls sh
 varying 7-9 (never a fixed 6); a live purchase (Chestnut, clicked through the real UI) still spent
 exactly 12 coins and granted 1 chestnut, same as before the rewrite - then reverted via
 `Economy.useProjectile`/`Economy.addCoins` to leave the test save as found, per standing practice.
-- `src/shop.js?v=41`, `src/boxes.js?v=5`, `src/collection.js?v=82`, `index.html`.
+
+**Same-day follow-up: Potato joins the guaranteed list, Toy Tank re-tiered.** Asked "what's the
+chance to get the drone each reroll" - answered 1.99% (`1 - (1 - 0.01)^2`, drone being the only
+legendary projectile drawn against a 1% rarity chance over 2 attempts) - then asked for a fair
+rarity/price estimate for Toy Tank. Its only effect is `triggerEvent: tank` (forces an immediate
+shop reroll) - no payout of its own, unlike every other legendary buff. Its value is purely "skip
+the wait for a fresh reroll," and that wait just shrank 6x (30min -> 5min) in the change above, so
+its old legendary price (900) is now ~6x too high for what it delivers - and keeping it legendary
+meant 1/5 of the "~1 legendary buff/day" budget was being spent on the least exciting item in that
+tier instead of an actual jackpot. **Estimate: rare, 150** (900 / 6, rounded) - implemented as
+`toy_tank.rarity: "legendary" -> "rare"`, `price: 900 -> 150` in `economy.json` (with an inline
+`_rebalanceNote` explaining why, next to the item). Also added `"potato"` to
+`shop.guaranteedIds` (now always in stock alongside chestnut/stone), per direct request - no other
+code changes needed, `guaranteedIds` was already a plain array `rerollAll()`/`eligible()` read from.
+
+Verified live (test origin): 300 forced rerolls via `Shop.rerollAll()` never once dropped chestnut,
+potato, or stone from stock; Toy Tank now sorts among the RARE items (between Cheese Triangles and
+Mints) and shows a real `150` coin buy button when in stock, appearing at ~14% per reroll (rare-tier
+rate, consistent with 5 rare buffs now sharing that 30% pool instead of 4); no console errors.
+- `economy.json`.

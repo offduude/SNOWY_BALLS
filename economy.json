@@ -200,7 +200,7 @@
 
   "shop": {
     "_guaranteedIdsNote": "These ids are ALWAYS in stock, every reroll, forever - they never enter the RNG pool at all (2026-09-27, the owner's 'grow a garden' ask, replacing the old fixed-6-slots model). Everything else rolls independently per category, see rollsPerCategory below.",
-    "guaranteedIds": ["chestnut", "stone", "skyr_blue", "water_bottle", "snowy_cube"],
+    "guaranteedIds": ["chestnut", "potato", "stone", "skyr_blue", "water_bottle", "snowy_cube"],
     "_rollsPerCategoryNote": "Each reroll, EACH category (projectile, consumable) independently runs this many draws from the existing rarity-chance table below (rarities[].chance) among its own non-guaranteed items, deduped into the stock (2026-09-27: replaces the old 'exactly 6 shared slots' cap - stock length is now variable, could in principle be as few as 5 (just the guaranteed ids) or, with very low odds, most of the catalog at once). Calibrated so a legendary (drone, or any of the 5 legendary buffs) shows up roughly once per ~4h play session on average - see docs/NOTES.md.",
     "rollsPerCategory": 2,
     "_priceOverrideNote": "PLACEHOLDER: while priceOverride is a number, EVERY item costs that many coins in the shop (so we can test buying). Set it to null to use each item's real 'price' below.",
@@ -404,14 +404,15 @@
         "id": "toy_tank",
         "name": "Toy Tank",
         "category": "consumable",
-        "rarity": "legendary",
-        "price": 900,
+        "rarity": "rare",
+        "price": 150,
         "ignorePriceOverride": true,
         "charge": true,
         "image": "assets/items/toy_tank.png",
         "effects": [{ "type": "triggerEvent", "value": "tank" }],
         "description": "Magnificent tank made by Candy.",
-        "detail": "Rerolls the SHOP."
+        "detail": "Rerolls the SHOP.",
+        "_rebalanceNote": "Downgraded legendary(900) -> rare(150) 2026-09-27: its only effect is forcing an immediate shop reroll, which used to skip up to 30 minutes of waiting - now the shop rerolls naturally every 5 minutes, so the same effect is worth ~1/6 as much (900/6=150). It also has no payout of its own (unlike every other legendary buff), so keeping it legendary just diluted the '~1 legendary buff/day' budget on the least exciting item in that tier - moved to rare instead, where it now appears often as a cheap on-demand reroll button."
       },
       {
         "id": "daniels_coin",

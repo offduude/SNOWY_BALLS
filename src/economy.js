@@ -54,6 +54,7 @@ const Economy = (() => {
         consumables: {}, // id -> how many bought and not yet used
         nextRerollAt: null, // ms timestamp (SHOP clock, see shopNow) at which every slot rerolls together, bought or not (see shop.js) - null = not generated yet
         unseen: false, // the shop rerolled while closed and the player has not looked yet (SHOP button dot)
+        unseenIds: [], // ids currently in stock that rerolled in while the shop was closed and haven't been scrolled into view yet (a red dot per row, see shop.js checkDisplayed)
       },
     };
   }
@@ -190,6 +191,7 @@ const Economy = (() => {
         // stale relative to the new model anyway, so that immediate reroll overwrites them within the same tick).
         nextRerollAt: typeof shop.nextRerollAt === "number" ? shop.nextRerollAt : null,
         unseen: shop.unseen === true,
+        unseenIds: cleanIds(shop.unseenIds).map(rn),
       },
     };
   }

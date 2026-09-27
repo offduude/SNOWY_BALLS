@@ -354,7 +354,9 @@ const Saves = (() => {
       el.innerHTML = `<div class="board-empty">No scores yet.</div>`;
       return;
     }
-    el.innerHTML = rows.map((row, i) => leaderboardCardHtml(row, i + 1)).join("") + `<div class="board-hint">TAP to INSPECT</div>`;
+    // The "TAP to INSPECT" hint used to be the last row here, scrolled away with the cards - it's now a fixed
+    // footer under the whole tab instead (index.html #list-hint, toggled by collection.js's open()).
+    el.innerHTML = rows.map((row, i) => leaderboardCardHtml(row, i + 1)).join("");
   }
 
   // ---- click a leaderboard card to inspect it ----

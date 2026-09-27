@@ -45,18 +45,14 @@ const Shop = (() => {
     return { amount: randInt(item.amount.min, item.amount.max) };
   }
 
-  // What the slot costs. `offer` is the rolled offer for a stack item (its amount x the item's fixed unitPrice).
-  function price(item, offer) {
-    if (item.amount) return item.unitPrice * (offer ? offer.amount : item.amount.min);
+  // What ONE costs - a stack item is bought one unit at a time now (2026-09-27, the owner's ask: "clicking it
+  // once buys only a single projectile"), so its price is just its fixed unitPrice, no multiplication. `amount`
+  // (see rollOffer) is no longer "how many you get", it's "how many are left in this slot before it empties".
+  function price(item) {
+    if (item.amount) return item.unitPrice;
     if (item.ignorePriceOverride) return item.price;
     const o = eco.shop.priceOverride; // placeholder pricing switch, see economy.json
     return o !== null && o !== undefined ? o : item.price;
-  }
-
-  // The cheapest a stack item can be (for the "always show something affordable" safety net).
-  function minPrice(item) {
-    if (item.amount) return item.unitPrice * item.amount.min;
-    return price(item);
   }
 
   function itemById(id) {
@@ -75,7 +71,7 @@ const Shop = (() => {
   }
 
   function isCheap(item, cfg) {
-    return minPrice(item) <= cfg.maxPriceInAverageHits * averageHitCoins();
+    return price(item) <= cfg.maxPriceInAverageHits * averageHitCoins();
   }
 
   // Every item in a rarity pool is drawn with equal weight now that skins (which used to be thinned to half
@@ -164,31 +160,40 @@ const Shop = (() => {
     const item = itemById(itemId);
     if (!item) return { ok: false, reason: "empty" };
     if (isMaxed(item)) return { ok: false, reason: "max" }; // already holding the most of this buff: nothing is charged
-    const offer = (st.offers || [])[slot] || null;
-    if (!Economy.spendCoins(price(item, offer))) return { ok: false, reason: "funds" };
+    if (!Economy.spendCoins(price(item))) return { ok: false, reason: "funds" };
 
     if (item.category === "projectile") {
-      // The whole stack goes into the inventory. If this is a kind the player had none of, the PROJECTILES
-      // list expands and its red dot comes on (Economy raises it; more of a kind they already have doesn't).
-      Economy.addProjectiles(item.id, offer ? offer.amount : 1);
+      // One at a time now (2026-09-27, the owner's ask) - click again for more, while the slot's remaining stock
+      // (offer.amount) lasts. If this is a kind the player had none of, the PROJECTILES list expands and its red
+      // dot comes on (Economy raises it; more of a kind they already have doesn't).
+      Economy.addProjectiles(item.id, 1);
+      const offer = st.offers[slot];
+      if (offer) offer.amount -= 1;
+      if (!offer || offer.amount <= 0) {
+        st.stock[slot] = null;
+        st.offers[slot] = null;
+        if (st.unseenIds) st.unseenIds = st.unseenIds.filter((id) => id !== itemId);
+      }
     } else {
       Economy.addBuffs(item.id, 1); // a buff goes into the inventory; it is USED from the BUFFS tab (see buffs.js)
+      // A buff's slot has no "amount" to run down - one purchase always empties it, same as before.
+      st.stock[slot] = null;
+      st.offers[slot] = null;
+      if (st.unseenIds) st.unseenIds = st.unseenIds.filter((id) => id !== itemId);
     }
-
-    // The slot just stays empty (not sold to anyone else) until the next global reroll - no per-slot timer any more.
-    st.stock[slot] = null;
-    st.offers[slot] = null;
+    // Either way the slot just stays empty (not sold to anyone else) until the next global reroll - no per-slot
+    // timer any more.
     Economy.saveShop();
     return { ok: true, item };
   }
 
   // ---------- UI ----------
   // The SHOP tab is a plain list of every projectile/buff (2026-09-27) - one row per catalog item, not one card per
-  // rolled slot. Sorted by rarity ASCENDING (common at the top, legendary at the bottom - the owner's ask). An item
-  // currently in the roll (Economy.getShopState().stock) shows its real rolled price and a working BUY button
-  // (muted/red-priced if it can't currently be afforded - see Collection.shopRowHtml); one that isn't in the roll
-  // shows a clearly greyed-out "NOT IN STOCK" row instead, with no price at all (there's nothing to buy until the
-  // next reroll, so unlike the old "from X" hint there's no offer to preview).
+  // rolled slot. Sorted by rarity ASCENDING (common at the top, legendary at the bottom - the owner's ask). Every
+  // row always has a real BUY button with its real (fixed, since the price-range collapse) price - available AND
+  // affordable shows it live; either available-but-too-expensive or plain not-in-stock right now greys the SAME
+  // button out the SAME way (2026-09-27: no more red price text, no more a separate "NOT IN STOCK" label - just
+  // one consistent "can't buy this right now" look, whatever the reason).
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -209,25 +214,48 @@ const Shop = (() => {
   function rowHtml(item) {
     const st = Economy.getShopState();
     const slot = st.stock ? st.stock.indexOf(item.id) : -1;
-    if (slot === -1) {
-      return Collection.shopRowHtml(item, { extraClass: " unavailable", action: `<span class="shop-not-in-stock">NOT IN STOCK</span>` });
-    }
-    const offer = (st.offers || [])[slot] || null;
-    const p = price(item, offer);
-    const afford = Economy.getCoins() >= p && !isMaxed(item); // a maxed-out buff looks unbuyable, like a too-expensive one
+    const available = slot !== -1;
+    const offer = available ? (st.offers || [])[slot] || null : null;
+    const p = price(item); // fixed now (2026-09-27) - the same number whether or not it's currently in stock
+    const buyable = available && Economy.getCoins() >= p && !isMaxed(item); // a maxed-out buff looks unbuyable, like a too-expensive one
     const action =
-      `<button class="pick-equip shop-buy${afford ? "" : " cant"}" type="button" data-id="${esc(item.id)}">` +
+      `<button class="pick-equip shop-buy${buyable ? "" : " cant"}" type="button" data-id="${esc(item.id)}"${available ? "" : " disabled"}>` +
       `<i class="coin"></i><span>${p}</span></button>`;
     // Replaces the old per-item availability countdown (removed 2026-09-27, see the global-reroll note above) in
-    // that same spot under the button: how many are in THIS offer for a stack item, nothing for a buff (always
-    // exactly one per purchase).
-    const amountText = offer && offer.amount ? `x${offer.amount}` : null;
-    return Collection.shopRowHtml(item, { offer, action, amountText });
+    // that same spot under the button: how many are LEFT in this slot for a stack item, nothing for a buff
+    // (always exactly one per purchase) or when there's nothing currently in stock to count.
+    const amountText = available && offer && offer.amount ? `x${offer.amount}` : null;
+    const dot = available && (st.unseenIds || []).includes(item.id);
+    return Collection.shopRowHtml(item, { offer, action, extraClass: available ? "" : " unavailable", amountText, dot });
   }
 
   function render() {
     if (!root) return;
     root.innerHTML = categoryItems(openCat).map(rowHtml).join("");
+    checkDisplayed();
+  }
+
+  // A row whose item is "new to the roll" (see rerollAll's unseenIds note) loses its dot once it's been scrolled
+  // into view - same idea as the SKINS menu's checkDisplayed, but clearing the dot by removing its DOM node
+  // directly rather than a full re-render (a full render() would restart every OTHER row's CSS animation too -
+  // see tick()'s own note on why that's avoided now).
+  function checkDisplayed() {
+    const st = Economy.getShopState();
+    if (!root || !st.unseenIds || !st.unseenIds.length) return;
+    const view = root.getBoundingClientRect();
+    let changed = false;
+    root.querySelectorAll(".pick-row[data-id]").forEach((row) => {
+      const id = row.dataset.id;
+      if (!st.unseenIds.includes(id)) return;
+      const r = row.getBoundingClientRect();
+      const visible = Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top);
+      if (visible < r.height / 2) return;
+      st.unseenIds = st.unseenIds.filter((x) => x !== id);
+      changed = true;
+      const dot = row.querySelector(".pick-new");
+      if (dot) dot.remove();
+    });
+    if (changed) Economy.saveShop();
   }
 
   // Top-right of the header (see index.html #shop-timer): counts down to the next global reroll.
@@ -259,6 +287,7 @@ const Shop = (() => {
     openCat = cat;
     updateCatButtons();
     render();
+    if (root) root.scrollTop = 0; // every category opens at the top of its list, never wherever the last one left off
   }
 
   function isShopOpen() {
@@ -282,6 +311,10 @@ const Shop = (() => {
   // (2026-09-23, extended 2026-09-27 to also be the scheduled 30-minute cadence, not just the Toy Tank's forced
   // one - see the global-reroll note above). Used by the Toy Tank event (main.js fireTank) too - "the entire shop
   // should reroll the exact time the tank fires", and its own cadence just restarts from that moment.
+  //
+  // If this happens while the shop is closed, every freshly-stocked id is marked "unseen" (a red dot, same idea
+  // as a new projectile/buff's - the owner's ask, 2026-09-27) until its row is scrolled into view (checkDisplayed).
+  // A reroll while the shop is OPEN needs none of that - the player is looking straight at it happening.
   function rerollAll() {
     const st = Economy.getShopState();
     const slots = eco.shop.slots;
@@ -296,6 +329,7 @@ const Shop = (() => {
     st.stock = stock;
     st.offers = offers;
     st.nextRerollAt = shopNow() + rerollMs();
+    if (!isShopOpen()) st.unseenIds = [...new Set([...(st.unseenIds || []), ...stock.filter(Boolean)])];
     Economy.saveShop();
     if (isShopOpen()) {
       render();
@@ -368,6 +402,7 @@ const Shop = (() => {
       syncRate();
       root = document.getElementById("shop-scroll");
       root.addEventListener("click", onClick);
+      root.addEventListener("scroll", checkDisplayed); // clears a row's "new to the roll" dot as it scrolls into view
       document.getElementById("shop-cat-projectile").addEventListener("click", () => setCat("projectile"));
       document.getElementById("shop-cat-buff").addEventListener("click", () => setCat("consumable")); // economy.json's own category id for a buff
       document.getElementById("shop-backdrop").addEventListener("click", () => document.getElementById("shop-btn").click());
@@ -393,6 +428,7 @@ const Shop = (() => {
       Economy.saveShop();
       setDot(false);
       render();
+      root.scrollTop = 0; // always opens at the top of the list (the owner's ask), never the last scroll position
       updateTimerText();
     },
     rerollAll, // exposed for the Toy Tank event (main.js fireTank) - see rerollAll's own comment

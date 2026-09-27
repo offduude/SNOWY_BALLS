@@ -161,13 +161,16 @@
 
     /* The odds grid (boxes.js openInspect): a dimmed backdrop over the boxes screen with just each possible
        item's picture and its chance% - no other text at all (the owner's ask), captioned in the exact same
-       white/black-outline style as #boxes-hint/#message above, not a card of its own. */
+       white/black-outline style as #boxes-hint/#message above, not a card of its own. A "TAP to INSPECT" caption
+       (same style again) sits below the rectangle, telling them what tapping a picture does. */
     #boxes-inspect {
       position: absolute;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: calc(var(--u) * 1.6);
       background: rgba(0, 0, 0, 0.55);
       opacity: 0;
       pointer-events: none;
@@ -180,38 +183,48 @@
       pointer-events: auto;
     }
 
+    /* A rectangle that scales with however many items are in the box, not a fixed shape - boxes.js sets
+       grid-template-columns inline (roughly ceil(sqrt(count)) columns) so it reads as one deliberate block
+       instead of a loose wrapped row. */
     #boxes-inspect-grid {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      gap: calc(var(--u) * 1.8);
       justify-content: center;
-      gap: calc(var(--u) * 2.4);
-      width: 70%;
     }
 
     .box-inspect-cell {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: calc(var(--u) * 0.6);
-      width: calc(var(--u) * 14);
+      gap: calc(var(--u) * 0.5);
+      width: calc(var(--u) * 10);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
 
     .box-inspect-cell img {
       width: 100%;
-      height: calc(var(--u) * 14);
+      height: calc(var(--u) * 10);
       object-fit: contain;
       image-rendering: pixelated;
       pointer-events: none;
     }
 
-    .box-inspect-chance {
+    .box-inspect-chance,
+    #boxes-inspect-caption {
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: calc(var(--u) * 1.1);
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
         0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
+    }
+
+    .box-inspect-chance {
+      font-size: calc(var(--u) * 1.1);
+    }
+
+    #boxes-inspect-caption {
+      font-size: calc(var(--u) * 1.3);
+      pointer-events: none;
     }
 
     /* One item's own card, tapped from the odds grid above - the exact same look the SKINS menu uses
@@ -283,7 +296,10 @@
     }
 
     .box-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
-    .box-btn.cant { opacity: 0.65; }
+    /* Unaffordable: the button STAYS bright (the owner likes the colourful look, didn't want it dimmed) - just
+       the price itself turns red, with the same black outline every box's white text already has for contrast
+       against all three background colours. */
+    .box-btn.cant .box-price { color: #ff5252; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
     .box-btn.shake { animation: shop-shake 0.3s linear; }
 
     .box-btn.box-soon {
@@ -455,10 +471,11 @@
        greyed out when not currently in the roll, instead of the old 3x2 grid of rolled slots - so a row already
        shows the full description, and there's no separate hold-to-inspect popup any more. Styled distinctly from
        #list-panel (a warm cream instead of solid brown) so it doesn't read as just another collection menu.
-       Centered on screen (not offset by a side column any more - PROJECTILES/BUFFS moved inside the panel as
-       tabs, see #shop-tabs) with its own header row carrying the reroll countdown, per the owner's redesign ask. */
+       PROJECTILES/BUFFS are a column beside the list (#shop-cats below), not tabs inside the panel any more - the
+       owner's later call, so the column has obvious room to grow (more buttons, future seasons). */
     #shop-backdrop,
-    #shop-panel {
+    #shop-panel,
+    #shop-cats {
       position: absolute;
       opacity: 0;
       pointer-events: none;
@@ -472,10 +489,10 @@
     }
 
     #shop-panel {
-      left: 20%;
-      top: 10%;
-      width: 60%;
-      height: 80%;
+      left: 15%;
+      top: 12%;
+      width: 56%;
+      height: 76%;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
@@ -488,8 +505,21 @@
       z-index: 4;
     }
 
+    #shop-cats {
+      left: 73%;
+      top: 12%;
+      width: 17%;
+      height: 76%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: calc(var(--u) * 1.6);
+      z-index: 4;
+    }
+
     #game-container.shop-open #shop-backdrop,
-    #game-container.shop-open #shop-panel {
+    #game-container.shop-open #shop-panel,
+    #game-container.shop-open #shop-cats {
       opacity: 1;
       pointer-events: auto;
     }
@@ -520,33 +550,21 @@
       color: #5a3d1c;
     }
 
-    /* PROJECTILES / BUFFS, moved inside the panel as a segmented control under the header (redesigned 2026-09-27
-       - used to be two separate buttons floating beside the list). Centers the whole panel as one unit instead of
-       needing room for a side column. */
-    #shop-tabs {
-      flex: none;
-      display: flex;
-      border-bottom: 2px solid #7a5230;
-    }
-
-    .shop-tab {
-      flex: 1;
-      padding: calc(var(--u) * 1) 0;
+    .shop-cat-btn {
+      width: 100%;
+      height: 32px;
+      padding: 0;
       background: #8b5a2b;
-      border: none;
-      border-right: 2px solid #7a5230;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
       color: #ffffff;
-      font-family: inherit;
-      font-size: calc(var(--u) * 1);
+      font-family: "Press Start 2P", monospace;
+      font-size: 8px;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
 
-    .shop-tab:last-child {
-      border-right: none;
-    }
-
-    .shop-tab.active {
+    .shop-cat-btn.active {
       background: #74491f;
     }
 
@@ -569,25 +587,17 @@
       display: none;
     }
 
-    /* Available/unaffordable vs. unavailable are now unmistakably different looks (the owner's ask, 2026-09-27):
-       an unaffordable row is still fully in stock, just too pricey right now (red price, muted button); an
-       unavailable one is greyscale AND dimmed, with no price at all - there's nothing to buy until the next
-       reroll (see shop.js rowHtml). */
+    /* A row not currently in stock is only lightly dimmed (its picture/name/description stay fully readable -
+       the owner didn't want the old heavier grayscale treatment); its BUY button always shows the item's real
+       (fixed) price, just greyed out and disabled like an unaffordable one - see .pick-equip.shop-buy.cant below.
+       There is no separate "NOT IN STOCK" label any more (2026-09-27, the owner's ask - one consistent look for
+       "can't buy this right now", whatever the reason). */
     .shop-row.unavailable {
-      opacity: 0.5;
-      filter: grayscale(0.85);
+      opacity: 0.8;
     }
 
-    .shop-not-in-stock {
-      display: inline-block;
-      padding: calc(var(--u) * 0.5) calc(var(--u) * 0.9);
-      color: #7a5230;
-      font-size: calc(var(--u) * 0.95);
-      letter-spacing: 0.05em;
-    }
-
-    /* "xN" under the BUY button for a stack currently on sale - replaces the old (removed 2026-09-27) per-item
-       availability countdown in that same spot. */
+    /* "xN" left in this slot's offer for a stack currently on sale - replaces the old (removed 2026-09-27)
+       per-item availability countdown in that same spot. */
     .shop-avail-row {
       font-size: calc(var(--u) * 0.85);
       color: #8a6a44;
@@ -617,10 +627,14 @@
       box-sizing: border-box;
     }
 
-    /* Unaffordable (in stock, too expensive right now): the price itself turns red, same convention the old
-       shop grid used (.shop-card.cant .shop-price), not just a dimmer button. */
-    .pick-equip.shop-buy.cant { opacity: 0.8; }
-    .pick-equip.shop-buy.cant span { color: #a3261c; }
+    /* Can't buy this right now - either too expensive or genuinely out of stock (see .shop-row.unavailable above):
+       ONE consistent look for both, the button itself greys out rather than the price turning red (the owner's
+       call, 2026-09-27 - didn't like the red-price-on-brown look). */
+    .pick-equip.shop-buy.cant {
+      background: #8a8a8a;
+      border-color: #5a5a5a;
+    }
+    .pick-equip.shop-buy.cant .coin { filter: grayscale(1); }
     .pick-equip.shop-buy.shake { animation: shop-shake 0.3s linear; }
 
     /* A held-down picture must not open the browser's image menu (save / share): the pictures take no touches at all, nothing is selectable or draggable. */
@@ -1778,15 +1792,21 @@
       font-size: calc(var(--u) * 1.1);
     }
 
-    /* Below the leaderboard's cards (saves.js renderLeaderboard) - same look as the in-game "TAP to AIM" prompt
-       (#message): white with a thin black outline, so it reads as an active instruction, not a muted hint like
-       .board-empty above. */
+    /* Fixed under the whole LEADERBOARD tab (index.html #list-hint, toggled by collection.js's open() - moved out
+       of the scrollable cards, 2026-09-27, the owner's ask: "under the whole leaderboard tab", not scrolled away
+       with them). Same look as the in-game "TAP to AIM" prompt (#message): white with a thin black outline, so
+       it reads as an active instruction, not a muted hint like .board-empty above. Empty (no padding needed) for
+       every other list kind. */
     .board-hint {
       flex: none;
       color: #ffffff;
       font-size: calc(var(--u) * 1.1);
       text-align: center;
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
+    }
+
+    #list-hint:not(:empty) {
+      padding: calc(var(--u) * 1) 0;
     }
 
     /* The leaderboard's inspect popup (saves.js: clicking a card) - lives over the LIST panel (list-open), not
@@ -1925,17 +1945,17 @@
     <img id="boxes-board" src="assets/ui/shop_board.png" alt="" />
     <div id="boxes-items"></div>
     <div id="boxes-hint">HOLD to INSPECT</div>
-    <div id="boxes-inspect"><div id="boxes-inspect-grid"></div></div>
+    <div id="boxes-inspect"><div id="boxes-inspect-grid"></div><div id="boxes-inspect-caption">TAP to INSPECT</div></div>
     <div id="boxes-inspect-item"><div id="boxes-inspect-item-card"></div></div>
     <div id="board-inspect"><div id="board-inspect-card"></div></div>
     <div id="shop-backdrop"></div>
     <div id="shop-panel">
       <div id="shop-header"><span id="shop-title">SHOP</span><span id="shop-timer"></span></div>
-      <div id="shop-tabs">
-        <button id="shop-cat-projectile" class="shop-tab active" type="button" data-cat="projectile">PROJECTILES</button>
-        <button id="shop-cat-buff" class="shop-tab" type="button" data-cat="buff">BUFFS</button>
-      </div>
       <div id="shop-scroll"></div>
+    </div>
+    <div id="shop-cats">
+      <button id="shop-cat-projectile" class="shop-cat-btn active" type="button" data-cat="projectile">PROJECTILES</button>
+      <button id="shop-cat-buff" class="shop-cat-btn" type="button" data-cat="buff">BUFFS</button>
     </div>
     <div id="list-backdrop"></div>
     <div id="list-panel">
@@ -1943,6 +1963,7 @@
       <button id="list-back" type="button">BACK</button>
       <div id="version-tag"></div>
       <div id="list-scroll"></div>
+      <div id="list-hint" class="board-hint"></div>
     </div>
     <div id="buff-hud"></div>
     <div id="aim-label"></div>
@@ -1972,8 +1993,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=299"></script>
-  <script src="src/economy.js?v=45"></script>
+  <script src="src/version.js?v=300"></script>
+  <script src="src/economy.js?v=46"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -2003,11 +2024,11 @@
   <script src="src/cloud.js?v=26"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
-  <script src="src/shop.js?v=38"></script>
-  <script src="src/boxes.js?v=3"></script>
+  <script src="src/shop.js?v=39"></script>
+  <script src="src/boxes.js?v=4"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=24"></script>
-  <script src="src/collection.js?v=80"></script>
+  <script src="src/saves.js?v=25"></script>
+  <script src="src/collection.js?v=81"></script>
   <script src="src/main.js?v=190"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
@@ -2015,7 +2036,7 @@
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["boxes-board", "boxes-items", "boxes-hint", "boxes-inspect", "boxes-inspect-item", "boxes-btn", "shop-panel", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["boxes-board", "boxes-items", "boxes-hint", "boxes-inspect", "boxes-inspect-item", "boxes-btn", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

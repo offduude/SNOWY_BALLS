@@ -184,11 +184,17 @@ const Boxes = (() => {
 
   // The odds grid: just each item's picture and its chance%, styled like "TAP to AIM" (white, black-outlined
   // text) - no other text at all, per the owner's ask. Tapping a picture opens that item's own card on top.
+  // Laid out as a rectangle that scales with the item count (2026-09-27, the owner's ask) - roughly
+  // ceil(sqrt(n)) columns, so e.g. 4 items make a 2x2 block and 6 make a 3x2 one, rather than a loose wrapped
+  // row that happens to look however wide the last one left it.
   function openInspect(kind) {
     const def = boxDef(kind);
     if (!def || !inspectGridEl) return;
+    const odds = oddsFor(kind);
+    const cols = Math.max(1, Math.ceil(Math.sqrt(odds.length)));
+    inspectGridEl.style.gridTemplateColumns = `repeat(${cols}, auto)`;
     inspectGridEl.dataset.kind = kind;
-    inspectGridEl.innerHTML = oddsFor(kind)
+    inspectGridEl.innerHTML = odds
       .map(
         ({ item, chance }) =>
           `<div class="box-inspect-cell" data-id="${esc(item.id)}">` +

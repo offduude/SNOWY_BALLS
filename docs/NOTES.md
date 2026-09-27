@@ -2539,3 +2539,87 @@ picked the highest point** for all of them.
   have varied 4-7) - confirmed by forcing it into a slot with a fresh (empty) offer and reading the rendered
   price straight from the DOM. No console errors.
 - `economy.json`, `src/shop.js?v=38`.
+
+## SHOP polish round 2: grey buttons, per-unit buying, per-row dots (2026-09-27)
+
+**Asked directly**, from a screenshot of the red unaffordable price: (1) don't turn the price red, grey out the
+button instead; (2) an unavailable row should ALSO have a price button, just greyed; (3) a projectile's button
+should price and buy ONE at a time, not the whole rolled stack; (4)/(5) check the shop's own red dot still
+works, and add a per-row red dot for anything new to the roll the player hasn't scrolled to yet (like buffs/
+projectiles get) - every category should always open at the top of the list, never the last scroll position.
+Separately: PROJECTILES/BUFFS move back to a column beside the list (not tabs in the header) - "there will be
+more buttons for future seasons".
+
+- **Grey button, not red price** (1+2): `.pick-equip.shop-buy.cant` now greys the button itself
+  (`background:#8a8a8a`, its coin icon grayscaled) instead of coloring the price span red - ONE look for "can't
+  buy this right now", used for both an unaffordable row (still in stock) and an unavailable one (not in stock
+  at all). `.shop-row.unavailable`'s heavier grayscale+dimming is gone too (0.5 opacity + `filter:grayscale` ->
+  just 0.8 opacity) - the picture/name/description stay fully readable, only the button signals "can't buy".
+- **Unavailable rows keep their price button** (2): the separate "NOT IN STOCK" label is gone - `rowHtml()`
+  always builds a real BUY button with the item's real (fixed, since the price-range collapse) price, `disabled`
+  and `.cant`-styled when not in stock. This only became possible because price is fully fixed now (no roll to
+  be missing) - see the price-collapse entry above.
+- **Per-unit projectile buying** (3): `price(item)` for a stack is now just `item.unitPrice` (no more x amount);
+  `buy()` grants exactly 1 and decrements the slot's remaining `offer.amount` by 1, clearing the slot only once
+  it hits 0 - so `amount`'s meaning flips from "how many you get in one purchase" to "how many are left in this
+  slot before it empties". A buff's slot still empties in one purchase (it never had an `amount` to run down).
+  `minPrice()`/`needsOffer`-adjacent complexity that only existed for the old range math is gone with it.
+- **Per-row "new to the roll" dots** (4): `Economy.getShopState().unseenIds` tracks item ids that rerolled in
+  while the shop was CLOSED and haven't been scrolled into view yet - same red dot markup or the owned lists'
+  new-item one (`Collection.shopRowHtml`'s new `dot` param), cleared by `shop.js checkDisplayed()` (a `scroll`
+  listener, same idea as the SKINS menu's own check) which removes just that row's dot node directly rather than
+  calling a full `render()` - avoids restarting every OTHER row's CSS animation again (see the legendary-flash
+  fix earlier in this file). The shop's own whole-button dot (`#shop-dot`, "something changed while you were
+  away") was already there and unaffected - checked it's still lighting up correctly.
+- **Always opens at the top** (5): `root.scrollTop = 0` after `render()` in both `onOpen()` and `setCat()` -
+  buying an item still preserves scroll position (its own `render()` call doesn't reset it), only a fresh open
+  or a category switch does.
+- **Side buttons instead of header tabs**: `#shop-tabs` (in-panel segmented control, added a few hours earlier
+  this same day) is reverted - PROJECTILES/BUFFS are `#shop-cats` again, a column beside the list, because
+  "there will be more buttons for future seasons" and a vertical column has obvious room to grow where two fixed
+  header tabs didn't. Panel position reverts to its pre-tabs values too (`left:15%; width:56%`, cats at
+  `left:73%; width:17%`) - the reroll countdown stays in the header, that part of the redesign wasn't reverted.
+- Verified live (test origin): fresh tab, no console errors. Bought Stone twice in a row (30 coins, x2 -> x1 ->
+  exhausted) confirming per-unit buying and the slot only clearing at 0; Chestnut/Potato (not in stock) showed a
+  real greyed 12-coin button the whole time. Forced a reroll while closed (backdated `nextRerollAt`) -
+  `unseenIds` populated, `#shop-dot` lit correctly, reopening showed red dots on exactly the newly-rolled
+  available rows; scrolling a dotted row into view cleared it (confirmed the coarse programmatic scroll used for
+  testing can miss a row entirely in one jump in a short viewport - a known limitation the SKINS menu's identical
+  pattern already has, not a new bug - and confirmed it clears correctly once genuinely scrolled past).
+- `src/economy.js?v=46`, `src/shop.js?v=39`, `src/collection.js?v=81`, `index.html`.
+
+## BOXES polish: red price instead of dimming, a real inspect rectangle (2026-09-27)
+
+**Asked directly**: (1) keep the bright box fully colourful when unaffordable - grey or red the price instead,
+whichever fits; (2) the inspect popup's icons should be a bit smaller and arranged as a rectangle that scales
+with how many items are in the box, not a loose wrapped row; (3) a "TAP to INSPECT" caption under that rectangle.
+
+- (1): `.box-btn.cant` no longer dims the whole button - only `.box-price` turns red (`#ff5252`, with the same
+  black-outline text-shadow every other white label on the box already has, so it stays readable against all
+  three background colours). Chose red over grey since the box's own bright colour already reads as "active";
+  red pairs with that better than a muted grey would.
+- (2): `#boxes-inspect-grid` is a real CSS grid now (was `flex-wrap`), with `grid-template-columns` set inline by
+  `boxes.js openInspect()` to `ceil(sqrt(itemCount))` columns - a 3-item box (today's Character/Weather boxes)
+  makes a 2-column block (2 then 1), a future box with more items would round out into an actual rectangle.
+  Icons shrank from 14u to 10u ("slightly smaller", the owner's words).
+- (3): `#boxes-inspect` is now a flex COLUMN (grid, then the caption) instead of just centering one child;
+  `#boxes-inspect-caption` reuses the exact white/black-outline text style `#boxes-hint`/`#message` already use.
+- Verified live (test origin): drained coins to 100, all three boxes stayed full brightness with red prices (no
+  dimming); held Weather Box - grid-template-columns computed to `repeat(2, auto)` for its 3 items, smaller
+  icons, "TAP to INSPECT" visible under the rectangle.
+- `src/boxes.js?v=4`, `index.html`.
+
+## LEADERBOARD: "TAP to INSPECT" moved to a fixed footer (2026-09-27)
+
+**Asked directly**: "place the 'tap to inspect' text under the whole leaderboard tab" - it used to be the last
+row of the scrollable card list itself (`saves.js renderLeaderboard`'s own `innerHTML`), so with enough entries
+it scrolled away and was only visible at the very bottom of a long scroll.
+
+- New persistent `#list-hint` element (reusing the existing `.board-hint` look) sits in `#list-panel` AFTER
+  `#list-scroll` - a `flex:none` footer below the scrollable area, always visible regardless of scroll position,
+  instead of a child of the scrollable content. `collection.js`'s `open(kind)` sets its text to "TAP to INSPECT"
+  only for `kind === "leaderboard"`, empty otherwise (confirmed it's cleared switching to PROJECTILES).
+  `renderLeaderboard()` no longer appends the hint to its own `innerHTML`.
+- Verified live (test origin): opened LEADERBOARD, hint shows fixed at the panel's bottom edge; switched to
+  PROJECTILES, hint cleared.
+- `src/saves.js?v=25`, `src/collection.js?v=81`, `index.html`.

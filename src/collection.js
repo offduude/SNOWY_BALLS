@@ -249,11 +249,12 @@ const Collection = (() => {
 
   // ---- The SHOP's list row (shop.js): every projectile/buff, whether or not it's currently in the roll (item.category
   // is only ever "projectile" or "consumable" - skins left the shop's pool entirely, 2026-09-27). `action` is the BUY
-  // button (or a plain "NOT IN STOCK" label - shop.js's own job to decide which); `amountText`, when given, is a
-  // stack's "x14" for the CURRENT offer, shown under the button in the spot the old (now-removed) availability
-  // countdown used to have; `extraClass` marks a row that isn't currently in stock so it can be greyed out. A stack
-  // shows how many are ON SALE right now where the owned list shows how many the player HAS instead.
-  function shopRowHtml(item, { offer, action, extraClass, amountText } = {}) {
+  // button (always shown, even when not currently in stock - shop.js's own job to grey it out); `amountText`, when
+  // given, is a stack's remaining "x14" for the CURRENT offer, shown under the button; `extraClass` marks a row
+  // that isn't currently in stock; `dot` is the same "new, not yet scrolled into view" red dot the owned lists use
+  // (Economy.isNewProjectile/isNewBuff), just for "newly in stock, haven't looked yet" instead - shop.js's own
+  // tracking. A stack shows how many are ON SALE right now where the owned list shows how many the player HAS.
+  function shopRowHtml(item, { offer, action, extraClass, amountText, dot } = {}) {
     const amount = amountText ? `<div class="shop-avail-row">${esc(amountText)}</div>` : "";
     if (item.category === "projectile") {
       const cat = CATALOG.projectile.items.find((i) => i.id === item.id) || { id: item.id, name: item.name, description: item.description, image: item.image };
@@ -261,6 +262,7 @@ const Collection = (() => {
       const p = eco && eco.projectiles && eco.projectiles[item.id];
       return (
         `<div class="pick-row shop-row${stats ? " has-stats" : ""}${extraClass || ""}${Rarity.cardClass(p && p.rarity)}" data-id="${esc(item.id)}">` +
+        (dot ? NEW_DOT : "") +
         `<img class="pick-pic" src="${esc(cat.image || "")}" alt="" draggable="false" />` +
         `<div class="pick-text"><div class="pick-name">${esc(cat.name)}</div><div class="pick-desc">${esc(cat.description || "")}</div></div>` +
         `<div class="pick-action">${action}${amount}</div>` +
@@ -275,6 +277,7 @@ const Collection = (() => {
     const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
     return (
       `<div class="pick-row shop-row buff-row${item.detail ? " buff-detail" : ""}${extraClass || ""}${Rarity.cardClass(Rarity.ofItem(item))}" data-id="${esc(item.id)}">` +
+      (dot ? NEW_DOT : "") +
       `<img class="pick-pic" src="${esc(item.image || "")}" alt="" draggable="false" />` +
       `<div class="pick-text"><div class="pick-name">${esc(item.name)}</div><div class="pick-desc">${esc(item.description || "")}</div></div>` +
       `<div class="pick-action">${action}${amount}<div class="pick-regen"><span>${maxText}</span></div></div>` +
@@ -421,6 +424,9 @@ const Collection = (() => {
     scrollEl.dataset.kind = kind; // (the OPTIONS list redraws itself after a change, see Saves.refresh)
     panelEl.classList.toggle("options-open", kind === "options"); // (the version tag is shown in the OPTIONS list only)
     document.getElementById("version-tag").textContent = typeof GAME_VERSION_TEXT === "string" ? GAME_VERSION_TEXT : "";
+    // Fixed under the whole tab, not scrolled away with the cards (moved out of Saves.renderLeaderboard's own
+    // innerHTML, 2026-09-27 - the owner's ask, it used to be the last row of the scrollable list itself).
+    document.getElementById("list-hint").textContent = kind === "leaderboard" ? "TAP to INSPECT" : "";
     buttons.buff.classList.toggle("active", kind === "buff");
     buttons.options.classList.toggle("active", kind === "options");
     buttons.leaderboard.classList.toggle("active", kind === "leaderboard");

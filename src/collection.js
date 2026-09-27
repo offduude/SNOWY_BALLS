@@ -421,6 +421,14 @@ const Collection = (() => {
   function open(kind) {
     markSeen(); // switching straight from one list to another
     Saves.closeInspect(); // ... and an inspected leaderboard card must not linger over whatever list comes next either
+    // SHOP no longer greys these buttons out (2026-09-27, the owner's ask) - it stays open behind whatever list
+    // you tap into unless told to close, so opening one closes SHOP the same way SHOP itself already closes any
+    // open list (see the shop-btn handler in index.html). BOXES still has its own separate mutual-exclusion with
+    // SHOP, untouched - only SHOP got this treatment.
+    if (container.classList.contains("shop-open")) {
+      container.classList.remove("shop-open");
+      document.getElementById("shop-btn").textContent = "SHOP";
+    }
     openKind = kind;
     scrollEl.dataset.kind = kind; // (the OPTIONS list redraws itself after a change, see Saves.refresh)
     panelEl.classList.toggle("options-open", kind === "options"); // (the version tag is shown in the OPTIONS list only)

@@ -970,18 +970,16 @@
       background: #74491f;
     }
 
-    /* BOXES and SHOP go non-interactive while the other is open - only one full-screen panel at a time - but stay
-       ON SCREEN, dimmed by the same backdrop that dims the rest of the game (2026-09-27, the owner's correction:
-       "they vanish completely and shouldn't" - they used to fully disappear via opacity:0). z-index drops below
-       the backdrop (3) so it actually dims them instead of them sitting on top of it undimmed. */
-    #game-container.shop-open #boxes-btn,
+    /* BOXES still goes non-interactive while it's the OTHER panel open (only one full-screen panel at a time),
+       dimmed by the same backdrop that dims the rest of the game. SHOP no longer does this to boxes-btn
+       (2026-09-27, the owner's ask: SHOP shouldn't grey out other buttons at all any more - see #side-buttons'
+       own note just below, and Collection.open/the boxes-btn handler, which now close SHOP for you instead). */
     #game-container.boxes-open #shop-btn {
       pointer-events: none;
       z-index: 1;
     }
 
-    /* PROJECTILES / CHARACTERS buttons: middle of the left edge, same look as the SHOP button.
-       Hidden (and untappable) while the shop is open. */
+    /* PROJECTILES / CHARACTERS buttons: middle of the left edge, same look as the SHOP button. */
     #side-buttons {
       position: absolute;
       left: 10px;
@@ -994,12 +992,10 @@
       transition: opacity 0.25s ease;
     }
 
-    /* Stays ON SCREEN while the shop/boxes panel is open, just dimmed by the same backdrop that dims the rest of
-       the game and unclickable (2026-09-27, the owner's correction: "they vanish completely and shouldn't" - an
-       earlier pass made this opacity:0, fully invisible, which wasn't the ask). #side-buttons' own z-index (5) is
-       normally ABOVE the shop/boxes panel (4) and its backdrop (3) - dropping it to 1 here puts it BELOW the
-       backdrop so the backdrop's dimming actually shows over it, instead of it sitting on top undimmed. */
-    #game-container.shop-open #side-buttons,
+    /* BOXES still dims these (same reasoning as #shop-btn just above). SHOP no longer does (2026-09-27, the
+       owner's ask: "make the shop tab not grey out other buttons behind it, just like projectile list or buff
+       list" - tapping one of these while SHOP is open now closes SHOP and opens it directly, the exact same
+       feel a list already had toward SHOP/BOXES). */
     #game-container.boxes-open #side-buttons {
       pointer-events: none;
       z-index: 1;
@@ -1348,10 +1344,8 @@
       transition: opacity 0.2s ease;
     }
 
-    /* All in-game HUD hides behind the SHOP/BOXES panels while either is open (the owner's ask, 2026-09-27 -
-       "all the other buttons disappear behind it"): buff cards and the ammo count (#ammo-box, further down)
-       were the two left showing through, everything else already had its own hide-while-open rule. */
-    #game-container.shop-open #buff-hud,
+    /* Still hides behind BOXES (same reasoning as #side-buttons' own note above) - no longer behind SHOP
+       (2026-09-27, reversed the same day it was added: SHOP stopped dimming anything else). */
     #game-container.boxes-open #buff-hud {
       z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
     }
@@ -1429,7 +1423,6 @@
       transition: opacity 0.25s ease;
     }
 
-    #game-container.shop-open #leaderboard-btn,
     #game-container.boxes-open #leaderboard-btn {
       pointer-events: none;
       z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
@@ -1492,7 +1485,6 @@
 
     #ammo-box { top: 44px; transition: opacity 0.2s ease; } /* 10px margin + 28px buttons + 6px gap */
 
-    #game-container.shop-open #ammo-box,
     #game-container.boxes-open #ammo-box {
       pointer-events: none;
       z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
@@ -1537,7 +1529,6 @@
       image-rendering: pixelated;
     }
 
-    #game-container.shop-open #buffs-btn,
     #game-container.boxes-open #buffs-btn {
       pointer-events: none;
       z-index: 1; /* dimmed by the backdrop, not fully hidden - see #side-buttons' own note */
@@ -1604,8 +1595,7 @@
       bottom: 80px; /* boxes-btn's own top edge: 48px margin + 32px tall */
     }
 
-    #game-container.boxes-open #shop-dot,
-    #game-container.shop-open #boxes-dot {
+    #game-container.boxes-open #shop-dot {
       display: none;
     }
 
@@ -1636,7 +1626,6 @@
       top: 64px; /* 72 - half the dot */
     }
 
-    #game-container.shop-open #buffs-dot,
     #game-container.boxes-open #buffs-dot {
       display: none;
     }
@@ -2219,7 +2208,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=310"></script>
+  <script src="src/version.js?v=311"></script>
   <script src="src/economy.js?v=46"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2254,7 +2243,7 @@
   <script src="src/boxes.js?v=9"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=25"></script>
-  <script src="src/collection.js?v=82"></script>
+  <script src="src/collection.js?v=83"></script>
   <script src="src/main.js?v=195"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
@@ -2308,6 +2297,12 @@
       document.getElementById("boxes-btn").textContent = open ? "BACK" : "BOXES";
       if (open) {
         Collection.close();
+        // SHOP no longer blocks this button (2026-09-27, the owner's ask) - closing it here mirrors what
+        // Collection.open() now does for every list button, so BOXES can be reached straight from SHOP too.
+        if (container.classList.contains("shop-open")) {
+          container.classList.remove("shop-open");
+          document.getElementById("shop-btn").textContent = "SHOP";
+        }
         const game = window.snowyBallsGame;
         const scene = game && game.scene.getScene("main");
         if (scene && scene.onShopOpened) scene.onShopOpened(); // drop an aim in progress - same reasoning as the shop

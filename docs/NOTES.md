@@ -3020,3 +3020,34 @@ Refunded coins back to the 72 the test save already had from actual play between
 handful of skins granted mid-verification (Banan, Lollipop, Summer, Frosty Night, ...) as harmless
 leftovers, same as every previous testing round - no decrement API exists by design.
 - `src/main.js`, `src/boxes.js`, `index.html`, `assets/audio/legendary_pull.mp3` (new).
+
+## SHOP stops dimming everything else, switches tabs directly (2026-09-27)
+
+Reversed, for SHOP only, a decision from earlier the same day ("all the other buttons disappear behind
+it"): PROJECTILES/SKINS/OPTIONS (`#side-buttons`), BUFFS, LEADERBOARD, the ammo counter and the buff HUD
+all had their z-index dropped below `#shop-backdrop` and `pointer-events: none` while SHOP was open, so
+they sat there dimmed and dead. The owner's new ask: SHOP should behave exactly like a PROJECTILES/BUFFS
+list already does toward everything else - stay open behind it, untouched, until something else is
+tapped. Removed the `.shop-open` half of every one of those CSS rules (and the matching `#boxes-dot`/
+`#buffs-dot` hide-while-shop-open rules, since the buttons carrying those dots are interactive again) -
+kept the `.boxes-open` half of each exactly as it was, since only SHOP was asked for. BOXES still goes
+fully non-interactive behind SHOP and vice versa (that pair's own deliberate mutual exclusion, untouched).
+
+Being visible again isn't enough on its own - a tap on PROJECTILES while SHOP was still open would have
+done nothing before now (the whole point of `pointer-events: none`), so two spots now close SHOP as part
+of opening themselves: `Collection.open()` in `collection.js` (covers PROJECTILES/SKINS/OPTIONS/BUFFS/
+LEADERBOARD - every list goes through this one function) and the `boxes-btn` handler in `index.html`
+(BOXES isn't a list, has its own separate open logic). Both just remove `shop-open` and reset the SHOP
+button's own label back to "SHOP" - the same two lines the SHOP/BACK button's handler already runs when
+closing itself normally, so nothing else needed to change (the shop's countdown ticks on a plain
+`setInterval` regardless of whether the screen is open, same as before).
+
+Version bump: `src/collection.js?v=82 -> 83`.
+
+Verified live (test origin): opened SHOP - PROJECTILES/SKINS/OPTIONS, LEADERBOARD/BUFFS and BOXES/SHOP all
+stayed bright and clickable behind the panel (no grey overlay over them at all). Tapped PROJECTILES,
+BUFFS, and BOXES in turn straight from an open SHOP - each one closed SHOP cleanly (its own button's label
+correctly back to "SHOP", not stuck on "BACK") and opened directly, no intermediate empty frame. Re-opened
+BOXES on its own afterward and confirmed it still fully dims everything else exactly as before - only
+SHOP's own behaviour changed. No console errors. No coins/skins/equip state touched this round.
+- `index.html`, `src/collection.js`.

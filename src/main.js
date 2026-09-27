@@ -614,6 +614,7 @@ class MainScene extends Phaser.Scene {
     this.load.audio("window_clink", "assets/audio/window_clink.mp3");
     this.load.audio("click", "assets/audio/click.mp3");
     this.load.audio("shop_restock", "assets/audio/shop_restock.mp3?v=2");
+    this.load.audio("legendary_pull", "assets/audio/legendary_pull.mp3"); // boxes.js revealSound - a legendary box pull only
     this.load.audio("chestnut_impact", "assets/audio/chestnut_impact.mp3");
     this.load.audio("grenade_launch", "assets/audio/grenade_launch.mp3");
     this.load.audio("grenade_impact", "assets/audio/grenade_impact.mp3");

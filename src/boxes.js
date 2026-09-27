@@ -253,9 +253,9 @@ const Boxes = (() => {
   function revealSound(rarityId) {
     const game = window.snowyBallsGame;
     if (!game) return;
-    // epic/legendary get the same "something good just happened" chime a shop restock uses; common/rare just a
-    // slightly louder confirmation click, so the flourish itself signals how good the pull was before you even read it.
-    if (rarityId === "epic" || rarityId === "legendary") game.sound.play("shop_restock", { volume: 0.7 });
+    // Legendary gets its own dedicated fanfare (legendary_pull.mp3, 2026-09-27); every other rarity - epic
+    // included - just gets the plain confirmation click, so legendary is the only pull with a distinct sound.
+    if (rarityId === "legendary") game.sound.play("legendary_pull", { volume: 0.85 });
     else game.sound.play("click", { volume: 0.5 });
   }
 

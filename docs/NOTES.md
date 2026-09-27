@@ -2987,3 +2987,36 @@ the same correct 40/40/15/4/1% breakdown as before. Refunded the 500 coins spent
 back to 5072); did not touch equipped scenery/weather (space/acid_rain), which were already set from
 outside this session and were never mine to change.
 - `economy.json`, `src/boxes.js`, `index.html`.
+
+## Case-opening reveal sounds: legendary gets its own fanfare, epic downgraded (2026-09-27)
+
+The owner dropped `legendary_pull.mp3` on the Desktop and asked for two swaps: legendary pulls play that
+file instead of the shop-restock chime, and epic pulls drop down to the same plain click common/rare
+already got (so epic no longer shares a sound with legendary at all). File copied into
+`assets/audio/legendary_pull.mp3`, loaded in `main.js`'s `preload()` alongside the other one-off sounds.
+`boxes.js` `revealSound(rarityId)`: now `rarityId === "legendary"` -> `legendary_pull` (0.85 volume),
+everything else (common/rare/epic alike) -> the plain `click` (0.5 volume, same as before). Epic no longer
+gets any special treatment - legendary is now the only rarity with its own sound.
+
+Version bumps: `src/main.js?v=194 -> 195`, `src/boxes.js?v=8 -> 9`.
+
+Verified live (test origin) by forcing specific draws rather than hoping RNG cooperates: temporarily
+overrode `Math.random` to a fixed value for the duration of a single box-button `.click()` (draw() and its
+34 filler draws are all synchronous, so this reliably steers the roll into whichever rarity's slice of
+`boxOdds` without touching the odds themselves), then hooked `game.sound.play` to log every call. Confirmed
+a forced legendary draw (Banan) plays 27 ticks then exactly `legendary_pull` on landing; a forced epic draw
+(Lollipop) plays only `click` calls throughout, no `shop_restock` anywhere. No console errors.
+
+**Sidebar, for whoever reads this next:** forcing a draw by zeroing every `boxOdds` entry except the one
+you want (what I tried first) does NOT work - `draw()`'s `rid()` fallback (an item whose rarity isn't in
+the present-odds list falls back to the rarest present bucket, meant for a typo'd/missing rarity string)
+kicks in for EVERY item once only one rarity has nonzero odds, so `atRarity` ends up being the kind's
+*entire* pool and the result is a uniform pick across all of it, not a guaranteed pull of that rarity. Only
+found this by tracing `draw()` by hand against a live "epic" test that kept landing on a common item -
+forcing `Math.random` directly (leaving the real 80/15/4/1 odds untouched) is the reliable way to steer a
+specific test draw.
+
+Refunded coins back to the 72 the test save already had from actual play between sessions; left the
+handful of skins granted mid-verification (Banan, Lollipop, Summer, Frosty Night, ...) as harmless
+leftovers, same as every previous testing round - no decrement API exists by design.
+- `src/main.js`, `src/boxes.js`, `index.html`, `assets/audio/legendary_pull.mp3` (new).

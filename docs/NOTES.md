@@ -3178,3 +3178,57 @@ the equipped character all genuinely unchanged (checked the real values, not jus
 Andek afterward (equip state had drifted to Banan from earlier testing this session, not the owner's own
 play - the test save's baseline, harmless either way, but restored for cleanliness).
 - `economy.js`, `src/collection.js`, `index.html`.
+
+## Trading UI mockup: Private Inventory, INBOX, profile gallery, compose screen (2026-09-29)
+
+The client-only half of the trading plan (Part 2) - everything buildable and reviewable without Cloud
+Functions or a `trades/{}` collection, which don't exist yet (Part 3). Same standing as SELL: real, fully
+interactive UI: nothing it does actually creates, moves, or promises anything real yet.
+
+- **Private Inventory** (`src/economy.js`): new `privateInventory` bool, `getPrivateInventory`/
+  `setPrivateInventory`, a toggle in a new TRADING section of OPTIONS (`saves.js` `tradingSectionHtml`).
+  **Deliberately local-only** - NOT added to `cloud.js`'s `syncNow()` payload, because `firestore.rules`'
+  `leaderboard/{uid}` write rule today only allows `name/coins/character/description/updatedAt`
+  (`keys().hasOnly([...])`); sending an extra key would get the *entire* write rejected on the real
+  project, breaking normal leaderboard sync for anyone signed in. Wiring this into the cloud payload has to
+  wait until that rules key-list is updated (Part 3) - caught this before touching `cloud.js` at all.
+- **Profile-inspect popup** (`saves.js openInspect`): gains a PROPOSE TRADE button for anyone but yourself,
+  unless `row.privateInventory` is true (verified against a simulated private row, since no real leaderboard
+  row has this field yet - it correctly hides both the button and the gallery). Below the card,
+  `#board-inspect-skins` shows a real read-only gallery of what you actually own (`Collection.skinItems` +
+  `Economy.getSkinCount`, reusing BOXES' own `.box-inspect-cell`/`-icon` tile look) for your OWN card only -
+  another player's real inventory isn't synced to the cloud yet, so theirs reads "This player's inventory
+  isn't available to preview yet." instead of a gallery pretending to know something it doesn't.
+- **INBOX** (`saves.js` `renderBoardContent`/`renderInbox`/`toggleInbox`): a new button, top-right of the
+  LEADERBOARD panel (`#inbox-btn`, shown via a new `leaderboard-open` class `collection.js`'s `open()` now
+  toggles), swapping the same `#list-scroll` between the leaderboard and an INBOX sub-view in place - no
+  separate screen, its own title/hint text swap with it. Reads empty today ("No trade offers yet.") since
+  there's nowhere real to read from - `Cloud.refreshTrades` (once it exists) plugs in at `renderInbox`
+  without touching anything else. Built as a generic feed on purpose (the owner's own idea): a future
+  "letter"/postcard item can land in this same button/view later without restructuring it.
+- **Trade-compose screen** (`#trade-compose`, `saves.js openTradeCompose`): two columns, YOU GIVE (a coins
+  input clamped to what you actually have + a tile grid of your own real owned skins) and YOU WANT (a coins
+  input with no upper bound + a tile grid of the *entire* catalog, since no target's real inventory is
+  synced yet - the exact same "blind" fallback the plan already designed for a Private Inventory target,
+  just universal for now because the data simply doesn't exist). Tapping a tile toggles it (one of each, no
+  stacking - kept simple for a mockup). SEND OFFER summarizes the pick ("You give: Banan. You want: 5000
+  coins, Pryk.") in a popup that says plainly this is a preview, then closes - refuses with a gentle prompt
+  if both sides are completely empty, otherwise never blocks on anything.
+
+Version bumps: `src/economy.js?v=48 -> 49`, `src/saves.js?v=26 -> 28`, `src/collection.js?v=86 -> 87`
+(`Collection.skinItems` exported for the gallery/compose screen to read from).
+
+Verified live (test origin, public leaderboard read - no sign-in needed since every row reads as "not me"
+when signed out, which conveniently exercises the real "someone else" path against real player rows: BOOM,
+Domino, florian, ...): no console errors through the whole session. Toggled Private Inventory on/off in
+OPTIONS, confirmed the saved value flips both ways. Opened INBOX from LEADERBOARD - button label and list
+title both swap correctly, empty state shows, toggling back returns the real leaderboard rows unchanged.
+Opened BOOM's profile - PROPOSE TRADE button present, gallery correctly says inventory preview isn't
+available. Opened the compose screen against them: GIVE showed my own two owned skins (Banan, Black Andek -
+leftover test grants from earlier sessions), WANT showed the full catalog scrollable; selected one tile on
+each side (visible gold ring), set WANT's coins to 5000, confirmed GIVE's coins input clamps to my real
+balance (typed 99999, landed on 0); SEND produced the exact expected summary and closed both popups with
+coins/skin counts genuinely unchanged before and after. Separately simulated a private-inventory row
+client-side (real rows don't have the field yet) and confirmed both the trade button and the gallery
+correctly disappear for that player specifically, leaving no empty box behind.
+- `economy.js`, `src/saves.js`, `src/collection.js`, `index.html`.

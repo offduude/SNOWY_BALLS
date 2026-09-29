@@ -37,6 +37,12 @@ const Economy = (() => {
       event: null, // the event that is running: { name, startedAt, applauseAt } (both on the device clock; applauseAt null until the applause phase actually starts - see main.js "THE CLOCK") - it goes on while the app is closed, like the shop timers
       lastUsedBuff: null, // the id of the buff the player used last (the BUFFS list opens on it)
       god: false, // GOD MODE (the import code "god mode", see saves.js): nothing is ever used up or paid for - coins, projectiles and buffs are infinite
+      // PRIVATE INVENTORY (2026-09-29, OPTIONS toggle, saves.js renderOptions): when true, another player can't see
+      // your skins or propose a trade with you. Purely local for now - NOT sent to leaderboard/{uid} (cloud.js
+      // syncNow) yet, since firestore.rules doesn't allow that field on the live project and a client write with
+      // an extra key gets the WHOLE write rejected - wiring the sync waits for that rules change (see the trading
+      // plan's Part 3), same reasoning as economy.json's _boxOddsSecurityNote for selling/box-opening.
+      privateInventory: false,
       coinCarry: 0, // the fraction of a coin left over from a payout with a coin multiplier (0 <= x < 1), added to the next payout
       aiming: false, // true from the tap on "TAP to aim" until the ball is thrown - if the game starts with this still set, the aim was abandoned (the app was closed)
       streak: 0, // the CURRENT streak (hits in a row) - kept across reloads, projectile changes, closing the app
@@ -131,6 +137,7 @@ const Economy = (() => {
       accountNameChanges: Number.isInteger(p.accountNameChanges) && p.accountNameChanges >= 0 ? p.accountNameChanges : 0,
       streak: Number.isInteger(p.streak) && p.streak > 0 ? p.streak : 0,
       god: p.god === true,
+      privateInventory: p.privateInventory === true,
       lastUsedBuff: typeof p.lastUsedBuff === "string" ? rn(p.lastUsedBuff) : null,
       event:
         p.event && typeof p.event === "object" && typeof p.event.name === "string" && typeof p.event.startedAt === "number"
@@ -647,6 +654,14 @@ const Economy = (() => {
     return true;
   }
 
+  function getPrivateInventory() {
+    return state.privateInventory;
+  }
+  function setPrivateInventory(v) {
+    state.privateInventory = v === true;
+    save();
+  }
+
   // kind: "character" | "scenery" | "weather" | "projectile"
   function getEquipped(kind) {
     return state.equipped[kind];
@@ -782,6 +797,8 @@ const Economy = (() => {
     hasUnseenProjectiles,
     clearUnseenProjectiles,
     onProjectilesChange,
+    getPrivateInventory,
+    setPrivateInventory,
     getEquipped,
     setEquipped,
     setEquippedHook: (fn) => {

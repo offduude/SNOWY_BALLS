@@ -1110,6 +1110,36 @@
       display: block;
     }
 
+    /* INBOX (2026-09-29): top-right of the LEADERBOARD tab, same idea as #list-back but on the other corner and
+       only ever shown there - toggles between the leaderboard itself and the INBOX sub-view (saves.js
+       toggleInbox), its own label swapping between "INBOX" and "LEADERBOARD" the way SHOP/BACK already do. */
+    #inbox-btn {
+      display: none;
+      position: absolute;
+      top: calc(var(--u) * 1.1);
+      right: calc(var(--u) * 1.6);
+      padding: calc(var(--u) * 0.5) calc(var(--u) * 0.9);
+      background: #dcc9a0;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #3b2412;
+      font-family: inherit;
+      font-size: calc(var(--u) * 1);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #inbox-btn:active { background: #cbb789; }
+
+    #list-panel.leaderboard-open #inbox-btn {
+      display: block;
+    }
+
+    #inbox-btn .notif-dot {
+      top: calc(var(--u) * -0.8);
+      right: calc(var(--u) * -0.8);
+    }
+
     /* The SKINS list: two big buttons, one for each menu, with what is equipped now under the name. */
     /* The SKINS list: three category cards that share the whole height of the list between them (no scrolling); their CHANGE button is as wide as
        EQUIPPED so it looks like the skin cards' button. */
@@ -1911,10 +1941,22 @@
     }
 
     .save-icon-btn:active { background: #74491f; }
+    /* PRIVATE INVENTORY's own ON state (saves.js tradingSectionHtml, 2026-09-29) - a toggle, not a one-shot
+       action, so it needs a distinct "currently active" look, same idea as .pick-equip.on. */
+    .save-icon-btn.on { background: #b9a88f; border-color: #8a7a62; color: #3b2412; }
+    .save-icon-btn.on:active { background: #a89878; }
 
     /* CHANGE NAME + CHANGE DESCRIPTION side by side instead of stacked, splitting the row evenly. */
     .account-btn-row { flex: none; display: flex; gap: calc(var(--u) * 1); }
     .account-btn-row .save-icon-btn { flex: 1; min-width: 0; }
+
+    /* Small explanatory line under the PRIVATE INVENTORY toggle - muted, not an error (unlike .account-error). */
+    .trading-note {
+      flex: none;
+      color: #e6cfa3;
+      font-size: calc(var(--u) * 0.95);
+      line-height: 1.5;
+    }
 
     /* A leaderboard card: place | name ... coins. Ranks 2-3 get the same epic tint the buff cards use, rank 1 the same
        travelling rainbow + pulsing shine a legendary buff card gets (.rarity-wave / .buff-card-shine, shared keyframes) -
@@ -2047,13 +2089,17 @@
     }
 
     /* The leaderboard's inspect popup (saves.js: clicking a card) - lives over the LIST panel (list-open), not
-       the shop (the shop tab no longer has an inspect popup of its own since it became a plain list, 2026-09-27). */
+       the shop (the shop tab no longer has an inspect popup of its own since it became a plain list, 2026-09-27).
+       A column now (2026-09-29), not just the card centered alone - #board-inspect-skins (the inventory preview
+       PROPOSE TRADE reads from) stacks under it. */
     #board-inspect {
       position: absolute;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: calc(var(--u) * 1.4);
       background: rgba(0, 0, 0, 0.55);
       opacity: 0;
       pointer-events: none;
@@ -2071,6 +2117,174 @@
       font-family: "Press Start 2P", monospace;
       color: #3b2412;
     }
+
+    /* The inspected player's owned skins (saves.js skinsGalleryHtml, 2026-09-29) - same cream panel and icon-tile
+       look BOXES' own odds popup already established (.box-inspect-cell/.box-inspect-icon, reused verbatim). Only
+       ever shown for your OWN card today - another player's real inventory isn't synced to the cloud yet (see
+       skinsGalleryHtml's own note), so theirs reads as a plain placeholder line instead of an empty gallery. */
+    #board-inspect-skins {
+      width: 60%;
+      box-sizing: border-box;
+      max-height: calc(var(--u) * 24);
+      overflow-y: auto;
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 6px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+      padding: calc(var(--u) * 1.4);
+      font-family: "Press Start 2P", monospace;
+    }
+
+    #board-inspect-skins:empty { display: none; }
+
+    .inv-head {
+      color: #8a6a44;
+      font-size: calc(var(--u) * 1);
+      letter-spacing: 0.05em;
+      margin-bottom: calc(var(--u) * 1);
+    }
+
+    .inv-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: calc(var(--u) * 1.2);
+    }
+
+    .inv-count {
+      color: #8a6a44;
+      font-size: calc(var(--u) * 0.85);
+    }
+
+    .inv-note {
+      color: #8a6a44;
+      font-size: calc(var(--u) * 1);
+      text-align: center;
+    }
+
+    /* Trade compose (2026-09-29, saves.js openTradeCompose) - a full-screen popup above #board-inspect (8), same
+       family as every other overlay: dimmed backdrop, cream panel, gated by .list-open + its own .show class. */
+    #trade-compose {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.62);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 9;
+    }
+
+    #game-container.list-open #trade-compose.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #trade-compose-panel {
+      width: 82%;
+      height: 82%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 6px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+      padding: calc(var(--u) * 1.6);
+      font-family: "Press Start 2P", monospace;
+      color: #3b2412;
+    }
+
+    #trade-compose-title {
+      flex: none;
+      text-align: center;
+      font-size: calc(var(--u) * 1.4);
+      margin-bottom: calc(var(--u) * 1.2);
+    }
+
+    #trade-compose-cols {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      gap: calc(var(--u) * 1.6);
+    }
+
+    .trade-col {
+      flex: 1;
+      min-width: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--u) * 1);
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 4px;
+      padding: calc(var(--u) * 1);
+    }
+
+    .trade-col-head {
+      flex: none;
+      text-align: center;
+      font-size: calc(var(--u) * 1.1);
+      color: #8a6a44;
+      letter-spacing: 0.05em;
+    }
+
+    .trade-coins-row {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: calc(var(--u) * 0.6);
+    }
+
+    .trade-coins-row .coin {
+      flex: none;
+      width: calc(var(--u) * 1.4);
+      height: calc(var(--u) * 1.4);
+      background: #f1c40f;
+      border: 2px solid #b8860b;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
+
+    .trade-coins-input {
+      width: calc(var(--u) * 12);
+      box-sizing: border-box;
+      padding: calc(var(--u) * 0.6);
+      background: #fff8e6;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+      color: #3b2412;
+      font: calc(var(--u) * 1.1) "Press Start 2P", monospace;
+    }
+
+    .trade-skins-grid {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: calc(var(--u) * 1);
+    }
+
+    /* A tapped tile in either grid (reuses BOXES' own .box-inspect-cell/-icon tiles) - a gold ring on top of
+       whatever rarity tint it already has, so "selected" reads clearly against any of them, tinted or not. */
+    .trade-skins-grid .box-inspect-cell.selected .box-inspect-icon {
+      box-shadow: 0 0 0 3px #f1c40f, 0 0 10px rgba(241, 196, 15, 0.6);
+    }
+
+    #trade-compose-buttons {
+      flex: none;
+      display: flex;
+      gap: calc(var(--u) * 1);
+      margin-top: calc(var(--u) * 1.4);
+    }
+
+    #trade-compose-buttons .save-icon-btn { flex: 1; }
+    .save-icon-btn.ghost { background: #dcc9a0; border-color: #7a5230; color: #3b2412; }
+    .save-icon-btn.ghost:active { background: #cbb789; }
 
     /* A fixed height (as tall as a full 60-character bio ever needs, wrapped) - a safety net alongside the length cap and
        the word-break above, not the thing doing the capping: the card clips rather than grows if it's ever exceeded. */
@@ -2195,7 +2409,30 @@
       <div id="box-open-result"><span id="box-open-rarity"></span><span id="box-open-name"></span></div>
       <div id="box-open-caption">TAP to CONTINUE</div>
     </div>
-    <div id="board-inspect"><div id="board-inspect-card"></div></div>
+    <div id="board-inspect"><div id="board-inspect-card"></div><div id="board-inspect-skins"></div></div>
+    <!-- Trade compose (2026-09-29, saves.js openTradeCompose) - a mockup, see that function's own note: SEND
+         only ever shows a summary and closes, nothing is created anywhere yet. -->
+    <div id="trade-compose">
+      <div id="trade-compose-panel">
+        <div id="trade-compose-title">PROPOSE TRADE</div>
+        <div id="trade-compose-cols">
+          <div class="trade-col">
+            <div class="trade-col-head">YOU GIVE</div>
+            <div class="trade-coins-row"><i class="coin"></i><input type="number" min="0" step="1" inputmode="numeric" class="trade-coins-input" data-side="give" /></div>
+            <div class="trade-skins-grid" data-side="give"></div>
+          </div>
+          <div class="trade-col">
+            <div class="trade-col-head">YOU WANT</div>
+            <div class="trade-coins-row"><i class="coin"></i><input type="number" min="0" step="1" inputmode="numeric" class="trade-coins-input" data-side="want" /></div>
+            <div class="trade-skins-grid" data-side="want"></div>
+          </div>
+        </div>
+        <div id="trade-compose-buttons">
+          <button type="button" id="trade-send-btn" class="save-icon-btn">SEND OFFER</button>
+          <button type="button" id="trade-cancel-btn" class="save-icon-btn ghost">CANCEL</button>
+        </div>
+      </div>
+    </div>
     <div id="shop-backdrop"></div>
     <div id="shop-panel">
       <div id="shop-header"><span id="shop-title">SHOP</span><span id="shop-timer"></span></div>
@@ -2209,6 +2446,7 @@
     <div id="list-panel">
       <div id="list-title"></div>
       <button id="list-back" type="button">BACK</button>
+      <button id="inbox-btn" type="button">INBOX<span id="inbox-dot" class="notif-dot"></span></button>
       <div id="version-tag"></div>
       <div id="list-scroll"></div>
       <div id="list-hint" class="board-hint"></div>
@@ -2241,8 +2479,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=314"></script>
-  <script src="src/economy.js?v=48"></script>
+  <script src="src/version.js?v=315"></script>
+  <script src="src/economy.js?v=49"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -2275,8 +2513,8 @@
   <script src="src/shop.js?v=42"></script>
   <script src="src/boxes.js?v=9"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=26"></script>
-  <script src="src/collection.js?v=86"></script>
+  <script src="src/saves.js?v=28"></script>
+  <script src="src/collection.js?v=87"></script>
   <script src="src/main.js?v=195"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
@@ -2284,7 +2522,7 @@
     // Worse: when the shop re-rendered a card mid-touch, its touchend never reached window, Phaser
     // thought the finger was still down, and every later tap was ignored ("tap to aim" did nothing).
     // These elements are pure HTML UI, so keep their touches away from Phaser entirely.
-    ["boxes-board", "boxes-items", "boxes-hint", "boxes-inspect", "boxes-inspect-item", "box-open", "boxes-btn", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
+    ["boxes-board", "boxes-items", "boxes-hint", "boxes-inspect", "boxes-inspect-item", "box-open", "boxes-btn", "shop-panel", "shop-cats", "shop-backdrop", "shop-btn", "buffs-btn", "buff-hud", "ammo-box", "leaderboard-btn", "board-inspect", "trade-compose", "coin-counter", "side-buttons", "list-panel", "list-backdrop"].forEach((id) => {
       const el = document.getElementById(id);
       ["touchstart", "touchend", "touchcancel", "mousedown", "mouseup"].forEach((type) => {
         el.addEventListener(type, (e) => e.stopPropagation());

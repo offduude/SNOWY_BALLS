@@ -468,6 +468,7 @@ const Collection = (() => {
     openKind = kind;
     scrollEl.dataset.kind = kind; // (the OPTIONS list redraws itself after a change, see Saves.refresh)
     panelEl.classList.toggle("options-open", kind === "options"); // (the version tag is shown in the OPTIONS list only)
+    panelEl.classList.toggle("leaderboard-open", kind === "leaderboard"); // (the INBOX button is shown in the LEADERBOARD list only, 2026-09-29)
     document.getElementById("version-tag").textContent = typeof GAME_VERSION_TEXT === "string" ? GAME_VERSION_TEXT : "";
     // Fixed under the whole tab, not scrolled away with the cards (moved out of Saves.renderLeaderboard's own
     // innerHTML, 2026-09-27 - the owner's ask, it used to be the last row of the scrollable list itself).
@@ -633,6 +634,7 @@ const Collection = (() => {
     isOpen: () => openKind !== null,
     shopRowHtml,
     skinRowHtml, // the BOXES inspect popup's item detail card (boxes.js) reuses the same card the SKINS menu itself uses
+    skinItems, // (kind) -> every character/scenery/weather item, incl. default - the leaderboard inspect popup's own skins gallery (saves.js, 2026-09-29) uses this to list what you actually own
     projectileImage: (id) => ((CATALOG.projectile.items.find((i) => i.id === id) || {}).image) || "", // (the counter under the top-right buttons)
     characterInfo: (id) => skinItems("character").find((c) => c.id === id) || null, // { id, name, description, image, ... } - the ACCOUNT card and the leaderboard's inspect popup (saves.js) use this for the picture + description
     close,

@@ -117,6 +117,20 @@ const Saves = (() => {
     return `<div class="opt-section"><div class="opt-head">ACCOUNT</div>${card}${errorLine}${btnRow}</div>`;
   }
 
+  // PRIVATE INVENTORY (2026-09-29): on = other players can't see your skins from your LEADERBOARD profile, and
+  // can't propose a trade with you at all - Economy.getPrivateInventory/setPrivateInventory, purely local for
+  // now (see that function's own note on why it isn't synced to the cloud yet).
+  function tradingSectionHtml() {
+    if (typeof Economy === "undefined") return "";
+    const on = Economy.getPrivateInventory();
+    return (
+      `<div class="opt-section"><div class="opt-head">TRADING</div>` +
+      `<div class="account-row"><span>Private Inventory</span>` +
+      `<button type="button" class="save-icon-btn${on ? " on" : ""}" data-act="toggle-private">${on ? "ON" : "OFF"}</button></div>` +
+      `<div class="trading-note">Hides your skins and blocks trade offers from other players.</div></div>`
+    );
+  }
+
   // CHANGE DESCRIPTION: edit the account's own bio line. Sanitized and capped the same way on save as everywhere else
   // (Economy.setAccountDescription does its own cleaning too - this is just for the live counter/preview here).
   function showEditDescription() {
@@ -232,6 +246,7 @@ const Saves = (() => {
     listEl = el;
     el.innerHTML =
       accountSectionHtml() +
+      tradingSectionHtml() +
       `<div class="opt-section"><div class="opt-head">VOLUME</div><div class="vol-row" data-vol="master"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Volume" /><span class="vol-value"></span></div>` +
       `<div class="vol-name">Weather</div><div class="vol-row" data-vol="weather"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Weather" /><span class="vol-value"></span></div></div>`;
     wireVolume(el);
@@ -270,7 +285,7 @@ const Saves = (() => {
 
   function refresh() {
     if (listEl && listEl.dataset.kind === "options") renderOptions(listEl);
-    if (boardEl && boardEl.dataset.kind === "leaderboard") renderLeaderboard(boardEl);
+    if (boardEl && boardEl.dataset.kind === "leaderboard") renderBoardContent(); // whichever of leaderboard/INBOX is currently showing, not reset to the leaderboard
     updateLeaderboardButton();
   }
 
@@ -286,6 +301,10 @@ const Saves = (() => {
     } else if (b.dataset.act === "editname") {
       if (typeof playUiClick === "function") playUiClick();
       showEditName();
+    } else if (b.dataset.act === "toggle-private") {
+      if (typeof playUiClick === "function") playUiClick();
+      Economy.setPrivateInventory(!Economy.getPrivateInventory());
+      renderOptions(listEl);
     }
   }
 
@@ -340,24 +359,64 @@ const Saves = (() => {
     );
   }
 
+  // Opening the LEADERBOARD screen always starts on the actual leaderboard, never wherever INBOX was left last
+  // time - `inboxOpen` only flips via the INBOX button itself (toggleInbox) from here on.
   function renderLeaderboard(el) {
     boardEl = el;
+    inboxOpen = false;
+    renderBoardContent();
+  }
+
+  function renderBoardContent() {
+    if (!boardEl) return;
+    updateInboxButton();
+    const titleEl = document.getElementById("list-title");
+    if (titleEl) titleEl.textContent = inboxOpen ? "INBOX" : "LEADERBOARD";
+    const hintEl = document.getElementById("list-hint");
+    if (hintEl) hintEl.textContent = inboxOpen ? "" : "TAP to INSPECT";
+    if (inboxOpen) {
+      renderInbox(boardEl);
+      return;
+    }
     if (typeof Cloud === "undefined" || !Cloud.isConfigured()) {
-      el.innerHTML = `<div class="board-empty">Not set up yet.</div>`;
+      boardEl.innerHTML = `<div class="board-empty">Not set up yet.</div>`;
       return;
     }
     const rows = Cloud.getLeaderboardCache();
     if (!rows) {
-      el.innerHTML = `<div class="board-empty">Loading...</div>`;
+      boardEl.innerHTML = `<div class="board-empty">Loading...</div>`;
       return;
     }
     if (!rows.length) {
-      el.innerHTML = `<div class="board-empty">No scores yet.</div>`;
+      boardEl.innerHTML = `<div class="board-empty">No scores yet.</div>`;
       return;
     }
     // The "TAP to INSPECT" hint used to be the last row here, scrolled away with the cards - it's now a fixed
     // footer under the whole tab instead (index.html #list-hint, toggled by collection.js's open()).
-    el.innerHTML = rows.map((row, i) => leaderboardCardHtml(row, i + 1)).join("");
+    boardEl.innerHTML = rows.map((row, i) => leaderboardCardHtml(row, i + 1)).join("");
+  }
+
+  // ---------- INBOX (2026-09-29): a sub-view of the LEADERBOARD screen (top-right button, #inbox-btn), meant to
+  // hold both trade offers and - later, the owner's own idea - a "letter"/postcard item's messages, in one
+  // newest-first feed. There is no trades/{tradeId} collection yet (see the trading plan's Part 3 - proposeTrade
+  // is a Cloud Function that doesn't exist), so this always reads empty today; Cloud.refreshTrades (once it
+  // exists) plugs in here, replacing the empty-state check below with real rows sorted the same way
+  // Cloud.refreshLeaderboard's own cache already is.
+  let inboxOpen = false;
+
+  function renderInbox(el) {
+    el.innerHTML = `<div class="board-empty">No trade offers yet.</div>`;
+  }
+
+  function updateInboxButton() {
+    const btn = document.getElementById("inbox-btn");
+    if (btn) btn.textContent = inboxOpen ? "LEADERBOARD" : "INBOX";
+  }
+
+  function toggleInbox() {
+    if (typeof playUiClick === "function") playUiClick();
+    inboxOpen = !inboxOpen;
+    renderBoardContent();
   }
 
   // ---- click a leaderboard card to inspect it ----
@@ -375,16 +434,66 @@ const Saves = (() => {
     const row = rows[i];
     const me = Cloud.getUser();
     const isMe = me && me.uid === uid;
+    // PROPOSE TRADE (2026-09-29): hidden only when the target has explicitly gone private - `row.privateInventory`
+    // is `undefined` for every real leaderboard row today (the field isn't synced to the cloud yet, see
+    // Economy.setPrivateInventory's own note), which is falsy, so the button shows by default until that changes.
+    const tradeBtn = isMe || row.privateInventory ? "" : ` <button type="button" class="save-icon-btn" data-act="trade" data-uid="${esc(uid)}">PROPOSE TRADE</button>`;
     const action = isMe
       ? `<button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button>`
-      : `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span>`;
+      : `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span>${tradeBtn}`;
     inspectOpenedAt = Date.now();
     inspectEl.querySelector("#board-inspect-card").innerHTML = accountCardHtml(row.name, row.character, row.description, action, boardTierClass(i + 1), i + 1);
+    inspectEl.querySelector("#board-inspect-skins").innerHTML = skinsGalleryHtml(uid, row);
     inspectEl.classList.add("show");
+  }
+
+  // The rarity-tint trick every icon-tile popup in the game uses (boxes.js tintAttrs is the original - duplicated
+  // here rather than exported, since it's three lines and boxes.js has no reason to know saves.js exists).
+  function invTintAttrs(item) {
+    const r = typeof Rarity !== "undefined" && Rarity.info(item.rarity);
+    if (!r) return "";
+    if (r.color === "rainbow") return " rainbow";
+    const m = /^#([0-9a-f]{6})$/i.exec(r.color || "");
+    if (!m) return "";
+    const n = parseInt(m[1], 16);
+    return ` box-inspect-icon tinted" style="--tint: rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.22)`;
+  }
+
+  // The inspected player's owned (non-default) skins, read-only - reuses BOXES' own .box-inspect-cell/-icon tile
+  // look. Only ever real for YOUR OWN card (Economy has your own skinCounts locally); another player's inventory
+  // isn't broadcast to leaderboard/{uid} yet (no `skins` field there today - see the trading plan's Part 3), so
+  // their card gets an honest placeholder instead of a gallery that pretends to know what they own.
+  function skinsGalleryHtml(uid, row) {
+    const me = Cloud.getUser();
+    if (!(me && me.uid === uid)) {
+      if (row.privateInventory) return ""; // no PROPOSE TRADE either in this case - nothing to preview
+      return `<div class="inv-note">This player's inventory isn't available to preview yet.</div>`;
+    }
+    if (typeof Collection === "undefined" || typeof Economy === "undefined") return "";
+    const cells = [];
+    for (const kind of ["character", "scenery", "weather"]) {
+      for (const item of Collection.skinItems(kind)) {
+        const n = Economy.getSkinCount(kind, item.id);
+        if (item.rarity === "default" || n <= 0) continue;
+        cells.push(
+          `<div class="box-inspect-cell" title="${esc(item.name)}">` +
+          `<span class="box-inspect-icon${invTintAttrs(item)}"><img src="${esc(item.image || "")}" alt="" draggable="false" /></span>` +
+          `<span class="inv-count">x${n}</span>` +
+          `</div>`
+        );
+      }
+    }
+    if (!cells.length) return `<div class="inv-note">No skins yet.</div>`;
+    return `<div class="inv-head">INVENTORY</div><div class="inv-grid">${cells.join("")}</div>`;
   }
 
   function onInspectClick(e) {
     if (Date.now() - inspectOpenedAt < 350) return; // the finger that opened it must not also close/act on it
+    const tradeBtn = e.target.closest('[data-act="trade"]');
+    if (tradeBtn) {
+      openTradeCompose(tradeBtn.dataset.uid); // opens the compose screen instead of the generic data-act handling below
+      return;
+    }
     const btn = e.target.closest("[data-act]");
     if (btn) {
       onClick(e); // SIGN OUT on your own inspected card - same handling as the ACCOUNT section's button
@@ -392,6 +501,129 @@ const Saves = (() => {
       return;
     }
     if (!e.target.closest(".pick-row")) closeInspect(); // outside the card
+  }
+
+  // ---------- Trade compose (2026-09-29) ----------
+  // A MOCKUP, same standing as SELL: SEND opens a summary and closes, nothing is actually created anywhere (no
+  // trades/{tradeId} collection exists yet - that's Cloud Functions work, see the trading plan's Part 3). This
+  // is here to review the layout and the picking flow, not to move anything real yet.
+  let tradeComposeEl = null;
+  let tradeTarget = null; // { uid, name } | null
+  let tradeGive = { coins: 0, skins: [] }; // skins: [{kind,id}] - one of each, no stacking (kept simple for the mockup)
+  let tradeWant = { coins: 0, skins: [] };
+
+  // "YOU WANT" has nothing real to pick from yet - the target's actual inventory isn't synced to the cloud (see
+  // skinsGalleryHtml's own note) - so it offers the whole catalog instead, the same fallback the trading plan
+  // already designs for a Private Inventory target: you can ask for anything, it just wouldn't be valid to
+  // accept unless they really own it, which only a real acceptTrade Cloud Function could ever check.
+  function allSkinsCatalog() {
+    const out = [];
+    for (const kind of ["character", "scenery", "weather"]) {
+      for (const item of Collection.skinItems(kind)) if (item.rarity !== "default") out.push({ kind, item });
+    }
+    return out;
+  }
+
+  function mySkinsCatalog() {
+    const out = [];
+    for (const kind of ["character", "scenery", "weather"]) {
+      for (const item of Collection.skinItems(kind)) {
+        if (item.rarity !== "default" && Economy.getSkinCount(kind, item.id) > 0) out.push({ kind, item });
+      }
+    }
+    return out;
+  }
+
+  function tradeTileHtml(kind, item, selected) {
+    return (
+      `<div class="box-inspect-cell${selected ? " selected" : ""}" data-kind="${esc(kind)}" data-id="${esc(item.id)}" title="${esc(item.name)}">` +
+      `<span class="box-inspect-icon${invTintAttrs(item)}"><img src="${esc(item.image || "")}" alt="" draggable="false" /></span>` +
+      `</div>`
+    );
+  }
+
+  function renderTradeSide(side) {
+    const state = side === "give" ? tradeGive : tradeWant;
+    const catalog = side === "give" ? mySkinsCatalog() : allSkinsCatalog();
+    tradeComposeEl.querySelector(`.trade-skins-grid[data-side="${side}"]`).innerHTML = catalog.length
+      ? catalog.map(({ kind, item }) => tradeTileHtml(kind, item, state.skins.some((s) => s.kind === kind && s.id === item.id))).join("")
+      : `<div class="inv-note">${side === "give" ? "You have no sellable skins yet." : "Nothing to pick from yet."}</div>`;
+    tradeComposeEl.querySelector(`.trade-coins-input[data-side="${side}"]`).value = state.coins;
+  }
+
+  function openTradeCompose(uid) {
+    const row = (Cloud.getLeaderboardCache() || []).find((r) => r.uid === uid);
+    if (!row || !tradeComposeEl) return;
+    tradeTarget = { uid, name: row.name };
+    tradeGive = { coins: 0, skins: [] };
+    tradeWant = { coins: 0, skins: [] };
+    tradeComposeEl.querySelector("#trade-compose-title").textContent = `PROPOSE TRADE - ${row.name}`;
+    renderTradeSide("give");
+    renderTradeSide("want");
+    tradeComposeEl.classList.add("show");
+  }
+
+  function closeTradeCompose() {
+    if (tradeComposeEl) tradeComposeEl.classList.remove("show");
+    tradeTarget = null;
+  }
+
+  function skinLabel(kind, id) {
+    const item = (Collection.skinItems(kind) || []).find((x) => x.id === id);
+    return item ? item.name : id;
+  }
+
+  function tradeSummaryLine(state) {
+    const parts = [];
+    if (state.coins > 0) parts.push(`${state.coins} coins`);
+    parts.push(...state.skins.map((s) => skinLabel(s.kind, s.id)));
+    return parts.length ? esc(parts.join(", ")) : "nothing";
+  }
+
+  function handleTradeSend() {
+    if (!tradeGive.coins && !tradeGive.skins.length && !tradeWant.coins && !tradeWant.skins.length) {
+      openModal("PROPOSE TRADE", `<div class="modal-text">Offer at least a coin or a skin on one side first.</div>`, [{ label: "OK" }]);
+      return;
+    }
+    openModal(
+      "PROPOSE TRADE",
+      `<div class="modal-text">To <b>${esc(tradeTarget.name)}</b>:<br>You give: ${tradeSummaryLine(tradeGive)}.<br>` +
+        `You want: ${tradeSummaryLine(tradeWant)}.<br><br>This is a preview - trading isn't live yet.</div>`,
+      [{ label: "OK", onClick: () => closeTradeCompose() }]
+    );
+  }
+
+  function onTradeComposeClick(e) {
+    const cell = e.target.closest(".box-inspect-cell[data-id]");
+    if (cell) {
+      const side = cell.closest(".trade-skins-grid").dataset.side;
+      const state = side === "give" ? tradeGive : tradeWant;
+      const idx = state.skins.findIndex((s) => s.kind === cell.dataset.kind && s.id === cell.dataset.id);
+      if (idx >= 0) state.skins.splice(idx, 1);
+      else state.skins.push({ kind: cell.dataset.kind, id: cell.dataset.id });
+      if (typeof playUiClick === "function") playUiClick();
+      renderTradeSide(side);
+      return;
+    }
+    if (e.target.id === "trade-cancel-btn" || e.target === tradeComposeEl) {
+      if (typeof playUiClick === "function") playUiClick();
+      closeTradeCompose();
+      return;
+    }
+    if (e.target.id === "trade-send-btn") {
+      if (typeof playUiClick === "function") playUiClick();
+      handleTradeSend();
+    }
+  }
+
+  function onTradeComposeInput(e) {
+    const input = e.target.closest(".trade-coins-input");
+    if (!input) return;
+    const side = input.dataset.side;
+    let v = Math.max(0, Math.floor(Number(input.value) || 0));
+    if (side === "give") v = Math.min(v, Economy.getCoins()); // can't offer more than you actually have
+    input.value = v;
+    (side === "give" ? tradeGive : tradeWant).coins = v;
   }
 
   function wireLeaderboardClick(root) {
@@ -403,6 +635,13 @@ const Saves = (() => {
       const card = e.target.closest(".board-card[data-uid]");
       if (card) openInspect(card.dataset.uid);
     });
+    tradeComposeEl = document.getElementById("trade-compose");
+    if (tradeComposeEl) {
+      tradeComposeEl.addEventListener("click", onTradeComposeClick);
+      tradeComposeEl.addEventListener("input", onTradeComposeInput);
+    }
+    const inboxBtn = document.getElementById("inbox-btn");
+    if (inboxBtn) inboxBtn.addEventListener("click", toggleInbox);
   }
 
   if (typeof Cloud !== "undefined") {

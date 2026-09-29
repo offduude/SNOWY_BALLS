@@ -434,13 +434,16 @@ const Saves = (() => {
     const row = rows[i];
     const me = Cloud.getUser();
     const isMe = me && me.uid === uid;
-    // PROPOSE TRADE (2026-09-29): hidden only when the target has explicitly gone private - `row.privateInventory`
-    // is `undefined` for every real leaderboard row today (the field isn't synced to the cloud yet, see
+    // TRADE (2026-09-29): hidden only when the target has explicitly gone private - `row.privateInventory` is
+    // `undefined` for every real leaderboard row today (the field isn't synced to the cloud yet, see
     // Economy.setPrivateInventory's own note), which is falsy, so the button shows by default until that changes.
-    const tradeBtn = isMe || row.privateInventory ? "" : ` <button type="button" class="save-icon-btn" data-act="trade" data-uid="${esc(uid)}">PROPOSE TRADE</button>`;
+    const tradeBtn = isMe || row.privateInventory ? "" : `<button type="button" class="save-icon-btn" data-act="trade" data-uid="${esc(uid)}">TRADE</button>`;
+    // Coins + TRADE stacked in their own column with real spacing between them (2026-09-29 - they used to just
+    // sit side by side in .pick-action's own flow with no gap, reading as cramped once TRADE was added next to
+    // the coins) instead of both loose inside .pick-action.
     const action = isMe
       ? `<button type="button" class="save-icon-btn" data-act="signout">SIGN OUT</button>`
-      : `<span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span>${tradeBtn}`;
+      : `<div class="board-action-col"><span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span>${tradeBtn}</div>`;
     inspectOpenedAt = Date.now();
     inspectEl.querySelector("#board-inspect-card").innerHTML = accountCardHtml(row.name, row.character, row.description, action, boardTierClass(i + 1), i + 1);
     inspectEl.querySelector("#board-inspect-skins").innerHTML = skinsGalleryHtml(uid, row);
@@ -552,12 +555,13 @@ const Saves = (() => {
   }
 
   function openTradeCompose(uid) {
-    const row = (Cloud.getLeaderboardCache() || []).find((r) => r.uid === uid);
-    if (!row || !tradeComposeEl) return;
-    tradeTarget = { uid, name: row.name };
+    const rows = Cloud.getLeaderboardCache() || [];
+    const i = rows.findIndex((r) => r.uid === uid);
+    if (i < 0 || !tradeComposeEl) return;
+    tradeTarget = { uid, name: rows[i].name, rank: i + 1 };
     tradeGive = { coins: 0, skins: [] };
     tradeWant = { coins: 0, skins: [] };
-    tradeComposeEl.querySelector("#trade-compose-title").textContent = `PROPOSE TRADE - ${row.name}`;
+    tradeComposeEl.querySelector("#trade-compose-title").textContent = `PROPOSE TRADE - ${rows[i].name}`;
     renderTradeSide("give");
     renderTradeSide("want");
     tradeComposeEl.classList.add("show");
@@ -580,16 +584,29 @@ const Saves = (() => {
     return parts.length ? esc(parts.join(", ")) : "nothing";
   }
 
+  // The confirm itself reads as a real, weighty commitment (2026-09-29, the owner's ask: "look more serious") -
+  // a bordered GIVE/WANT block instead of a plain sentence, the target's leaderboard rank next to their name,
+  // and SEND OFFER styled `danger` (the same red every other real, consequential confirm in the game uses - SELL,
+  // the account-overwrite warning) rather than a throwaway "OK". CANCEL backs out to the compose screen, still
+  // open underneath, without sending anything - only SEND OFFER closes it. The "preview, not live yet" line
+  // stays, just demoted to a small status note under the real terms instead of being the headline.
   function handleTradeSend() {
     if (!tradeGive.coins && !tradeGive.skins.length && !tradeWant.coins && !tradeWant.skins.length) {
-      openModal("PROPOSE TRADE", `<div class="modal-text">Offer at least a coin or a skin on one side first.</div>`, [{ label: "OK" }]);
+      openModal("TRADE OFFER", `<div class="modal-text">Offer at least a coin or a skin on one side first.</div>`, [{ label: "OK" }]);
       return;
     }
     openModal(
-      "PROPOSE TRADE",
-      `<div class="modal-text">To <b>${esc(tradeTarget.name)}</b>:<br>You give: ${tradeSummaryLine(tradeGive)}.<br>` +
-        `You want: ${tradeSummaryLine(tradeWant)}.<br><br>This is a preview - trading isn't live yet.</div>`,
-      [{ label: "OK", onClick: () => closeTradeCompose() }]
+      "CONFIRM TRADE OFFER",
+      `<div class="modal-text">Proposing a trade with <b>${esc(tradeTarget.name)}</b> (#${tradeTarget.rank}):</div>` +
+        `<div class="trade-confirm-block">` +
+        `<div class="trade-confirm-row"><span class="trade-confirm-label">YOU GIVE</span><span>${tradeSummaryLine(tradeGive)}</span></div>` +
+        `<div class="trade-confirm-row"><span class="trade-confirm-label">YOU WANT</span><span>${tradeSummaryLine(tradeWant)}</span></div>` +
+        `</div>` +
+        `<div class="modal-status">Preview only - trading isn't live yet.</div>`,
+      [
+        { label: "SEND OFFER", cls: "danger", onClick: () => closeTradeCompose() },
+        { label: "CANCEL", cls: "ghost" },
+      ]
     );
   }
 
@@ -602,7 +619,10 @@ const Saves = (() => {
       if (idx >= 0) state.skins.splice(idx, 1);
       else state.skins.push({ kind: cell.dataset.kind, id: cell.dataset.id });
       if (typeof playUiClick === "function") playUiClick();
-      renderTradeSide(side);
+      // Toggle just this one tile's own class instead of re-rendering the whole grid (renderTradeSide rebuilds
+      // every tile's innerHTML, which restarts a legendary tile's rainbow animation from scratch - even one NOT
+      // being tapped - reading as the whole background "jumping" on every selection, 2026-09-29 bugfix).
+      cell.classList.toggle("selected", idx < 0);
       return;
     }
     if (e.target.id === "trade-cancel-btn" || e.target === tradeComposeEl) {

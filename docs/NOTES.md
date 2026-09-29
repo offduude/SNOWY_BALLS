@@ -3232,3 +3232,98 @@ coins/skin counts genuinely unchanged before and after. Separately simulated a p
 client-side (real rows don't have the field yet) and confirmed both the trade button and the gallery
 correctly disappear for that player specifically, leaving no empty box behind.
 - `economy.js`, `src/saves.js`, `src/collection.js`, `index.html`.
+
+## Trading mockup polish round: selection ring, TRADE placement, serious confirm (2026-09-29)
+
+Four owner-flagged issues after using the trading mockup for the first time:
+
+- **Legendary tiles "jumped" when selecting anything.** Root cause: `onTradeComposeClick` called
+  `renderTradeSide(side)` on every tap, rebuilding the WHOLE grid's `innerHTML` - which restarts every CSS
+  animation in it from frame 0, including a legendary tile's own `rarity-wave`/`buff-card-shine` rainbow
+  loop, even for a tile that wasn't the one tapped. Fixed by toggling just the tapped cell's own `.selected`
+  class directly instead of re-rendering anything - confirmed via the DOM node's own identity surviving a
+  neighbor's selection (it does now; it didn't before).
+- **The selection ring was invisible on a legendary tile specifically** - a SEPARATE bug from the jump, not
+  just a contrast issue: `.rainbow` already runs its own box-shadow keyframe (`buff-card-shine`, the white
+  shine-pulse), and an element can only run ONE box-shadow animation - it was silently overwriting the
+  selection ring's static box-shadow every frame. Same class of conflict `.shop-card-shine` already exists
+  to avoid elsewhere in this file. Fixed with a dedicated `trade-select-shine-rainbow` keyframe that carries
+  the ring in every frame, shine pulsing around it instead of replacing it. Also switched the ring itself
+  from gold to red (`#ff3b30`) per the owner's ask, for guaranteed contrast against any rarity tint.
+- **TRADE button placement** (`saves.js accountCardHtml`'s `action` slot): coins and the button used to sit
+  loose in `.pick-action`'s own flow with no gap between them, reading cramped once the button was added.
+  New `.board-action-col` wrapper (flex column, real gap, right-aligned) fixes the spacing; the button's own
+  label also shortened from "PROPOSE TRADE" to "TRADE" (matching help it fit).
+- **The trade confirm now reads as a real commitment, not a throwaway "OK"**: title "CONFIRM TRADE OFFER",
+  the target's leaderboard rank next to their name ("Proposing a trade with florian (#3):"), a bordered
+  GIVE/WANT terms block instead of an inline sentence, SEND OFFER styled `danger` (matching SELL's own red -
+  the game's existing convention for a real, consequential confirm) with a genuine CANCEL that backs out to
+  the still-open compose screen rather than a single dismissive OK. The "preview, not live yet" line is now
+  a small status note under the real terms, not the headline.
+
+Version bumps: `src/saves.js?v=28 -> 29`. No other files' logic changed this round beyond `index.html`'s CSS.
+
+Verified live (test origin, real leaderboard rows again): confirmed via `getComputedStyle` that a selected
+legendary tile's box-shadow now genuinely includes the red ring (`rgb(255, 59, 48) 0px 0px 0px 3px, ...`)
+running `trade-select-shine-rainbow`, not silently dropped: screenshotted and visually confirmed too.
+Confirmed a DOM node tagged with a custom property survives a sibling tile being selected (no re-render).
+TRADE button now sits with clear spacing under the coins. CONFIRM TRADE OFFER shows the bordered terms
+block, correct rank (#3), red SEND OFFER, and CANCEL returns to the compose screen still open underneath -
+checked via state (`composeStillOpen: true`) after CANCEL, not just visually. No console errors.
+- `src/saves.js`, `index.html`.
+
+## Critical fix: a fresh account link no longer trusts the local save (2026-09-29)
+
+**The bug, exactly as the owner described it:** a player could play entirely signed OUT (device-only
+save), edit that local save with devtools - coins, skin counts, anything `Economy` exposes, since none of
+it is server-validated yet (see `_boxOddsSecurityNote`) - and THEN link a Google account for the first
+time. `Cloud.signIn()`'s existing "first time this account has been used" branch (`src/cloud.js`) uploaded
+whatever was currently on the device as that brand-new account's starting cloud save, no questions asked -
+laundering the tampered local state into a permanent, cloud-backed balance.
+
+**The fix:** that branch now unconditionally calls `resetLocalSave()` (writes `Economy.freshJson()` over
+the local save, the same primitive already used for the narrower "leftover different account" case) before
+reloading, regardless of what was on the device - a brand-new account always starts at zero. This also
+subsumes the old narrower special-case (`mySession.uid !== uid`) for free, since the reset is no longer
+conditional on it.
+
+**Why this can't repeat the 2026-09-22 incident (the owner asked directly to make sure of this):** the new
+reset only runs in the branch that fires after `cloudSave` has been POSITIVELY CONFIRMED absent by a
+successful Firestore read. The `checkFailed` branch above it - a read that errored, meaning we genuinely
+don't know whether a save exists - is completely untouched: it still aborts with an explicit error and
+signs back out rather than guessing, exactly as the 2026-09-22 fix established. And the `cloudSave` branch
+(an account that DOES have a save) is a totally separate code path, also untouched - it still downloads the
+real save exactly as before. The new reset is therefore structurally incapable of firing for, or touching,
+any existing player's real progress; it can only ever run for an account confirmed to have never been used.
+
+**"Are we even using localStorage any more once this happens?"** - yes, unconditionally, both before and
+after this fix, signed in or not. Traced the actual flow: `resetLocalSave()` writes straight into
+`localStorage` under `Economy.storageKey`; after the reload, `Economy` loads from `localStorage` exactly as
+it always does (it has no concept of "cloud" - that's entirely `cloud.js`'s job, layered on top). Going
+forward, `heartbeat()`/`syncNow()` keep PUSHING local (`localStorage`-backed) changes up to Firestore on the
+existing cadence (every 30s, on visibility change, or right after specific actions) - Firestore is a
+sync/backup target and the public leaderboard source, not something gameplay reads from live. Nothing pulls
+DOWN from Firestore again until either a fresh interactive sign-in (`signIn()`) or a restored-session load
+finding the cloud copy newer (`onAuthStateChanged`'s own restore path). This will genuinely change once the
+Blaze migration makes the economy server-authoritative (Cloud Functions become the real source of truth),
+but today `localStorage` is still very much the game's continuous working copy throughout.
+
+Not exercised end-to-end live (a real Google sign-in popup needs real credentials, which this session
+doesn't have and shouldn't try to obtain) - verified by full re-read of the modified `signIn()` flow and the
+`onAuthStateChanged` restore path it hands off to after `location.reload()`, tracing exactly how the
+already-proven "leftover different account" precedent (identical shape: `resetLocalSave(); location.reload();
+return;`, no manual `revealUser`/`dirty`/`syncNow` bookkeeping needed) re-establishes everything correctly
+on its own. Confirmed no console errors on a normal page load with the new code. **The owner should verify
+the actual sign-in flow by hand** (a genuinely fresh Google account, or `god mode`'s console tool to fake a
+tampered local save first) before this lands anywhere real.
+
+Version bump: `src/cloud.js?v=26 -> 27`.
+
+Also recorded as a standing principle going forward (not code, a memory:
+`snowy-balls-smooth-version-transitions`): every future save-schema, client-version, or Firestore
+rules/Functions change must transition an existing player on the old version smoothly - this incident and
+the 2026-09-22 one are the same underlying failure mode (a save/account-model change collaterally damaging
+real progress), and the same discipline (confirmed-absent vs. couldn't-tell, defensive defaults for new
+fields, rules+Functions before client at cutover) applies to all of them, including whatever the eventual
+Blaze cutover's own player-inventory migration turns out to be.
+- `src/cloud.js`.

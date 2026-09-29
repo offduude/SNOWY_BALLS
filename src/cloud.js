@@ -366,28 +366,24 @@ const Cloud = (() => {
           location.reload();
           return;
         }
-        // First time this account has been used: nothing to download, nothing to ask - safe to reveal immediately. THIS
-        // device's current save becomes its save - UNLESS it's evidently leftover from a DIFFERENT account (mySession
-        // remembers a different uid: a revoked session, or any other passive sign-out that never got a chance to
-        // clean up - see the note in onAuthStateChanged above, which no longer resets reactively). Uploading it as if
-        // it belonged to this brand-new account would duplicate the old account's progress onto it - the actual
-        // problem the old reactive reset was trying to prevent. Reset and reload instead; the player signs in again
-        // onto a genuinely clean slate.
-        if (mySession && mySession.uid !== uid) {
-          resetLocalSave();
-          location.reload();
-          return;
-        }
-        revealUser = true;
-        notifyAuth();
-        dirty = true;
-        lastWrittenCoins = null;
-        lastWrittenCharacter = null;
-        lastWrittenSave = null;
-        // Refresh the leaderboard only AFTER the write actually lands (syncNow now resolves once its commit settles) -
-        // otherwise the read can beat the write and the account card keeps showing "unranked" until the next time
-        // LEADERBOARD happens to be opened, even though this player is on the board now.
-        syncNow().then(() => refreshLeaderboard(() => { if (typeof Saves !== "undefined") Saves.refresh(); }));
+        // First time this account has been used: nothing to download - but THIS DEVICE'S CURRENT SAVE IS NEVER
+        // TRUSTED AS THE STARTING POINT (2026-09-29, closing a real exploit): a player could play signed OUT,
+        // edit their local save with devtools (coins, skins, anything Economy exposes - there is no server
+        // validation yet, see economy.json's own _boxOddsSecurityNote), THEN link a fresh Google account for the
+        // first time and have that tampered save laundered into a permanent, cloud-backed starting balance. A
+        // brand-new account always starts from a genuinely fresh save instead, regardless of whatever was on the
+        // device before signing in - this also covers the narrower case this used to special-case (mySession
+        // remembering a leftover different uid: a revoked session, or any passive sign-out that never got a
+        // chance to clean up) for free, since resetting is now unconditional here rather than only then.
+        //
+        // Safe against repeating the 2026-09-22 incident: this branch only runs once `cloudSave` has been
+        // POSITIVELY CONFIRMED absent by a successful read (`checkFailed` above already aborted with an error
+        // instead of guessing if the check itself failed) - an account that DOES have a save always takes the
+        // completely separate `cloudSave` branch above, downloading it exactly as before. This new reset can
+        // therefore never fire for, or touch, an existing player's real progress.
+        resetLocalSave();
+        location.reload();
+        return;
       })
       .catch((e) => {
         if (e && BENIGN_AUTH_ERRORS.has(e.code)) return;

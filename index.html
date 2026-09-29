@@ -2043,6 +2043,16 @@
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
     }
 
+    /* Coins + the TRADE button, stacked with real spacing (2026-09-29, saves.js accountCardHtml's `action`) -
+       replaces .board-coins sitting loose in .pick-action's own flow, which had no gap of its own to give it. */
+    .board-action-col {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: calc(var(--u) * 1);
+    }
+
     .board-coins {
       flex: none;
       display: flex;
@@ -2269,10 +2279,26 @@
       gap: calc(var(--u) * 1);
     }
 
-    /* A tapped tile in either grid (reuses BOXES' own .box-inspect-cell/-icon tiles) - a gold ring on top of
-       whatever rarity tint it already has, so "selected" reads clearly against any of them, tinted or not. */
+    /* A tapped tile in either grid (reuses BOXES' own .box-inspect-cell/-icon tiles) - a red ring on top of
+       whatever rarity tint it already has (2026-09-29: was gold, changed to red - see the rainbow override
+       note right below, which was the real bug the owner actually saw). */
     .trade-skins-grid .box-inspect-cell.selected .box-inspect-icon {
-      box-shadow: 0 0 0 3px #f1c40f, 0 0 10px rgba(241, 196, 15, 0.6);
+      box-shadow: 0 0 0 3px #ff3b30, 0 0 10px rgba(255, 59, 48, 0.7);
+    }
+
+    /* A legendary tile's own .rainbow class already runs a box-shadow keyframe (buff-card-shine, the white
+       shine-pulse) - an element can only ever run ONE box-shadow animation, so that pulse was silently
+       overwriting the selection ring above every single frame, making it invisible specifically on a legendary
+       tile (2026-09-29 bugfix; same class of conflict .shop-card-shine already exists to avoid elsewhere in this
+       file). Fix: a dedicated keyframe that carries the red ring in every frame, with the same shine pulsing
+       around it rather than replacing it. */
+    .trade-skins-grid .box-inspect-cell.selected .box-inspect-icon.rainbow {
+      animation: rarity-wave 2.4s linear infinite, trade-select-shine-rainbow 1.7s ease-in-out infinite;
+    }
+
+    @keyframes trade-select-shine-rainbow {
+      0%, 100% { box-shadow: 0 0 0 3px #ff3b30, 0 0 1px rgba(255, 255, 255, 0.15); }
+      50% { box-shadow: 0 0 0 3px #ff3b30, 0 0 calc(var(--u) * 1.1) rgba(255, 255, 255, 0.85); }
     }
 
     #trade-compose-buttons {
@@ -2340,6 +2366,35 @@
 
     .modal-status { min-height: calc(var(--u) * 2.6); margin-top: calc(var(--u) * 0.8); font-size: calc(var(--u) * 1); line-height: 1.6; color: #8a6a44; }
     .modal-status.bad { color: #a3261c; } /* CHANGE NAME's two failure cases - empty, or not enough coins */
+
+    /* The trade confirm's own GIVE/WANT terms (2026-09-29, saves.js handleTradeSend) - a bordered block instead
+       of a plain sentence, reading like real terms rather than a casual aside. */
+    .trade-confirm-block {
+      margin: calc(var(--u) * 1) 0;
+      border: 2px solid #7a5230;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .trade-confirm-row {
+      display: flex;
+      justify-content: space-between;
+      gap: calc(var(--u) * 1.2);
+      padding: calc(var(--u) * 0.9) calc(var(--u) * 1.1);
+      background: #fff8e6;
+      font-size: calc(var(--u) * 1.05);
+    }
+
+    .trade-confirm-row + .trade-confirm-row {
+      border-top: 2px solid #7a5230;
+    }
+
+    .trade-confirm-label {
+      flex: none;
+      color: #8a6a44;
+      font-size: calc(var(--u) * 0.95);
+      letter-spacing: 0.05em;
+    }
 
     .modal-buttons { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); justify-content: flex-end; margin-top: calc(var(--u) * 1.4); }
 
@@ -2479,7 +2534,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=315"></script>
+  <script src="src/version.js?v=316"></script>
   <script src="src/economy.js?v=49"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2507,13 +2562,13 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=26"></script>
+  <script src="src/cloud.js?v=27"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
   <script src="src/shop.js?v=42"></script>
   <script src="src/boxes.js?v=9"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=28"></script>
+  <script src="src/saves.js?v=29"></script>
   <script src="src/collection.js?v=87"></script>
   <script src="src/main.js?v=195"></script>
   <script>

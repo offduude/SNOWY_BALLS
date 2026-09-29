@@ -48,6 +48,9 @@ const Cloud = (() => {
   let app = null;
   let auth = null;
   let db = null;
+  let functions = null; // Cloud Functions (functions/*.js) - see callFunction() below; only actually used once the
+  // client is wired to call purchase/useBuff/openBox/sellSkin/claimThrow/the trade functions instead of mutating
+  // Economy locally (not done yet - see docs/NOTES.md and the snowy-balls-blaze-migration memory)
   let ready = false; // FIREBASE_CONFIG looks real and the SDK loaded - false leaves every call below a harmless no-op
   let user = null; // { uid, name } | null
   let revealUser = true; // false only while a fresh interactive signIn() is still deciding upload vs download - see
@@ -85,12 +88,30 @@ const Cloud = (() => {
     authListeners.forEach((fn) => fn(visibleUser()));
   }
 
+  // Local emulator testing (2026-09-29, see docs/NOTES.md and the snowy-balls-blaze-migration memory): connects
+  // Auth/Firestore/Functions to the Firebase Local Emulator Suite (functions/, firebase.json) instead of the real
+  // project, so the wired-up client can be tested fully locally with zero real deploy and zero risk to any real
+  // player's data. Gated to EXACTLY hostname === "127.0.0.1" - deliberately narrower than the localhost-inclusive
+  // regex godMode()/calibrateHeld use (main.js), which only gate devtools convenience functions that never touch
+  // the network. This gates where EVERY Firebase call in the game actually goes, and the standing rule for this
+  // whole project is that "localhost:5501" is the owner's own real, signed-in save and must never be touched -
+  // including by silently rerouting it to a sandbox that has never heard of that account. Ports match
+  // firebase.json's emulators block exactly; run `firebase emulators:start` (or `npm run emulators`) first.
+  const USE_EMULATOR = location.hostname === "127.0.0.1";
+
   function init() {
     if (!isConfigured() || typeof firebase === "undefined") return; // no Firebase project set up yet, or its scripts didn't load - the game must not depend on either
     try {
       app = firebase.initializeApp(FIREBASE_CONFIG);
       auth = firebase.auth();
       db = firebase.firestore();
+      functions = firebase.functions();
+      if (USE_EMULATOR) {
+        auth.useEmulator("http://127.0.0.1:9099", { disableWarnings: true });
+        db.useEmulator("127.0.0.1", 8080);
+        functions.useEmulator("127.0.0.1", 5001);
+        console.log("Cloud: using the local Firebase emulator (127.0.0.1) - not the real project.");
+      }
       ready = true;
     } catch (e) {
       return; // a bad config, or the SDK failed some other way: the game carries on without the account system
@@ -484,8 +505,19 @@ const Cloud = (() => {
     const name = (typeof Economy !== "undefined" && Economy.getAccountName()) || user.name;
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
-    batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, updatedAt: now });
-    if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now, session: mySession.token });
+    // { merge: true } on both writes (2026-09-29, found while building the Cloud Functions migration - see
+    // functions/lib/saves.js's own header note): without it, this being a FULL document overwrite would silently
+    // wipe any server-owned field a Cloud Function has written into the same doc (skinCounts, buffItems, a
+    // trade's escrow, the leaderboard's own mirrored skinCounts/privateInventory) back down to nothing, the next
+    // time this runs. Still correct to push `coins` from here for now - nothing calls the economy Cloud Functions
+    // from gameplay yet, so Economy.getCoins() genuinely is the only source of truth today. That stops being true
+    // once shop/boxes/buffs/throws are wired to call purchase/openBox/useBuff/claimThrow instead of mutating
+    // Economy locally (the plan's "Client UI wave") - at that point this must stop writing `coins` (and,
+    // eventually, `character`/skin-related fields) entirely, since a Cloud Function already mirrors the
+    // authoritative value here on every action that changes it (see acceptTrade/openBox/sellSkin) and this
+    // client-side push would otherwise race it and sometimes win with a stale number.
+    batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, updatedAt: now }, { merge: true });
+    if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now, session: mySession.token }, { merge: true });
     return batch
       .commit()
       .then(() => {
@@ -525,6 +557,19 @@ const Cloud = (() => {
       });
   }
 
+  // Calls a server-authoritative Cloud Function (functions/economy.js, functions/trading.js, functions/shop.js)
+  // and resolves to its `data` - the caller applies ONLY this returned value, never an optimistic local guess
+  // (the same discipline the Functions themselves are built around - see the plan's Part 3). Rejects with the
+  // Function's own HttpsError shape ({ code: "functions/failed-precondition", message: "..." }, etc.) on
+  // failure - callers should read `.message` for a player-facing reason, `.code` only to branch on specific
+  // cases (e.g. "functions/unauthenticated" meaning "you need to sign in first"). Not called by anything yet -
+  // this is just the wiring; each gameplay path (shop, boxes, sell, buffs, throws, trading) still mutates
+  // Economy locally until it's individually rewired to call through here instead (see docs/NOTES.md).
+  function callFunction(name, data) {
+    if (!ready || !functions) return Promise.reject(new Error("Not signed in, or the account system isn't available."));
+    return functions.httpsCallable(name)(data).then((res) => res.data);
+  }
+
   return {
     init,
     isConfigured,
@@ -541,5 +586,6 @@ const Cloud = (() => {
     getLeaderboardCache,
     refreshLeaderboard,
     checkSession, // exposed mainly for testing - the timer/visibility cadence already calls this itself
+    callFunction,
   };
 })();

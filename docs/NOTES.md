@@ -3497,3 +3497,87 @@ Version bumps: none - still no `src/*.js`/`index.html` changes, this stays entir
 - `functions/shop.js` (new), `functions/lib/shopStock.js` (new), `functions/economy.js` (`purchase` rewritten),
   `functions/lib/economyData.js` (`priceOf`/`rarityOfItem` added), `functions/index.js`, `firestore.rules`,
   `functions/test/run.js`.
+
+## Fixed a real firestore.rules bug before it ever shipped: syncNow() would have broken itself (2026-09-29)
+
+Found while doing the "safe mechanical prerequisites" pass ahead of wiring the client to the new Cloud
+Functions: `src/cloud.js`'s `syncNow()` does a plain (non-merge) `batch.set()` on `saves/{uid}` and
+`leaderboard/{uid}` - the very first server-owned field a Cloud Function ever writes into either doc would get
+silently WIPED by the next periodic client sync. Fixed both to `{ merge: true }`.
+
+That fix immediately exposed a SECOND, more serious problem, caught only because this project's own emulator
+testing discipline exists: Firestore security rules evaluate `request.resource.data` as the FULL RESULTING
+document after a merge, not just the fields a write actually sends. `saves/{uid}`'s rule
+(`keys().hasOnly(['data','updatedAt','session'])`) would therefore reject a player's own perfectly normal sync
+the instant ANY Cloud Function had ever written a server-owned field (coins, skinCounts, ...) into that same
+doc - the resulting merged document would then have MORE keys than the allow-list permits, purely by them
+already being there, nothing to do with what the client itself sent. Exactly the kind of break the
+snowy-balls-smooth-version-transitions memory exists to prevent, and it would have shipped invisibly - nothing
+in the emulator's existing 27 checks touched this path at all, since every one of them uses the Admin SDK for
+`saves/{uid}` (Cloud Functions' own reads/writes, and the test's own seeding), which bypasses security rules
+entirely. Only a genuine CLIENT SDK write ever exercises this rule for real.
+
+**Getting the actual fix right took three tries**, each one caught by two new tests that finally drive the rule
+through the real client SDK instead of the Admin SDK:
+1. First attempt: allow-list the server-owned field names too, but only if `resource.data.X == request.resource.data.X`
+   (unchanged) - `evaluation error at L79`, not just a clean `false`, for both hypothetical create and update
+   paths. Root cause not fully chased down (see below - a different bug was actually responsible), but risky
+   and hard to reason about regardless (dot-access on a field/doc that might not exist).
+2. Second attempt: the same idea via `.get(key, default)` (Firestore's own null-safe map accessor) instead of
+   bare dot-access - same evaluation error, ruling out "unsafe dot-access" as the actual cause.
+3. **What actually fixed it, and is also just the right tool for the job**: Firestore's own documented idiom for
+   exactly this - `request.resource.data.diff(resource.data).affectedKeys().hasOnly([...])` - the set of keys
+   whose VALUE actually changed, which sidesteps every null/type-equality edge case a hand-rolled per-field
+   comparison has to get right itself. `resource == null` (Firestore's documented way to detect a create) takes
+   a separate branch requiring the brand-new doc to contain ONLY the client-owned fields, since there's nothing
+   to diff against yet.
+   **The real root cause of the "evaluation error" the whole time, found last**: the test itself, not the rule -
+   its client-SDK writes passed a literal `new Date()` for `updatedAt` instead of the `serverTimestamp()`
+   sentinel the existing (unrelated, unchanged) `updatedAt == request.time` check requires. Once fixed, even
+   re-testing the FIRST (`resource.data.X ==`) approach would likely have passed too - but the `diff()`-based
+   version is the more correct, more idiomatic fix regardless, so it stayed.
+
+`leaderboard/{uid}`'s `skinCounts`/`privateInventory` were deliberately left WITHOUT this same "unchanged" guard
+- unlike `saves/{uid}`, that doc has always had a mixed ownership model (a real save is a light, honest-signal
+of the "not a full anti-cheat system" the file's own header already accepts) and `coins` there has always been
+freely client-writable within a sanity range - adding a stricter guard only to the two newest fields there
+would be inconsistent, not a real security improvement (nothing on that doc is ever a source of truth for game
+logic - only `saves/{uid}` and the Cloud Functions' own reads are).
+
+29 checks now (was 27) - the two new ones exercise the real client SDK against the real rule, not just the
+Admin SDK path everything else already used.
+- `firestore.rules`, `src/cloud.js` (`syncNow()` merge fix), `functions/test/run.js`.
+
+## Client can now point at the local emulator - the last prerequisite before wiring real gameplay (2026-09-29)
+
+The owner's stated plan: build as much as possible, then test everything locally themselves, only release once
+they're satisfied. That needs the WIRED-UP client testable with zero real deploy - this is what makes that
+possible. `src/cloud.js`'s `init()` now creates a `firebase.functions()` instance always, and - gated to exactly
+`location.hostname === "127.0.0.1"`, deliberately narrower than the localhost-inclusive regex `godMode()`/
+`calibrateHeld` use (main.js) - points Auth/Firestore/Functions at the Local Emulator Suite instead of the real
+project (`auth.useEmulator(...)`, `db.useEmulator(...)`, `functions.useEmulator(...)`, ports matching
+firebase.json exactly). **Deliberately NOT the same gate as those devtools helpers**: this reroutes where EVERY
+Firebase call in the game actually goes, and the standing rule this whole project runs on is that
+`localhost:5501` is the owner's own real, signed-in save - narrowing this to `127.0.0.1` only keeps that
+completely untouched, never silently redirected to a sandbox that's never heard of that account, while
+`127.0.0.1:5501` (the established testing origin) gets the emulator.
+
+New `Cloud.callFunction(name, data)` - a thin wrapper around `functions.httpsCallable(name)(data)`, resolving to
+just `.data` (the caller applies only the returned value, never an optimistic guess, same discipline the
+Functions themselves already follow). Nothing calls it yet - every gameplay path (shop, boxes, sell, buffs,
+throws, trading) still mutates `Economy` locally exactly as before. This is only the wiring; rewiring each path
+individually is the next round of work.
+
+**Verified live**, not just read through: started `firebase emulators:start` (the long-running form, not
+`emulators:exec` - this needs to stay up while a real browser tab talks to it) and opened a FRESH tab at
+`http://127.0.0.1:5501` (never touched the real `localhost:5501` tab beyond a passive console read). Confirmed:
+the console logs "Cloud: using the local Firebase emulator" on the `127.0.0.1` tab and does NOT on the real
+`localhost:5501` tab (open the whole time, completely unaffected); `Cloud.callFunction("purchase", {...})`
+called from the `127.0.0.1` tab's own devtools reaches the real emulator and comes back with the real
+Function's actual `unauthenticated` rejection (signed out) - proving the whole chain (the new script tag,
+`functions()` instance, emulator wiring, `callFunction` itself) actually works end to end, not just that it
+compiles.
+
+Version bump: `src/cloud.js?v=28 -> 29`. Also added `firebase-functions-compat.js` (same CDN, same version
+10.14.1 as the other Firebase scripts) to `index.html`, required for `firebase.functions()` to exist at all.
+- `src/cloud.js`, `index.html`.

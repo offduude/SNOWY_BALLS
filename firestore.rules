@@ -58,25 +58,48 @@ service cloud.firestore {
     // `session` (added 2026-09-22): a short random token src/cloud.js writes on every save write, so the same account
     // signed in on two devices at once can't silently overwrite each other - see that file's header comment for the
     // full mechanism. Required on every write (never optional) since the client always sends one from here on.
-    // UNCHANGED since before the trading feature - and that's exactly what makes the server-owned economy fields
-    // (coins, skinCounts, buffItems, projectiles, buffs, equipped, reserved, outgoingTradeId - see
-    // functions/lib/saves.js) safe: `keys().hasOnly(['data', 'updatedAt', 'session'])` already rejects a client
-    // write containing ANY of them outright, with no rule change needed here. Only a Cloud Function's Admin SDK
-    // write (which bypasses these rules entirely) can ever touch those fields - a client can never set its own
-    // coins or skin counts directly, only ask a Function to do it. Every one of those Functions checks
-    // request.auth != null as its first step (see functions/lib/auth.js's requireAuth) - a signed-out caller is
-    // refused before it ever reaches a mutation, purchase and trade functions alike.
+    // The server-owned economy fields (coins, lifetimeCoins, skinCounts, buffItems, projectiles, buffs, equipped,
+    // reserved, outgoingTradeId - see functions/lib/saves.js) only a Cloud Function's Admin SDK write (which
+    // bypasses these rules entirely) can ever SET - a client can never grant itself coins or skin counts, only
+    // ask a Function to do it. But the CLIENT's own write (cloud.js syncNow(), `{data, updatedAt, session}` with
+    // `{merge: true}` as of 2026-09-29) still needs to be ALLOWED once those fields already exist on the doc -
+    // Firestore security rules evaluate `request.resource.data` as the FULL RESULTING document after a merge, not
+    // just the fields the client sent, so a bare `keys().hasOnly(['data','updatedAt','session'])` would reject
+    // every client sync the instant a Cloud Function ever wrote a server-owned field into this same doc (the
+    // client's own next write would then contain MORE keys than that allow-list permits, purely by them already
+    // being there) - exactly the kind of break the smooth-version-transitions memory exists to prevent. Fixed by
+    // allow-listing those fields too, but ONLY if UNCHANGED by this write (`resource` is the doc as it existed
+    // BEFORE this request, `null` for a brand-new doc - Firestore's own documented way to tell a create from an
+    // update): a client write may include a server-owned field only if its value exactly matches what was already
+    // stored, which a legitimate client write never needs to do (cloud.js never sends any of these) and a
+    // malicious one attempting to grant itself coins cannot satisfy without already knowing, and merely echoing
+    // back, the CURRENT real value - it can never actually change it through this path.
     match /saves/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.data.keys().hasOnly(['data', 'updatedAt', 'session'])
+                   && request.resource.data.keys().hasOnly(['data', 'updatedAt', 'session', 'coins', 'lifetimeCoins', 'skinCounts', 'buffItems', 'projectiles', 'buffs', 'equipped', 'reserved', 'outgoingTradeId'])
                    && request.resource.data.data is string
                    && request.resource.data.data.size() < 200000
                    && request.resource.data.session is string
                    && request.resource.data.session.size() > 0
                    && request.resource.data.session.size() <= 100
-                   && request.resource.data.updatedAt == request.time;
+                   && request.resource.data.updatedAt == request.time
+                   // A per-field `resource.data.X == request.resource.data.X` comparison (tried first) threw a
+                   // genuine evaluation error rather than just failing, for reasons that weren't worth chasing
+                   // further once this - Firestore's OWN documented idiom for "which fields did this write
+                   // actually change" - turned out simpler and more robust anyway: on an UPDATE,
+                   // `.diff(resource.data).affectedKeys()` is the set of keys whose VALUE changed (a field
+                   // present and identical on both sides never appears in it at all, regardless of type - no
+                   // null/map-equality edge cases to get wrong by hand) - requiring that set to be a subset of
+                   // the client-owned fields means a write may add/change `data`/`updatedAt`/`session` freely
+                   // but can never actually CHANGE any server-owned field, only (harmlessly) carry its existing
+                   // value forward via merge. On a CREATE there is no `resource.data` to diff against at all
+                   // (`resource == null` is Firestore's documented way to detect this) - a brand-new doc must
+                   // simply not contain any server-owned field yet, checked directly instead.
+                   && (resource == null
+                        ? request.resource.data.keys().hasOnly(['data', 'updatedAt', 'session'])
+                        : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['data', 'updatedAt', 'session']));
     }
 
     // Trade offers (2026-09-29, see the approved plan's Part 3 and functions/trading.js): a client can READ a

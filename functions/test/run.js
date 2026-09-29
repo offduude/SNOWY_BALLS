@@ -12,7 +12,7 @@ const admin = require("firebase-admin");
 const { initializeApp } = require("firebase/app");
 const { getAuth, connectAuthEmulator, signInWithCustomToken, signOut } = require("firebase/auth");
 const { getFunctions, connectFunctionsEmulator, httpsCallable } = require("firebase/functions");
-const { getFirestore, connectFirestoreEmulator, doc, getDoc } = require("firebase/firestore");
+const { getFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, serverTimestamp } = require("firebase/firestore");
 
 const PROJECT_ID = "snowy-balls-5f7a5"; // same id as production - safe: emulators never touch the real project regardless (see firebase.json's own note)
 const ADMIN_UID = "zrHVHG8QVXfZfMhUn0PJHf9TEKO2"; // must match functions/lib/auth.js exactly
@@ -380,6 +380,40 @@ async function main() {
       }
     }
     assert.ok(sawLimit, "expected a resource-exhausted error within 5 rapid proposeTrade calls (limit is 3/300s)");
+  });
+
+  console.log("\n-- firestore.rules: saves/{uid} client sync survives once server-owned fields exist --");
+  // This whole section exists because everything above uses the ADMIN SDK for saves/{uid} reads/writes (via `db`),
+  // which BYPASSES firestore.rules entirely - none of it proves the RULE itself is correct. This project has been
+  // bitten twice before by a rules bug that looked fine on paper (see docs/NOTES.md, the 2026-09-22 incident) -
+  // worth the extra section to actually drive the CLIENT SDK against the real rules engine instead of trusting a
+  // read-through.
+  await check("a normal client sync (data/updatedAt/session only) still succeeds once the doc also has server-owned fields", async () => {
+    await asUid(UID_A);
+    // Seed a doc shaped like a real one: client-owned fields (as cloud.js's own syncNow() would have written) PLUS
+    // server-owned ones (as a Cloud Function would have added since) - via Admin SDK, bypassing rules, just to set
+    // up the starting state.
+    await db.collection("saves").doc(UID_A).set({ data: "{}", updatedAt: new Date(), session: "tok", coins: 4242, skinCounts: { character: { pryk: 1 }, scenery: {}, weather: {} } });
+    // The exact shape cloud.js's syncNow() sends, through the REAL client SDK, against the REAL rule -
+    // serverTimestamp() is required here, not a literal Date: the rule checks updatedAt == request.time (the
+    // server's own clock), which only the serverTimestamp() sentinel resolves to - a plain client-supplied
+    // Date would never match and every write here would be rejected for that reason alone, real bug or not.
+    await setDoc(doc(clientDb, "saves", UID_A), { data: "{\"updated\":true}", updatedAt: serverTimestamp(), session: "tok2" }, { merge: true });
+    const after = (await db.collection("saves").doc(UID_A).get()).data();
+    assert.strictEqual(after.data, "{\"updated\":true}", "the client's own fields must actually update");
+    assert.strictEqual(after.coins, 4242, "a server-owned field the client never mentioned must survive the merge untouched");
+    assert.deepStrictEqual(after.skinCounts, { character: { pryk: 1 }, scenery: {}, weather: {} }, "same for a nested server-owned map");
+  });
+  await check("a client CANNOT change a server-owned field by including it in its own write, even matching the allow-list", async () => {
+    await db.collection("saves").doc(UID_A).set({ data: "{}", updatedAt: new Date(), session: "tok", coins: 500 });
+    try {
+      await setDoc(doc(clientDb, "saves", UID_A), { data: "{}", updatedAt: serverTimestamp(), session: "tok3", coins: 999999999 }, { merge: true });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied", `expected the rule to reject this, got: ${e.code} ${e.message}`);
+    }
+    const after = (await db.collection("saves").doc(UID_A).get()).data();
+    assert.strictEqual(after.coins, 500, "the real value must be completely untouched by the rejected write");
   });
 
   console.log(`\n${passed} passed, ${failed} failed.`);

@@ -22,7 +22,8 @@ const Saves = (() => {
 
   // buttons: [{ label, cls, html, onClick }]; onClick returns false to keep the popup open. `html: true` renders `label`
   // as raw markup instead of escaping it - only for a button whose label is built from trusted, fixed pieces (e.g. the
-  // CHANGE NAME price button's coin icon), never from player-typed text. Returns the panel element.
+  // CHANGE NAME price button's coin icon), never from player-typed text. Returns the panel element. Exported
+  // (2026-09-29) - collection.js's SELL confirm reuses this same popup instead of its own.
   function openModal(title, bodyHtml, buttons) {
     closeModal();
     layer = document.createElement("div");
@@ -409,5 +410,5 @@ const Saves = (() => {
     Cloud.setConfirmOverwrite(confirmCloudOverwrite);
   }
 
-  return { renderOptions, renderLeaderboard, wireLeaderboardClick, closeInspect, onClick, refresh };
+  return { renderOptions, renderLeaderboard, wireLeaderboardClick, closeInspect, onClick, refresh, openModal, closeModal };
 })();

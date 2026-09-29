@@ -1325,7 +1325,7 @@
     /* a USE button that cannot be used now (an event buff while an event runs) */
     .pick-use.off { opacity: 0.45; filter: grayscale(0.6); cursor: default; }
 
-    /* SELL next to EQUIP on a sellable skin card (2026-09-29, collection.js skinActionHtml) - stacked under EQUIP
+    /* SELL next to EQUIP on every skin card (2026-09-29, collection.js skinActionHtml) - stacked under EQUIP
        rather than beside it, so the action column doesn't widen and push the description around. */
     .pick-action-row {
       display: flex;
@@ -1351,9 +1351,9 @@
     }
 
     .pick-sell:active { background: #6e2c20; }
-    /* Armed by a first tap ("SELL for {price}? CONFIRM") - a second tap within ~3s finalizes it. */
-    .pick-sell.confirming { background: #a3261c; font-size: calc(var(--u) * 0.85); }
-    /* Dead on the skin you're currently wearing (relabeled "unequip to sell") - same greyed-out look .pick-equip.on uses. */
+    /* Dead on the skin you're currently wearing (relabeled "unequip to sell") or on one that was never sellable
+       to begin with (the default skin of a kind - plain "SELL", never relabeled) - same greyed-out look
+       .pick-equip.on uses either way. */
     .pick-sell.off,
     .pick-sell:disabled {
       background: #b9a88f;
@@ -2246,7 +2246,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=312"></script>
+  <script src="src/version.js?v=313"></script>
   <script src="src/economy.js?v=47"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2280,8 +2280,8 @@
   <script src="src/shop.js?v=42"></script>
   <script src="src/boxes.js?v=9"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=25"></script>
-  <script src="src/collection.js?v=84"></script>
+  <script src="src/saves.js?v=26"></script>
+  <script src="src/collection.js?v=85"></script>
   <script src="src/main.js?v=195"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

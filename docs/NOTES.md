@@ -3108,3 +3108,37 @@ shipped code. Restored the test save's equipped character back to Andek (the onl
 wasn't already a fresh/default value); left the two granted test skins in place as a harmless leftover, same
 precedent as every other testing round this engagement.
 - `economy.json`, `src/economy.js`, `src/collection.js`.
+
+## SELL: a real popup, and the button greyed out instead of hidden (2026-09-29)
+
+Two owner-flagged issues with the previous round's SELL button: the inline two-tap "SELL for {price}?
+CONFIRM" button-text-swap read as an eyesore, and unsellable skins simply had no SELL button at all
+(the default skin's card looked structurally different from every other card). Both fixed:
+
+- **Popup instead of inline confirm.** `src/saves.js`'s `openModal`/`closeModal` (the same reusable
+  confirm-dialog builder CHANGE NAME's "next change costs N coins, proceed?" warning already uses) are now
+  exported from `Saves` and reused by `collection.js` instead of collection.js rolling its own. Tapping SELL
+  opens "SELL / Sell {name} for {price} coins? / SELL, CANCEL" - same cream panel, same button styling as
+  every other confirm in the game. Removed the whole two-tap state machine (`sellConfirm`, the 3s timer, the
+  `.confirming` CSS) that this replaced - a popup doesn't need a timeout, since tapping outside it or CANCEL
+  already closes it, and the game's touch-blocking convention (stopPropagation on the modal layer) already
+  stops a stray tap from reaching anything underneath.
+- **Greyed out, not hidden.** `skinActionHtml` now always renders the SELL button (never `null`) - a
+  permanently-unsellable one (the default skin, or - defensively - anything with no `sellPrice`) gets a new
+  `.unsellable` marker class so `refreshButtons()` never re-enables it while toggling the *other* kind of
+  dead SELL button (the currently-equipped skin, which un-greys again the moment something else is
+  equipped). Every card in a list now has the same two-button shape, sellable or not.
+- SELL's confirm button is still an explicit no-op (see the previous entry's reasoning - selling has to
+  become a server-authoritative Cloud Function before it can safely pay out) - only the popup opening/
+  closing and the greyed-out styling are real.
+
+Version bumps: `src/saves.js?v=25 -> 26`, `src/collection.js?v=84 -> 85`.
+
+Verified live (test origin): fresh tab, no console errors throughout. The default skin (Andek) now shows a
+small greyed "SELL" alongside EQUIPPED, same as every other card's layout. Tapping Black Andek's SELL opened
+"Sell Black Andek for 1875 coins?"; tapping SELL inside the popup closed it with coins and owned-count both
+unchanged (0 and 1, before and after - confirmed via the actual values, not just visually) - the no-op is
+real. CANCEL and Banan's own popup (legendary, correctly showing "Sell Banan for 149985 coins?") both closed
+the same way. Tapping the disabled default-skin SELL button opened nothing at all. No coins/skins/equip
+state left changed this round (nothing was actually mutated, by design).
+- `src/saves.js`, `src/collection.js`, `index.html`.

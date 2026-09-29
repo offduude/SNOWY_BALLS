@@ -215,14 +215,15 @@ const Collection = (() => {
       b.classList.toggle("on", isOn);
     });
     // A SELL button next to it goes dead the instant its own skin becomes equipped (2026-09-29) - same pass, so
-    // the two buttons never disagree about which skin just got equipped.
+    // the two buttons never disagree about which skin just got equipped. Skipped for a permanently unsellable
+    // one (the default skin, marked at render time) - equipping/unequipping it must never re-enable SELL.
     scrollEl.querySelectorAll(".pick-sell[data-sell]").forEach((b) => {
+      if (b.classList.contains("unsellable")) return;
       const isOn = b.dataset.sell === equipped;
       b.disabled = isOn;
       b.classList.toggle("off", isOn);
       b.textContent = isOn ? "unequip to sell" : "SELL";
     });
-    resetSellConfirm();
   }
 
   // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner, the EQUIP
@@ -246,50 +247,39 @@ const Collection = (() => {
     );
   }
 
-  // The EQUIP-button replacement for a sellable skin card (2026-09-29): EQUIP itself, plus a SELL button beside
-  // it (economy.json item.sellPrice - default skins and anything with no sellPrice have none, same "default"
-  // exclusion boxes.js poolFor() already uses for what's ever a box prize). SELL goes dead on the currently
-  // equipped skin - selling your only copy of what you're wearing would leave an equipped-but-owned-0 skin, which
-  // nothing else in the game expects. `null` (unsellable) falls back to skinRowHtml's own plain EQUIP button.
+  // The EQUIP-button replacement for every skin card (2026-09-29): EQUIP itself, plus a SELL button beside it,
+  // always shown - greyed out (not hidden) rather than omitted when selling isn't possible, so a card's layout
+  // never jumps between kinds. Two separate reasons a SELL button can be dead: "unsellable" (the default skin,
+  // or - defensively - anything with no economy.json sellPrice at all: same "default" exclusion boxes.js
+  // poolFor() already uses for what's ever a box prize) is permanent and never re-checked; "equipped" (selling
+  // your only copy of what you're wearing would leave an equipped-but-owned-0 skin, which nothing else in the
+  // game expects) is re-evaluated every time refreshButtons() runs.
   function skinActionHtml(kind, item) {
-    if (item.rarity === "default" || !item.sellPrice) return null;
     const equip = `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>`;
-    const isOn = Economy.getEquipped(kind) === item.id;
+    const unsellable = item.rarity === "default" || !item.sellPrice;
+    const equipped = !unsellable && Economy.getEquipped(kind) === item.id;
+    const dead = unsellable || equipped;
+    const label = equipped ? "unequip to sell" : "SELL";
     const sell =
-      `<button class="pick-sell${isOn ? " off" : ""}" type="button" data-sell="${esc(item.id)}" data-kind="${esc(kind)}"` +
-      `${isOn ? " disabled" : ""}>${isOn ? "unequip to sell" : "SELL"}</button>`;
+      `<button class="pick-sell${dead ? " off" : ""}${unsellable ? " unsellable" : ""}" type="button"` +
+      ` data-sell="${esc(item.id)}" data-kind="${esc(kind)}"${dead ? " disabled" : ""}>${label}</button>`;
     return `<div class="pick-action-row">${equip}${sell}</div>`;
   }
 
-  // ---- SELL (2026-09-29): two-tap inline confirm, no popup - tap SELL once to arm it ("SELL for {price}?
-  // CONFIRM", ~3s to change your mind), tap again to actually sell. NOT wired to pay out yet on purpose (see
-  // economy.json _boxOddsSecurityNote and _sellPriceNote) - selling has to become a server-authoritative
-  // Cloud Function alongside box-opening before it can safely hand out real coins, so this stays a no-op past
-  // the confirm for now; only the price data and the UI are meant to be reviewed at this stage.
-  let sellConfirm = null; // { kind, id, timer } | null
-  function resetSellConfirm() {
-    if (!sellConfirm) return;
-    const btn = scrollEl.querySelector(`.pick-sell[data-sell="${sellConfirm.id}"][data-kind="${sellConfirm.kind}"]`);
-    if (btn && !btn.disabled) {
-      btn.textContent = "SELL";
-      btn.classList.remove("confirming");
-    }
-    clearTimeout(sellConfirm.timer);
-    sellConfirm = null;
-  }
+  // ---- SELL (2026-09-29): a real confirm popup (Saves.openModal - the same one CHANGE NAME's price warning
+  // uses) instead of the inline two-tap button-text-swap this replaced - the owner's call, the inline version
+  // read as an eyesore. NOT wired to pay out yet on purpose (see economy.json _boxOddsSecurityNote and
+  // _sellPriceNote) - selling has to become a server-authoritative Cloud Function alongside box-opening before
+  // it can safely hand out real coins, so SELL in the popup is still a no-op for now; only the price data and
+  // the UI are meant to be reviewed at this stage.
   function handleSellClick(btn) {
     const { kind, sell: id } = btn.dataset;
     const item = skinItems(kind).find((x) => x.id === id);
     if (!item || !item.sellPrice) return;
-    if (sellConfirm && sellConfirm.kind === kind && sellConfirm.id === id) {
-      resetSellConfirm(); // confirmed - but see the note above: intentionally not wired to actually sell yet
-      return;
-    }
-    resetSellConfirm();
-    click();
-    btn.textContent = `SELL for ${item.sellPrice}? CONFIRM`;
-    btn.classList.add("confirming");
-    sellConfirm = { kind, id, timer: setTimeout(resetSellConfirm, 3000) };
+    Saves.openModal("SELL", `<div class="modal-text">Sell ${esc(item.name)} for ${item.sellPrice} coins?</div>`, [
+      { label: "SELL" }, // intentionally does nothing yet - see the note above
+      { label: "CANCEL", cls: "ghost" },
+    ]);
   }
 
   // The SKINS list itself: one card per category, and each is the card of the skin that is EQUIPPED in it (name, description, rarity, detail - exactly what
@@ -475,7 +465,6 @@ const Collection = (() => {
 
   function open(kind) {
     markSeen(); // switching straight from one list to another
-    resetSellConfirm(); // an armed "CONFIRM" from whatever was open before must not linger into the new list
     Saves.closeInspect(); // ... and an inspected leaderboard card must not linger over whatever list comes next either
     // SHOP no longer greys these buttons out (2026-09-27, the owner's ask) - it stays open behind whatever list
     // you tap into unless told to close, so opening one closes SHOP the same way SHOP itself already closes any
@@ -562,7 +551,6 @@ const Collection = (() => {
 
   function close() {
     markSeen();
-    resetSellConfirm();
     openKind = null;
     container.classList.remove("list-open");
     scrollEl.dataset.kind = "";

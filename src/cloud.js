@@ -122,7 +122,10 @@ const Cloud = (() => {
       // save even belongs to the account being signed into before ever uploading it, closing the original
       // duplication concern from a different angle that does not depend on this listener at all.
       notifyAuth();
-      if (user && !signingIn) {
+      // Skip while a god save is active (2026-09-29, needed once godMode() started requiring sign-in - see main.js):
+      // without this, this restore-on-load path would immediately re-download the real cloud save over the god save
+      // on the very next reload, the same overwrite the isGod() guards on signIn()/syncNow() already exist to prevent.
+      if (user && !signingIn && !(typeof Economy !== "undefined" && Economy.isGod())) {
         // A restored session (the game was loaded while already signed in) - READ the account's current cloud save
         // and adopt it if it differs from what's sitting in localStorage, rather than trusting local and pushing it
         // up. We already flush on close (pagehide/visibilitychange below) - there's nothing that needs pushing right

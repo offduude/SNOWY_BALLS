@@ -3327,3 +3327,39 @@ real progress), and the same discipline (confirmed-absent vs. couldn't-tell, def
 fields, rules+Functions before client at cutover) applies to all of them, including whatever the eventual
 Blaze cutover's own player-inventory migration turns out to be.
 - `src/cloud.js`.
+
+## God mode restricted to the owner's testing account, not "anyone signed out on localhost" (2026-09-29)
+
+Part of planning the Blaze/trading cutover (see the approved plan, `snowy-balls-blaze-migration` memory):
+once Cloud Functions grant real value, a client-asserted `god:true` save field would be a straightforward
+exploit, so god-mode is being redesigned to become a hardcoded admin-uid check inside the Functions
+themselves (no save field at all) once that migration lands. This is the same-day, client-only first step
+of that redesign, independent of the rest: the console-only `window.godMode()` dev tool (`src/main.js`) used
+to require being signed OUT (refused if `Cloud.getUser()` was truthy) and worked for anyone with devtools
+open on `localhost`/`127.*`. It now requires being **signed in as the owner's specific testing account**
+(`zrHVHG8QVXfZfMhUn0PJHf9TEKO2`) - refuses for a signed-out client or any other uid.
+
+**A real bug this flip would otherwise introduce, caught and fixed in the same change:** `cloud.js`'s
+`onAuthStateChanged` restore-on-load path (the "was already signed in, re-download the account's cloud save
+on reload" branch) had no `Economy.isGod()` check at all - it only existed on `signIn()` and `syncNow()`.
+Under the OLD "must be signed out" rule that never mattered (a god save and an active auth session could
+never coexist). Under the new "must be signed in" rule, the very next reload after calling `godMode()` would
+have immediately re-downloaded the real cloud save right over the fresh god save, silently undoing it. Fixed
+by adding the same `!Economy.isGod()` guard to that restore branch, so a god save is now protected from being
+clobbered in all three places (`signIn()`, `syncNow()`, and this restore-on-load path) instead of two.
+
+Verified live at `http://127.0.0.1:5501` (never `localhost:5501`): signed-out call refuses with the new
+message, save byte-for-byte unchanged; a stubbed `Cloud.getUser()` returning a different uid also refuses,
+unchanged; a stubbed `Cloud.getUser()` returning the real testing uid successfully builds the god save
+(`god: true`, `coins: 999999999`) and reloads. No console errors. Local test-tab state reset back to a fresh
+save afterward, never touched `localhost:5501`.
+
+Version bump: `src/main.js?v=195 -> 196`, `src/cloud.js?v=27 -> 28`.
+
+The rest of the god-mode redesign (dropping the `god` field from the save schema entirely, the hardcoded
+`ADMIN_UID` constant inside Cloud Functions, and the decision that the admin account gets NO special-casing
+in the trade Functions specifically - it trades under exactly the same rules as everyone else, since it can
+already mint real inventory for free through the other Functions) is designed but not yet built - it ships
+together with the rest of Part 3 of the plan, once Cloud Functions exist. See the plan file and the updated
+`snowy-balls-blaze-migration` memory for the full design.
+- `src/main.js`, `src/cloud.js`.

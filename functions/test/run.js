@@ -115,6 +115,14 @@ async function main() {
       assert.strictEqual(e.code, "functions/unauthenticated", `expected unauthenticated, got ${e.code}: ${e.message}`);
     }
   });
+  await check("claimThrow refuses when signed out", async () => {
+    try {
+      await call("claimThrow", { projectileId: "snowball", hit: true });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "functions/unauthenticated", `expected unauthenticated, got ${e.code}: ${e.message}`);
+    }
+  });
 
   console.log("\n-- purchase / useBuff / openBox / sellSkin --");
   await asUid(UID_A);
@@ -176,6 +184,65 @@ async function main() {
     assert.strictEqual(res.data.buffs.length, 1);
     assert.strictEqual(res.data.buffs[0].id, "snowy_cube");
   });
+
+  console.log("\n-- claimThrow: trusts hit/miss, computes (never trusts) the reward --");
+  await seedSave(UID_A, { coins: 0, lifetimeCoins: 0, buffs: [], projectiles: {} });
+  await check("a plain hit pays exactly the projectile's real base hit value", async () => {
+    const res = await call("claimThrow", { projectileId: "snowball", hit: true }); // rarity "default", hitValue 4 - snowball is regen so no ownership check
+    assert.strictEqual(res.data.reward, 4);
+    assert.strictEqual(res.data.coins, 4);
+  });
+  await check("a miss pays exactly rewards.missCoins (0 today)", async () => {
+    const before = (await db.collection("saves").doc(UID_A).get()).data().coins;
+    const res = await call("claimThrow", { projectileId: "snowball", hit: false });
+    assert.strictEqual(res.data.reward, 0);
+    assert.strictEqual(res.data.coins, before);
+  });
+  await check("a real, owned consumable projectile is actually consumed", async () => {
+    await seedSave(UID_A, { projectiles: { chestnut: 2 } });
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: false }); // miss, to isolate the consumption check
+    assert.strictEqual(res.data.projectiles.chestnut, 1);
+  });
+  await check("a consumable the player doesn't own is refused", async () => {
+    await seedSave(UID_A, { projectiles: {} });
+    try {
+      await call("claimThrow", { projectileId: "chestnut", hit: true });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "functions/failed-precondition");
+    }
+  });
+  // From here, chestnut (common, hitValue 16, no override) rather than snowball (rarity "default", hitValue 4) -
+  // a plentiful stock so ownership never blocks these, and a base value that actually moves under a multiplier.
+  await seedSave(UID_A, { projectiles: { chestnut: 99 } });
+  await check("a REAL, currently-active coinMultiplier buff is applied exactly", async () => {
+    await seedSave(UID_A, { buffs: [{ id: "snowy_cube", endsAt: Date.now() + 60000 }] }); // coinMultiplier 1.1
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: true });
+    assert.strictEqual(res.data.reward, Math.round(16 * 1.1)); // 18
+  });
+  await check("an EXPIRED buff still sitting in the array does NOT count - evaluated at claim time, not aim time", async () => {
+    await seedSave(UID_A, { buffs: [{ id: "snowy_cube", endsAt: Date.now() - 1000 }] }); // already ended
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: true });
+    assert.strictEqual(res.data.reward, 16); // the multiplier must NOT apply
+  });
+  await check("a faceHit is honored (exact faceMultiplier) when the matching summon buff is genuinely active", async () => {
+    await seedSave(UID_A, { buffs: [], buffItems: { tomato_juice: 1 } });
+    await call("useBuff", { buffId: "tomato_juice" }); // real server-side "face" event window, 20s (economy.json faceWindow.durationMs)
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: true, faceHit: true, eventName: "face" });
+    assert.strictEqual(res.data.reward, Math.round(16 * 1.5)); // faceWindow.faceMultiplier
+    const saveA = (await db.collection("saves").doc(UID_A).get()).data();
+    assert.ok(!saveA.buffs.some((b) => b.id === "tomato_juice"), "the event must be consumed - can't be claimed twice");
+  });
+  await check("a second faceHit claim against the same (now-consumed) event gets no bonus", async () => {
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: true, faceHit: true, eventName: "face" });
+    assert.strictEqual(res.data.reward, 16); // plain hit value only
+  });
+  await check("a faceHit claimed with no server-verified active summon (e.g. a natural spawn) is not honored, not rejected", async () => {
+    await seedSave(UID_A, { buffs: [] }); // nothing summoned
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: true, faceHit: true, eventName: "disco" });
+    assert.strictEqual(res.data.reward, 16); // no bonus, but still a normal successful hit
+  });
+  await seedSave(UID_A, { coins: 50000 }); // reset for the tests below, which assume a healthy balance
 
   await check("openBox draws from the real pool and charges the real price", async () => {
     const before = (await db.collection("saves").doc(UID_A).get()).data().coins;

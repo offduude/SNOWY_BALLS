@@ -77,9 +77,16 @@ exports.purchase = functions.https.onCall(async (data, context) => {
 
 // ---------------------------------------------------------------------------------------------------------------
 // useBuff({ buffId, clientVersion }) - takes one out of the buff inventory and, if it has a duration, starts it
-// (pushes { id, endsAt } onto `buffs` - claimThrow reads this to know which coinMultiplier buffs are active). A
-// `charge`-type item (Diamond Cross, Toy Tank, the song-summon items) has no duration - it's consumed instantly,
-// its effect is a one-shot trigger the client plays out, not a timed state this function needs to track.
+// (pushes { id, endsAt } onto `buffs` - claimThrow reads this to know which coinMultiplier buffs, and which
+// summoned events, are genuinely active). A `charge`-type item (Diamond Cross, Toy Tank, the song-summon items)
+// normally has no duration of its own - it's a one-shot trigger the client plays out - EXCEPT the four
+// triggerEvent items claimThrow can honor a faceHit bonus for (see functions/lib/economyData.js's EVENT_DEFS):
+// those ALSO get a `buffs` entry now, purely so claimThrow has a real, server-known window to check a faceHit
+// claim against - Toy Tank (no face, no payout of its own) and Diamond Cross (its guaranteed-hit effect is
+// entirely subsumed into the `hit` claim claimThrow now trusts directly - see that function's own note) still
+// get none.
+const EVENT_TRIGGER_BUFF_IDS = new Set(Object.values(eco.EVENT_DEFS).map((d) => d.buffId));
+
 exports.useBuff = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const buffId = typeof data.buffId === "string" ? data.buffId : null;
@@ -99,7 +106,15 @@ exports.useBuff = functions.https.onCall(async (data, context) => {
     }
     const now = Date.now();
     save.buffs = save.buffs.filter((b) => b.endsAt > now); // sweep expired ones while we're here
-    if (item.duration) save.buffs.push({ id: buffId, endsAt: now + item.duration.seconds * 1000 });
+    if (item.duration) {
+      save.buffs.push({ id: buffId, endsAt: now + item.duration.seconds * 1000 });
+    } else if (EVENT_TRIGGER_BUFF_IDS.has(buffId)) {
+      // A generous, hand-picked window for the song-summon items (their real duration is an audio file's
+      // length, not known here - see GENEROUS_SONG_EVENT_MS's own note); tomato_juice already has a real
+      // `duration` of its own (20s, matching economy.json events.faceWindow.durationMs) and takes the branch
+      // above instead.
+      save.buffs.push({ id: buffId, endsAt: now + eco.GENEROUS_SONG_EVENT_MS });
+    }
 
     writeSave(tx, uid, save);
     return { buffItems: save.buffItems, buffs: save.buffs };
@@ -191,21 +206,38 @@ exports.sellSkin = functions.https.onCall(async (data, context) => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-// claimThrow({ projectileId, hit, claimedReward, clientVersion }) - v1, a RANGE check, not a full recomputation
-// of the client's event/streak/window-hit logic (songs, the banana/guitar face windows, the tank, streak
-// tracking) - reproducing all of that server-side is real future work, not something to fake here. What this DOES
-// enforce: the projectile must actually be equipped/owned (consumed if it's a real consumable), a miss must pay
-// exactly 0 (economy.json rewards.missCoins), and a hit's claimed reward must fall inside
-// [0, baseHitValue x activeCoinMultipliers x MAX_EVENT_FACE_MULTIPLIER] - the most any legitimate combination of
-// equipped projectile + active buffs + the best-paying event could produce. Anything outside that range is
-// rejected outright; a client cannot claim more than the honest ceiling no matter which event it pretends fired.
+// claimThrow({ projectileId, hit, faceHit, eventName, clientVersion }) - v2 (2026-09-29, replacing the v1 range
+// check). The owner's own call on where the trust line sits: the actual aiming skill (timing a fast-moving
+// marker) happens entirely client-side with nothing server-verifiable about it short of the server timing every
+// tap itself (a real round-trip per aim phase, not just per throw - rejected for the traffic/latency cost it
+// would add to the game's single most frequent interaction). So `hit` is TRUSTED, same trust level as every
+// other client-reported fact this migration didn't try to re-derive from first principles. What this function
+// does NOT trust, and computes itself instead of reading from the claim: the REWARD. There is no
+// `claimedReward` input at all any more - a hit always pays EXACTLY `baseHitValue x realActiveCoinMultipliers
+// x (a verified event's real faceMultiplier, if any)`, using the real economy.json catalog and the real
+// `buffs` array (server's own clock, checked at the moment THIS call is processed - i.e. right after the throw
+// resolves, not whatever buffs were running back when the player first tapped "TAP to aim" - closing exactly
+// the gap the owner flagged: a buff that would have run out mid-aim/mid-flight no longer silently still counts).
+// A client can therefore never claim an inflated number for a real hit; the only residual gap is claiming MORE
+// HITS than genuinely happened, bounded by the rate limit and real projectile consumption below.
+//
+// `faceHit`/`eventName` get a real, but partial, verification: `eventName` must be a real event AND the matching
+// summon buff (functions/lib/economyData.js EVENT_DEFS) must currently be active in the caller's OWN `buffs`
+// array (real server state, written by useBuff) for the bonus to be honored - a NATURAL (non-buff) event spawn
+// isn't tracked server-side at all yet (that RNG still lives entirely client-side, see src/main.js
+// rollNaturalEvent), so a faceHit claimed against one is simply not honored (pays the plain hit value, no event
+// bonus) rather than trusted blind - the owner's own reasoning for trusting `hit` doesn't extend to a 1.5-1.75x
+// bonus on top of it, which is a meaningfully larger thing to get wrong on every single throw. Flagged as a
+// known, deliberate gap, not silently shipped: closing it fully means moving natural event spawning
+// server-side too (own future work, not part of this pass).
 exports.claimThrow = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const projectileId = typeof data.projectileId === "string" ? data.projectileId : null;
   const hit = data.hit === true;
-  const claimedReward = Number.isFinite(data.claimedReward) ? data.claimedReward : null;
+  const faceHit = hit && data.faceHit === true; // a miss can never face-hit, whatever the client sends
+  const eventName = typeof data.eventName === "string" ? data.eventName : null;
   const baseValue = projectileId ? eco.projectileHitValue(projectileId) : null;
-  if (baseValue === null || claimedReward === null || claimedReward < 0) throw bad("Malformed throw claim.");
+  if (baseValue === null) throw bad("Unknown projectile.");
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(savesRef(uid));
@@ -221,26 +253,36 @@ exports.claimThrow = functions.https.onCall(async (data, context) => {
       if (save.projectiles[projectileId] <= 0) delete save.projectiles[projectileId];
     }
 
+    let reward;
     if (!hit) {
-      if (claimedReward !== 0) throw bad("A miss cannot pay out.");
+      reward = eco.eco.rewards.missCoins || 0; // economy.json rewards.missCoins - 0 today, respected either way
     } else {
       const now = Date.now();
-      const activeBuffIds = new Set(save.buffs.filter((b) => b.endsAt > now).map((b) => b.id));
+      save.buffs = save.buffs.filter((b) => b.endsAt > now); // sweep expired ones while we're here - also what makes the check below honest
       let multiplier = 1;
-      for (const id of activeBuffIds) {
-        const it = eco.shopItemIndex.get(id);
+      for (const b of save.buffs) {
+        const it = eco.shopItemIndex.get(b.id);
         const eff = it && (it.effects || []).find((e) => e.type === "coinMultiplier");
         if (eff) multiplier *= eff.value;
       }
-      const ceiling = baseValue * multiplier * eco.MAX_EVENT_FACE_MULTIPLIER;
-      if (!isAdmin(uid) && claimedReward > ceiling + 1e-6) {
-        throw new functions.https.HttpsError("failed-precondition", "Claimed reward exceeds the legitimate range.");
+      reward = baseValue * multiplier;
+
+      if (faceHit && eventName && eco.EVENT_DEFS[eventName]) {
+        const def = eco.EVENT_DEFS[eventName];
+        const buffIdx = save.buffs.findIndex((b) => b.id === def.buffId);
+        if (buffIdx !== -1) {
+          reward *= def.faceMultiplier;
+          save.buffs.splice(buffIdx, 1); // a face hit ends the event - this bonus can't be claimed twice
+        }
+        // else: claimed against an event this account has no server-verified active summon for (most likely a
+        // natural spawn) - not honored, falls through with the plain hit value only, per this function's own note.
       }
-      save.coins += Math.round(claimedReward);
-      save.lifetimeCoins += Math.round(claimedReward);
     }
+    reward = Math.round(reward);
+    save.coins += reward;
+    save.lifetimeCoins += reward;
 
     writeSave(tx, uid, save);
-    return { coins: save.coins, projectiles: save.projectiles };
+    return { coins: save.coins, projectiles: save.projectiles, reward };
   });
 });

@@ -66,11 +66,27 @@ function priceOf(item) {
   return o !== null && o !== undefined ? o : item.price;
 }
 
-// The highest faceMultiplier any event can pay (economy.json events._eventSummonPricingNote /
-// heavyGuitarWindow/discoWindow) - used as a generous, honest upper bound for claimThrow's range check (see
-// functions/economy.js) rather than simulating which specific event is actually active. 1.75 is both the disco's
-// and the heavy guitar's faceMultiplier today - if a future event pays more, this constant needs bumping too.
-const MAX_EVENT_FACE_MULTIPLIER = 1.75;
+// Every event claimThrow (functions/economy.js) can honor a faceHit for, and the shop item whose use (functions/
+// economy.js's useBuff) summons it. Real, exact faceMultiplier values straight from economy.json - once a claim
+// is verified as legitimate (see below), it's paid EXACTLY this, never a fudge-factor ceiling.
+const EVENT_DEFS = {
+  face: { buffId: "tomato_juice", faceMultiplier: eco.events.faceWindow.faceMultiplier },
+  disco: { buffId: "disco_ticket", faceMultiplier: eco.events.discoWindow.faceMultiplier },
+  guitar: { buffId: "guitar_pick", faceMultiplier: eco.events.guitarWindow.faceMultiplier },
+  heavy_guitar: { buffId: "heavy_guitar_pick", faceMultiplier: eco.events.heavyGuitarWindow.faceMultiplier },
+};
+
+// How long a summon-triggered song event's face-hit window is treated as open server-side, for events whose
+// REAL duration is the length of an audio file (disco.mp3 etc.) - not a number that exists anywhere in
+// economy.json, only in the client's loaded Sound objects (src/main.js songTimes(): `this.songSounds[name]
+// .duration * 1000`). Deliberately a generous, hand-picked upper bound (comfortably longer than any real song)
+// rather than trying to keep an exact duration in sync with whatever audio file happens to be loaded - a claim
+// arriving a little "late" relative to the real song length still gets honored; the only thing at stake in
+// picking this too generously is a slightly longer window an already-used buff's face-hit bonus could be
+// claimed in, not an unbounded one. `face` (the banana event) doesn't need this - its duration is a real
+// economy.json number (events.faceWindow.durationMs) and useBuff uses that exactly, via the same `buffs` array
+// entry every other timed buff already gets.
+const GENEROUS_SONG_EVENT_MS = 90000;
 
 module.exports = {
   eco,
@@ -86,5 +102,6 @@ module.exports = {
   projectileHitValue,
   rarityOfItem,
   priceOf,
-  MAX_EVENT_FACE_MULTIPLIER,
+  EVENT_DEFS,
+  GENEROUS_SONG_EVENT_MS,
 };

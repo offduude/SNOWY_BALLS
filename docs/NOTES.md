@@ -3581,3 +3581,68 @@ compiles.
 Version bump: `src/cloud.js?v=28 -> 29`. Also added `firebase-functions-compat.js` (same CDN, same version
 10.14.1 as the other Firebase scripts) to `index.html`, required for `firebase.functions()` to exist at all.
 - `src/cloud.js`, `index.html`.
+
+## claimThrow tightened: trusts hit/miss, computes (never trusts) the reward (2026-09-29)
+
+The v1 `claimThrow` (built earlier this session) was a RANGE check - it trusted whatever `claimedReward` number
+the client sent, only rejecting it if it exceeded a generous ceiling. The owner asked to tighten this properly,
+plus fix a specific "safety net" they'd noticed: buffs are read once at "TAP to aim" and frozen for the whole
+throw (`src/main.js` `takeAimSnapshot()`), so a buff that would have expired mid-aim or mid-flight still counts
+- they want buffs counted realistically, at the moment the projectile actually hits.
+
+**Investigated the full client-side aim/hit/event/buff mechanics first** (spawned an Explore agent to map
+`src/main.js`'s aim state machine, hit-window geometry, event triggering, and `src/buffs.js`'s `modifiers()`
+in detail before designing anything). Key finding: the hit/miss geometry IS fully deterministic (no
+server-side randomness needed to re-derive it) - but doing so would mean the server timing the aim phases
+itself (real round-trips at "tap to aim" and "offset chosen," not just at the throw's end), since a modified
+client could otherwise just submit whichever slider values it likes claiming genuine timing. Discussed this
+tradeoff with the owner directly; their call - correctly reasoned through out loud - was that if a modified
+client can lie about the SLIDER VALUES to fool a geometric re-derivation, it can just as easily lie about
+`hit` directly, so recomputing the trajectory doesn't close a meaningfully different gap - **trust `hit`/`miss`
+as reported, and put all the real validation effort into the REWARD instead**, which the server CAN compute
+exactly from data it already owns.
+
+**What changed:**
+- **`claimThrow`'s request shape**: `{ projectileId, hit, claimedReward }` → `{ projectileId, hit, faceHit,
+  eventName }`. There is no reward number in the request at all any more - the server always computes it:
+  `baseHitValue x realActiveCoinMultipliers x (a verified event's real faceMultiplier, if any)`. A client can
+  no longer claim an inflated number for a real hit, full stop - not bounded-but-possible, actually
+  impossible, since the number was never an input.
+- **Buff timing, the owner's specific ask**: the coinMultiplier product is read from the caller's OWN
+  `buffs` array using the SERVER's clock at the moment the call is processed - which, once the client is wired
+  to call this right after a throw resolves (the "Option B" latency design from earlier this session), is
+  effectively "at the moment the projectile hits," not "at the moment aiming started." A buff that would have
+  expired mid-flight genuinely stops counting. (The CLIENT's own `takeAimSnapshot()` freeze is a separate,
+  client-only concern for slider mechanics/UI - not touched here; wiring `main.js` to actually call this
+  function, and re-reading live buffs for its own optimistic display, is the next round of work.)
+- **Event face-hit bonus, partially verified rather than blindly trusted**: `useBuff` now ALSO starts a real,
+  server-known window for the four triggerEvent items claimThrow can honor a bonus for (disco_ticket,
+  guitar_pick, heavy_guitar_pick get a new `buffs` entry with a deliberately generous 90s window, since their
+  real duration is an audio file's length, not a number that exists in economy.json; tomato_juice already got
+  a real, exact 20s entry via the existing `duration`-based branch). `claimThrow` honors a `faceHit` claim with
+  the EXACT real `faceMultiplier` only if the matching summon buff is genuinely active in the caller's own
+  `buffs` array right now - and consumes it (can't be claimed twice). **Deliberately NOT extended to natural
+  (non-buff) event spawns** - that RNG still lives entirely client-side (`src/main.js` `rollNaturalEvent()`),
+  so the server has no way to verify one was really active; a faceHit claimed against a natural event is
+  simply not honored (pays the plain hit value, no bonus) rather than trusted the same way `hit` is. Reasoned
+  through explicitly rather than silently shipped: trusting `hit` bounds the worst case to "claims every throw
+  is a hit" (a real but bounded distortion); trusting `faceHit`/`eventName` too would bound the worst case to
+  "claims every throw is a hit AND the rarest possible bonus," a meaningfully bigger one - worth the extra,
+  cheap (useBuff already runs server-side) verification for the half that's free to get right.
+- Streak was confirmed (via the same investigation) to have zero effect on payout today - nothing to validate
+  there.
+
+**10 new tests** (39 total now, all passing): plain-hit exact value, miss pays exactly `missCoins`, real
+projectile ownership/consumption, refusing an unowned projectile, a real active buff applying its exact
+multiplier, an EXPIRED buff (still sitting in the array) correctly NOT counting - the direct test of the
+buff-timing fix - a genuinely-summoned event's faceHit paying its exact multiplier and getting consumed, a
+second claim against the same now-consumed event getting no bonus, and an unverified (natural-spawn-shaped)
+faceHit claim being quietly not honored rather than rejected. Caught a bug in the TEST itself while building
+these, not the Function: assumed `snowball` was common-rarity (16 coins) - it's actually rarity `"default"`
+(4 coins, per economy.json) - every "wrong" number the first run produced was actually the real, correct
+value for the projectile actually used, just not what the test expected. Switched the value-sensitive checks
+to `chestnut` (genuinely common, 16) instead.
+
+Version bumps: none - still entirely inside `functions/`, not deployed anywhere real yet.
+- `functions/economy.js` (`useBuff`, `claimThrow`), `functions/lib/economyData.js` (`EVENT_DEFS`,
+  `GENEROUS_SONG_EVENT_MS`), `functions/test/run.js`.

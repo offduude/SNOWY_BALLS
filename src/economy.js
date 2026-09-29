@@ -630,6 +630,21 @@ const Economy = (() => {
     skinsChanged();
   }
 
+  // Sells `n` of a skin (2026-09-29). Returns false (and changes nothing) if the player doesn't have that many -
+  // same delete-at-zero shape as useProjectile/takeBuff above. Not yet wired to actually pay out coins anywhere
+  // (see collection.js's own note) - the real mutation waits for a server-authoritative sellSkin, same reasoning
+  // as economy.json's _boxOddsSecurityNote.
+  function removeSkin(kind, id, n = 1) {
+    const before = getSkinCount(kind, id);
+    if (before < n) return false;
+    if (state.god) return true; // god mode: nothing is ever spent
+    if (before === n) delete state.skinCounts[kind][id];
+    else state.skinCounts[kind][id] = before - n;
+    save();
+    skinsChanged();
+    return true;
+  }
+
   // kind: "character" | "scenery" | "weather" | "projectile"
   function getEquipped(kind) {
     return state.equipped[kind];
@@ -777,6 +792,7 @@ const Economy = (() => {
     // Characters, sceneries and weathers the player has (kind: "character", "scenery" or "weather"); the default ones are always there.
     getSkinCount,
     addSkin,
+    removeSkin,
     // ---- THE RED DOTS OF A NEW SKIN (three of them, each with its own rule) ----
     //  - the SKINS button's: on while a new skin's category has not been ENTERED (opening the SKINS list itself does not count) - enterSkinKind
     //  - the category's (its card in the SKINS list): on until the new skin has been DISPLAYED, i.e. it was on screen in the category's menu (the player scrolls

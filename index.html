@@ -1325,6 +1325,44 @@
     /* a USE button that cannot be used now (an event buff while an event runs) */
     .pick-use.off { opacity: 0.45; filter: grayscale(0.6); cursor: default; }
 
+    /* SELL next to EQUIP on a sellable skin card (2026-09-29, collection.js skinActionHtml) - stacked under EQUIP
+       rather than beside it, so the action column doesn't widen and push the description around. */
+    .pick-action-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: calc(var(--u) * 0.5);
+    }
+
+    .pick-sell {
+      flex: none;
+      box-sizing: border-box;
+      width: calc(var(--u) * (1.2 * 8 + 2.4) + 4px); /* same width as .pick-equip, so the pair lines up */
+      text-align: center;
+      padding: calc(var(--u) * 0.6) 0;
+      background: #8b3a2b;
+      border: 2px solid #4a2f14;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: calc(var(--u) * 0.95);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .pick-sell:active { background: #6e2c20; }
+    /* Armed by a first tap ("SELL for {price}? CONFIRM") - a second tap within ~3s finalizes it. */
+    .pick-sell.confirming { background: #a3261c; font-size: calc(var(--u) * 0.85); }
+    /* Dead on the skin you're currently wearing (relabeled "unequip to sell") - same greyed-out look .pick-equip.on uses. */
+    .pick-sell.off,
+    .pick-sell:disabled {
+      background: #b9a88f;
+      border-color: #8a7a62;
+      color: #f4ead0;
+      cursor: default;
+      font-size: calc(var(--u) * 0.75);
+    }
+
     /* Buff cards: top of the screen, right of the live display (its frame spans 4..75 of 432 canvas
        px across and 4..67 of 243 down - keep in step with createTargetCamera, which shrank when W21
        was retired from scoring, 2026-09-27). Cards stack down until the column is as tall as the live
@@ -2208,8 +2246,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="src/version.js?v=311"></script>
-  <script src="src/economy.js?v=46"></script>
+  <script src="src/version.js?v=312"></script>
+  <script src="src/economy.js?v=47"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
     // shows the sentence, and once the game is up (and the sentence has been read) fades out into it.
@@ -2243,7 +2281,7 @@
   <script src="src/boxes.js?v=9"></script>
   <script src="src/volume.js?v=2"></script>
   <script src="src/saves.js?v=25"></script>
-  <script src="src/collection.js?v=83"></script>
+  <script src="src/collection.js?v=84"></script>
   <script src="src/main.js?v=195"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

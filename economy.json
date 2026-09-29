@@ -51,6 +51,7 @@
       "image": "assets/character/pryk_face.png",
       "character": "pryk",
       "rarity": "epic",
+      "sellPrice": 37496,
       "detail": ""
     },
     {
@@ -60,6 +61,7 @@
       "image": "assets/character/banan_face.png",
       "character": "banan",
       "rarity": "legendary",
+      "sellPrice": 149985,
       "detail": ""
     },
     {
@@ -69,6 +71,7 @@
       "image": "assets/character/black_andek_face.png",
       "character": "black_andek",
       "rarity": "common",
+      "sellPrice": 1875,
       "detail": ""
     },
     {
@@ -78,6 +81,7 @@
       "image": "assets/character/cool_andek_face.png",
       "character": "cool_andek",
       "rarity": "rare",
+      "sellPrice": 9999,
       "detail": ""
     }
   ],
@@ -98,6 +102,7 @@
       "image": "assets/scenery/frosty_night.png",
       "background": "assets/scenery/frosty_night_bg.png",
       "rarity": "rare",
+      "sellPrice": 1999,
       "detail": ""
     },
     {
@@ -107,6 +112,7 @@
       "image": "assets/scenery/desert.png",
       "background": "assets/scenery/desert_bg.png",
       "rarity": "common",
+      "sellPrice": 750,
       "detail": ""
     },
     {
@@ -116,6 +122,7 @@
       "image": "assets/scenery/lollipop.png",
       "background": "assets/scenery/lollipop_bg.png",
       "rarity": "epic",
+      "sellPrice": 7496,
       "detail": ""
     },
     {
@@ -125,6 +132,7 @@
       "image": "assets/scenery/space.png",
       "background": "assets/scenery/space_bg.png",
       "rarity": "legendary",
+      "sellPrice": 29985,
       "detail": ""
     },
     {
@@ -134,6 +142,7 @@
       "image": "assets/weather/sunny.png",
       "background": "assets/scenery/summer_bg.png",
       "rarity": "common",
+      "sellPrice": 750,
       "detail": "",
       "_imageNote": "The card thumbnail deliberately reuses Sunny's weather picture (assets/weather/sunny.png) - the owner's direct call, no separate scenery_summer_item.png exists."
     }
@@ -170,6 +179,7 @@
       "image": "assets/weather/sunny.png",
       "particle": null,
       "rarity": "common",
+      "sellPrice": 750,
       "detail": ""
     },
     {
@@ -188,6 +198,7 @@
       "soundVolume": 0.25,
       "affectsEvents": false,
       "rarity": "common",
+      "sellPrice": 750,
       "detail": ""
     },
     {
@@ -205,6 +216,7 @@
       "sound": "assets/audio/blizzard.mp3",
       "soundVolume": 0.3,
       "rarity": "epic",
+      "sellPrice": 7496,
       "detail": ""
     },
     {
@@ -220,6 +232,7 @@
       "density": "very_heavy",
       "fallSpeed": "fast",
       "rarity": "legendary",
+      "sellPrice": 29985,
       "detail": ""
     },
     {
@@ -236,6 +249,7 @@
       "density": "light",
       "fallSpeed": "slow",
       "rarity": "rare",
+      "sellPrice": 1999,
       "detail": "",
       "_imageNote": "The one file the owner supplied (banana_rain.png) is deliberately used for BOTH the card thumbnail (image) and the falling particle (particle) - the owner's direct call, there is no separate _item/_particle pair for this one."
     }
@@ -679,13 +693,14 @@
     ]
   },
 
-  "_boxesNote": "BOXES (the BOXES button, between SHOP and the coin counter, 2026-09-27): three always-available mystery boxes, one per skin kind (characters / sceneries / weathers) - PLACEHOLDER price, like the rest of the shop. Opening one spends `price` and draws one item from that kind's own list above, weighted by `boxOdds` below (its OWN rarity chances, 2026-09-27 - separate from the shop's `rarities[].chance`, since the owner wants boxes to feel different from the shop's odds) - the default item of a kind is never a possible draw (see boxes.js poolFor). Skins are stackable (Economy.addSkin) so a duplicate draw is still a real reward, not a dead end. Seasonal boxes (a second row) are 'for later' - not represented here yet.",
+  "_boxesNote": "BOXES (the BOXES button, between SHOP and the coin counter, 2026-09-27): three always-available mystery boxes, one per skin kind (characters / sceneries / weathers). Opening one spends `price` and draws one item from that kind's own list above, weighted by `boxOdds` below (its OWN rarity chances, 2026-09-27 - separate from the shop's `rarities[].chance`, since the owner wants boxes to feel different from the shop's odds) - the default item of a kind is never a possible draw (see boxes.js poolFor). Skins are stackable (Economy.addSkin) so a duplicate draw is still a real reward, not a dead end. `price` was a flat 250 placeholder for every box until 2026-09-29, when it was repriced (character 9999, scenery/weather 1999 each - the character box costs more since it has the smallest pool, one fewer guaranteed-loss common draw to dilute the average) to make a box a genuine, risky purchase rather than a 5-minute-cadence impulse click - see `_sellPriceNote` for the matching sell-back math this was designed alongside. Seasonal boxes (a second row) are 'for later' - not represented here yet.",
   "_boxOddsNote": "The chance a BOX draw lands on each rarity (2026-09-27, the owner's own numbers - previously boxes just reused the shop's rarities[].chance, 60/30/9/1). Only used by boxes.js (draw/oddsFor); the shop's own rolls are untouched by this.",
-  "_boxOddsSecurityNote": "NOT tamper-proof yet (2026-09-27): boxOdds/draw() run entirely client-side in boxes.js, loaded straight from this file - anyone with devtools can edit either and roll guaranteed legendaries. Same is true of the shop's own rarities[].chance and shop.js's pickWeighted. This is a known gap, not an oversight: real enforcement means the draw has to happen server-side (a Cloud Function that holds the odds and the RNG, the client just requests a result), which is exactly what the already-planned Blaze/Firebase economy migration covers - see the snowy-balls-blaze-migration memory. Don't build a partial client-side fix here; fold this into that migration when it starts.",
+  "_boxOddsSecurityNote": "NOT tamper-proof yet (2026-09-27): boxOdds/draw() run entirely client-side in boxes.js, loaded straight from this file - anyone with devtools can edit either and roll guaranteed legendaries. Same is true of the shop's own rarities[].chance and shop.js's pickWeighted, and now also of every skin's own `sellPrice` (_sellPriceNote) - selling isn't wired to actually pay out yet for exactly this reason (see collection.js's own note on skinActionHtml). This is a known gap, not an oversight: real enforcement means the draw AND the sell/purchase paths all have to happen server-side (Cloud Functions holding the odds, the RNG, and the actual coin/skin mutations - the client just requests a result), which is exactly what the already-planned Blaze/Firebase economy migration covers - see the snowy-balls-blaze-migration memory. Don't build a partial client-side fix here; fold this into that migration when it starts.",
+  "_sellPriceNote": "SELL PRICE (2026-09-29): every non-default character/scenery/weather has a fixed `sellPrice` in coins - what selling it back gives you (once Economy.removeSkin/the SELL button in collection.js is actually wired to pay out, post-Blaze-migration; see _boxOddsSecurityNote). Deliberately a HARDCODED NUMBER, not computed live from boxOdds/box price - the owner plans to add more skins, may retune box odds, and may eventually replace a box with a different one entirely, and wants sell prices to survive all of that unchanged rather than silently reshuffling. HOW THESE WERE DERIVED, so a new item can be priced the same way later even after today's boxes are gone: avgCost = boxPrice / p_item, where p_item is that item's own real draw chance in ITS box at the time it was priced (boxOdds[rarity]/100, divided by how many items shared that rarity in that box's pool then - see boxes.js poolFor/oddsFor). sellPrice = round(avgCost x 0.15) - one flat 15% for every rarity, no exceptions and no cap. At today's boxOdds (80/15/4/1) that 15% rate happens to land common well under its own box's price (a loss - common is by far the most likely draw, so this is what keeps a box a losing bet on average), rare at EXACTLY its box's price (15% sell rate over a 15%-chance tier is an exact break-even, not tuned to land there), and epic/legendary well above it (a real profit, legendary a big one - encouraging trading a spare legendary with another player over just selling it to the game). Character box (price 9999): black_andek(common) 1875, cool_andek(rare) 9999, pryk(epic) 37496, banan(legendary) 149985. Scenery/weather box (price 1999 each): common items (desert, summer, sunny, rain) 750, rare (frosty_night, banana_rain) 1999, epic (lollipop, blizzard) 7496, legendary (space, acid_rain) 29985.",
   "boxOdds": { "common": 80, "rare": 15, "epic": 4, "legendary": 1 },
   "boxes": [
-    { "id": "character_box", "kind": "character", "name": "Character Box", "price": 250 },
-    { "id": "scenery_box", "kind": "scenery", "name": "Scenery Box", "price": 250 },
-    { "id": "weather_box", "kind": "weather", "name": "Weather Box", "price": 250 }
+    { "id": "character_box", "kind": "character", "name": "Character Box", "price": 9999 },
+    { "id": "scenery_box", "kind": "scenery", "name": "Scenery Box", "price": 1999 },
+    { "id": "weather_box", "kind": "weather", "name": "Weather Box", "price": 1999 }
   ]
 }

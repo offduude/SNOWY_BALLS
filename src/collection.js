@@ -214,6 +214,15 @@ const Collection = (() => {
       b.textContent = isOn ? "EQUIPPED" : "EQUIP";
       b.classList.toggle("on", isOn);
     });
+    // A SELL button next to it goes dead the instant its own skin becomes equipped (2026-09-29) - same pass, so
+    // the two buttons never disagree about which skin just got equipped.
+    scrollEl.querySelectorAll(".pick-sell[data-sell]").forEach((b) => {
+      const isOn = b.dataset.sell === equipped;
+      b.disabled = isOn;
+      b.classList.toggle("off", isOn);
+      b.textContent = isOn ? "unequip to sell" : "SELL";
+    });
+    resetSellConfirm();
   }
 
   // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner, the EQUIP
@@ -235,6 +244,52 @@ const Collection = (() => {
       cornerHtml(item.rarity, "") +
       `</div>`
     );
+  }
+
+  // The EQUIP-button replacement for a sellable skin card (2026-09-29): EQUIP itself, plus a SELL button beside
+  // it (economy.json item.sellPrice - default skins and anything with no sellPrice have none, same "default"
+  // exclusion boxes.js poolFor() already uses for what's ever a box prize). SELL goes dead on the currently
+  // equipped skin - selling your only copy of what you're wearing would leave an equipped-but-owned-0 skin, which
+  // nothing else in the game expects. `null` (unsellable) falls back to skinRowHtml's own plain EQUIP button.
+  function skinActionHtml(kind, item) {
+    if (item.rarity === "default" || !item.sellPrice) return null;
+    const equip = `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>`;
+    const isOn = Economy.getEquipped(kind) === item.id;
+    const sell =
+      `<button class="pick-sell${isOn ? " off" : ""}" type="button" data-sell="${esc(item.id)}" data-kind="${esc(kind)}"` +
+      `${isOn ? " disabled" : ""}>${isOn ? "unequip to sell" : "SELL"}</button>`;
+    return `<div class="pick-action-row">${equip}${sell}</div>`;
+  }
+
+  // ---- SELL (2026-09-29): two-tap inline confirm, no popup - tap SELL once to arm it ("SELL for {price}?
+  // CONFIRM", ~3s to change your mind), tap again to actually sell. NOT wired to pay out yet on purpose (see
+  // economy.json _boxOddsSecurityNote and _sellPriceNote) - selling has to become a server-authoritative
+  // Cloud Function alongside box-opening before it can safely hand out real coins, so this stays a no-op past
+  // the confirm for now; only the price data and the UI are meant to be reviewed at this stage.
+  let sellConfirm = null; // { kind, id, timer } | null
+  function resetSellConfirm() {
+    if (!sellConfirm) return;
+    const btn = scrollEl.querySelector(`.pick-sell[data-sell="${sellConfirm.id}"][data-kind="${sellConfirm.kind}"]`);
+    if (btn && !btn.disabled) {
+      btn.textContent = "SELL";
+      btn.classList.remove("confirming");
+    }
+    clearTimeout(sellConfirm.timer);
+    sellConfirm = null;
+  }
+  function handleSellClick(btn) {
+    const { kind, sell: id } = btn.dataset;
+    const item = skinItems(kind).find((x) => x.id === id);
+    if (!item || !item.sellPrice) return;
+    if (sellConfirm && sellConfirm.kind === kind && sellConfirm.id === id) {
+      resetSellConfirm(); // confirmed - but see the note above: intentionally not wired to actually sell yet
+      return;
+    }
+    resetSellConfirm();
+    click();
+    btn.textContent = `SELL for ${item.sellPrice}? CONFIRM`;
+    btn.classList.add("confirming");
+    sellConfirm = { kind, id, timer: setTimeout(resetSellConfirm, 3000) };
   }
 
   // The SKINS list itself: one card per category, and each is the card of the skin that is EQUIPPED in it (name, description, rarity, detail - exactly what
@@ -420,6 +475,7 @@ const Collection = (() => {
 
   function open(kind) {
     markSeen(); // switching straight from one list to another
+    resetSellConfirm(); // an armed "CONFIRM" from whatever was open before must not linger into the new list
     Saves.closeInspect(); // ... and an inspected leaderboard card must not linger over whatever list comes next either
     // SHOP no longer greys these buttons out (2026-09-27, the owner's ask) - it stays open behind whatever list
     // you tap into unless told to close, so opening one closes SHOP the same way SHOP itself already closes any
@@ -453,7 +509,7 @@ const Collection = (() => {
       titleEl.textContent = SKIN_TITLES[kind];
       scrollEl.innerHTML =
         sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
-          .map((it) => skinRowHtml(kind, it, null, "", Economy.isNewSkin(kind, it.id)))
+          .map((it) => skinRowHtml(kind, it, skinActionHtml(kind, it), "", Economy.isNewSkin(kind, it.id)))
           .join("") + `<div class="list-soon">More coming soon!</div>`; // (under the last card: the default one)
       fitNames();
       centerOn(Economy.getEquipped(kind)); // opens on what is equipped
@@ -506,6 +562,7 @@ const Collection = (() => {
 
   function close() {
     markSeen();
+    resetSellConfirm();
     openKind = null;
     container.classList.remove("list-open");
     scrollEl.dataset.kind = "";
@@ -537,6 +594,12 @@ const Collection = (() => {
   }
 
   function onEquip(e) {
+    const sell = e.target.closest(".pick-sell[data-sell]");
+    if (sell) {
+      if (sell.disabled) return;
+      handleSellClick(sell);
+      return;
+    }
     const choice = e.target.closest(".skins-change");
     if (choice) {
       click();

@@ -3051,3 +3051,60 @@ correctly back to "SHOP", not stuck on "BACK") and opened directly, no intermedi
 BOXES on its own afterward and confirmed it still fully dims everything else exactly as before - only
 SHOP's own behaviour changed. No console errors. No coins/skins/equip state touched this round.
 - `index.html`, `src/collection.js`.
+
+## Skin economy phase 1: box repricing + sell-back data + SELL button (client-only, 2026-09-29)
+
+First of several planned batches (full plan: box repricing, skin sell-back, and player trading, all folded
+into the already-planned Blaze/Cloud-Functions migration - see the `snowy-balls-blaze-migration` memory
+and this session's plan file). This batch is deliberately **client-only and inert** - real money never
+moves - because selling and box-opening can't be made safe against a modified client until they're
+server-authoritative Cloud Functions (see `_boxOddsSecurityNote`/`_sellPriceNote` below); shipping a working
+client-side SELL now would just be a new duplicate-coins hole to close later.
+
+**Box prices** (`economy.json` `boxes[].price`, was a flat 250 placeholder for all three): character_box
+250 -> 9999, scenery_box and weather_box 250 -> 1999 each. Priced differently on purpose - the character
+box has the smallest pool (4 items today) so its common draw alone would otherwise dilute the "boxes lose
+money on average" invariant less than scenery/weather's 5-item pool does; see `_sellPriceNote`'s math.
+
+**Sell prices** (new `sellPrice` field on every non-default character/scenery/weather item): one flat 15%
+of `avgCost = boxPrice / p_item` (that item's own real draw chance in its box), the same rate for every
+rarity, no cap. The owner worked through several pricing models this session (a % of average cost that
+turned out to make box-flipping profitable regardless of rarity; a flat 5000 cap; per-tier percentages)
+before landing on flat 15% for its clean, almost-coincidental property: at today's boxOdds (80/15/4/1),
+15% lands common at a loss, rare at an EXACT break-even (15% sell rate over a 15%-chance tier), and
+epic/legendary at a real profit - legendary a big one (up to 149,985 on the character box), which is the
+whole point: a spare legendary is worth selling to the game, but worth much more trading to another
+player. Full worked table and the "why a % can't just be `1/N_items`" arbitrage catch are in `economy.json`'s
+new `_sellPriceNote`, written to survive future box-odds retuning or a box being replaced entirely (the
+owner is planning both) since the numbers are hardcoded, computed once, never re-derived live.
+
+- `src/economy.js`: new `removeSkin(kind, id, n=1)`, mirroring `useProjectile`/`takeBuff`'s delete-at-zero
+  pattern; exported next to `addSkin`. Not called by anything yet.
+- `src/collection.js`: `skinActionHtml(kind, item)` builds an EQUIP+SELL pair (stacked, not side-by-side -
+  keeps the action column from widening and pushing the description around) for any item with a
+  `sellPrice`; falls back to the plain EQUIP button for the default skin of each kind. SELL goes dead
+  ("unequip to sell") on whatever's currently equipped - selling your last copy of what you're wearing
+  would leave an equipped-but-owned-0 skin, which nothing else expects. A two-tap inline confirm (tap once
+  -> "SELL for {price}? CONFIRM" for ~3s, tap again to finalize) instead of a new popup, wired through the
+  same delegated `onEquip` click handler the rest of the list already uses (`data-sell`, checked first).
+  The confirmed tap is explicitly a no-op right now (see above) - `resetSellConfirm()` fires on it instead
+  of any real mutation, and also on leaving/reopening a list so an armed CONFIRM never survives navigation.
+- `economy.json`: `_boxesNote`/`_boxOddsSecurityNote` updated to reflect the real prices and to flag that
+  selling now shares the same "not tamper-proof until it's a Cloud Function" gap the box draw already had.
+
+Version bumps: `src/economy.js?v=46 -> 47`, `src/collection.js?v=83 -> 84`.
+
+Verified live (test origin): fresh tab, no console errors. Confirmed both box screens show the new prices
+(9999 / 1999 / 1999). Granted a common (Black Andek) and the legendary (Banan) on a test save and opened
+CHARACTERS: both show EQUIP+SELL, the default (Andek) shows only EQUIP, Black Andek's SELL correctly reads
+"SELL for 1875? CONFIRM" after one tap and Banan's "SELL for 149985? CONFIRM" - both match the computed
+table exactly. Confirmed the armed state times out back to plain "SELL" after ~3s with no tap, and that
+tapping through to "confirm" changes nothing (coins and skin count both unchanged) - the no-op is real, not
+just described in a comment. Equipping Black Andek correctly disabled and relabeled its own SELL button
+("unequip to sell") without touching Banan's. Note: the "computer" tool's synthetic click didn't register on
+these buttons in this pane for some reason (same quirk hit earlier this session with the box-opening reel) -
+verified instead via a real `.click()` call, which is what the numbers above reflect; not a bug in the
+shipped code. Restored the test save's equipped character back to Andek (the only state I changed that
+wasn't already a fresh/default value); left the two granted test skins in place as a harmless leftover, same
+precedent as every other testing round this engagement.
+- `economy.json`, `src/economy.js`, `src/collection.js`.

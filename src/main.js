@@ -2799,11 +2799,19 @@ class MainScene extends Phaser.Scene {
     return 1 / (meanShopHours * this.throwsPerHour());
   }
 
-  // One throw's roll for a natural event: an independent roll for EACH RARITY that has events (not one per event). If several rarities hit on the
-  // same throw the BETTER (rarer) one wins; its rarity then picks one of its events at random. Returns the event's name or null. (So adding
-  // an event to a rarity does not make that rarity's events more frequent; a rarity that loses to a better one on the same throw is only a
-  // little rarer than its chance - by that better one's chance.)
+  // DISABLED (2026-09-29, the owner's own call): natural (non-buff) event spawns are the one thing claimThrow
+  // can't verify server-side - the roll happened entirely in this function, client-side only, so a claimed
+  // face-hit against one could never be trusted the way a buff-triggered event's can (see docs/NOTES.md
+  // "claimThrow tightened..." and the snowy-balls-blaze-migration memory for the full reasoning). Rather than
+  // ship that gap, natural spawning is turned off outright - every event now only ever starts via its summon
+  // buff (Tomato Juice, Disco Ticket, Guitar Pick, Heavy Pick, Toy Tank), which useBuff already tracks
+  // server-side, so a faceHit claim against ANY currently-running event can be verified for real. The original
+  // roll (an independent per-rarity chance, the better rarity winning ties - see economy.json events._rarityNote)
+  // is left commented out below rather than deleted, in case natural spawning is ever revisited (e.g. once/if
+  // that roll itself moves server-side, closing the gap a different way instead of removing the feature).
   rollNaturalEvent() {
+    return null;
+    /*
     const byRarity = {};
     for (const d of this.eventDefs()) {
       if (d.natural === false) continue; // Toy Tank: never a natural pick, only startEvent("tank") directly
@@ -2817,6 +2825,7 @@ class MainScene extends Phaser.Scene {
     if (best === null) return null;
     const names = byRarity[best];
     return names[Math.floor(Math.random() * names.length)];
+    */
   }
 
   // Tomato Juice (buff effect triggerEvent "face"): while it runs the banana face is on. Checked every frame:

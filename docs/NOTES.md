@@ -3646,3 +3646,23 @@ to `chestnut` (genuinely common, 16) instead.
 Version bumps: none - still entirely inside `functions/`, not deployed anywhere real yet.
 - `functions/economy.js` (`useBuff`, `claimThrow`), `functions/lib/economyData.js` (`EVENT_DEFS`,
   `GENEROUS_SONG_EVENT_MS`), `functions/test/run.js`.
+
+## Natural event spawning disabled (2026-09-29)
+
+Direct follow-up to the claimThrow tightening above: rather than leave the natural-event/faceHit gap open (a
+naturally-spawned event's face-hit bonus silently not paying out once the client is wired to claimThrow for
+real), the owner's call was to just turn natural spawning off outright. `src/main.js`'s `rollNaturalEvent()`
+now returns `null` unconditionally - the original per-rarity roll is commented out in place (not deleted), in
+case it's ever revisited, e.g. if that roll itself moves server-side later instead. Every event (banana face,
+disco, guitar, heavy guitar, tank) now only ever starts via its summon buff - Tomato Juice, Disco Ticket,
+Guitar Pick, Heavy Pick, Toy Tank - which `useBuff` already tracks server-side, so a faceHit claim against any
+currently-running event can be verified for real once `main.js` is wired to call `claimThrow`.
+
+Verified live at `http://127.0.0.1:5501`: game loads clean, no console errors.
+
+Version bump: `src/main.js?v=196 -> 197`.
+
+Session paused here (approaching a usage limit) - next up whenever picked back up: wiring `main.js`/shop.js/
+boxes.js/buffs.js/collection.js to actually CALL the Cloud Functions instead of mutating `Economy` locally
+(still the single biggest remaining piece - see the "what's left" recap from earlier this session).
+- `src/main.js`, `index.html`.

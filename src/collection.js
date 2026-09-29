@@ -205,7 +205,9 @@ const Collection = (() => {
     );
   }
 
-  // Sets each EQUIP button's label/state without rebuilding the list (that would jump the scroll).
+  // Sets each EQUIP button's label/state without rebuilding the list (that would jump the scroll). SELL no
+  // longer has any equip-dependent state to sync here (2026-09-29, see skinActionHtml) - it doesn't go dead on
+  // the equipped skin any more, and the default skin never renders one at all - so this is EQUIP-only again.
   function refreshButtons() {
     if (!openKind) return;
     const equipped = Economy.getEquipped(openKind);
@@ -214,23 +216,14 @@ const Collection = (() => {
       b.textContent = isOn ? "EQUIPPED" : "EQUIP";
       b.classList.toggle("on", isOn);
     });
-    // A SELL button next to it goes dead the instant its own skin becomes equipped (2026-09-29) - same pass, so
-    // the two buttons never disagree about which skin just got equipped. Skipped for a permanently unsellable
-    // one (the default skin, marked at render time) - equipping/unequipping it must never re-enable SELL.
-    scrollEl.querySelectorAll(".pick-sell[data-sell]").forEach((b) => {
-      if (b.classList.contains("unsellable")) return;
-      const isOn = b.dataset.sell === equipped;
-      b.disabled = isOn;
-      b.classList.toggle("off", isOn);
-      b.textContent = isOn ? "unequip to sell" : "SELL";
-    });
   }
 
   // A character / scenery / weather card: picture, name, description, the rarity in the top-right corner, the EQUIP
   // button with how many the player has under it (stackable, never consumed - see Economy.getSkinCount), the detail
   // at the bottom. `action` replaces the EQUIP button (the SKINS list's CHANGE, the shop's price button), `extraClass`
   // is added to the card. `hideAmount` drops the owned-count line entirely (the BOXES inspect popup's item preview,
-  // 2026-09-27 - the owner didn't want a quantity shown there).
+  // and - 2026-09-29 - every default skin's own card: it's always owned exactly one, so the count says nothing
+  // an owned player doesn't already know).
   function skinRowHtml(kind, item, action, extraClass, dot, hideAmount) {
     const detail = item.detail ? `<div class="pick-stats"><span class="pick-stat">${esc(item.detail)}</span></div>` : "";
     const amount = hideAmount ? "" : `<div class="pick-regen"><span>${countText(Economy.getSkinCount(kind, item.id))}</span></div>`;
@@ -247,37 +240,35 @@ const Collection = (() => {
     );
   }
 
-  // The EQUIP-button replacement for every skin card (2026-09-29): EQUIP itself, plus a SELL button beside it,
-  // always shown - greyed out (not hidden) rather than omitted when selling isn't possible, so a card's layout
-  // never jumps between kinds. Two separate reasons a SELL button can be dead: "unsellable" (the default skin,
-  // or - defensively - anything with no economy.json sellPrice at all: same "default" exclusion boxes.js
-  // poolFor() already uses for what's ever a box prize) is permanent and never re-checked; "equipped" (selling
-  // your only copy of what you're wearing would leave an equipped-but-owned-0 skin, which nothing else in the
-  // game expects) is re-evaluated every time refreshButtons() runs.
+  // The EQUIP-button replacement for a sellable skin card (2026-09-29): EQUIP itself, plus an always-active SELL
+  // button beside it. The default skin of a kind has neither a price nor any point in one (it's free and
+  // permanent) - it gets `null` here, which falls all the way back to skinRowHtml's own plain lone EQUIP button
+  // (no SELL, and the caller also passes hideAmount for it - see the open() call below - so its card drops the
+  // owned-count line too). Selling the EQUIPPED skin is allowed (the owner's call) - once wired for real, the
+  // Cloud Function that actually performs the sale re-equips the kind's default the moment a sale empties out
+  // whatever was equipped, so nothing is ever left "equipped" at 0 owned; nothing client-side needs to guard
+  // against that today since selling itself is still inert (see handleSellClick).
   function skinActionHtml(kind, item) {
+    if (item.rarity === "default" || !item.sellPrice) return null;
     const equip = `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>`;
-    const unsellable = item.rarity === "default" || !item.sellPrice;
-    const equipped = !unsellable && Economy.getEquipped(kind) === item.id;
-    const dead = unsellable || equipped;
-    const label = equipped ? "unequip to sell" : "SELL";
-    const sell =
-      `<button class="pick-sell${dead ? " off" : ""}${unsellable ? " unsellable" : ""}" type="button"` +
-      ` data-sell="${esc(item.id)}" data-kind="${esc(kind)}"${dead ? " disabled" : ""}>${label}</button>`;
+    const sell = `<button class="pick-sell" type="button" data-sell="${esc(item.id)}" data-kind="${esc(kind)}">SELL</button>`;
     return `<div class="pick-action-row">${equip}${sell}</div>`;
   }
 
-  // ---- SELL (2026-09-29): a real confirm popup (Saves.openModal - the same one CHANGE NAME's price warning
-  // uses) instead of the inline two-tap button-text-swap this replaced - the owner's call, the inline version
-  // read as an eyesore. NOT wired to pay out yet on purpose (see economy.json _boxOddsSecurityNote and
+  // ---- SELL (2026-09-29): a confirm popup (Saves.openModal - the same one CHANGE NAME's price warning uses)
+  // instead of collection.js's own bespoke inline state. Styled `danger` (red, the same colour .pick-sell
+  // itself uses in the list - the owner's ask) since it's the one confirm in the game that's genuinely
+  // destructive. NOT wired to pay out yet on purpose (see economy.json _boxOddsSecurityNote and
   // _sellPriceNote) - selling has to become a server-authoritative Cloud Function alongside box-opening before
-  // it can safely hand out real coins, so SELL in the popup is still a no-op for now; only the price data and
-  // the UI are meant to be reviewed at this stage.
+  // it can safely hand out real coins (and, once it is, before it can safely re-equip the default on your
+  // behalf if you sold what you were wearing - see skinActionHtml above), so SELL in the popup is still a
+  // no-op for now; only the price data and the UI are meant to be reviewed at this stage.
   function handleSellClick(btn) {
     const { kind, sell: id } = btn.dataset;
     const item = skinItems(kind).find((x) => x.id === id);
     if (!item || !item.sellPrice) return;
     Saves.openModal("SELL", `<div class="modal-text">Sell ${esc(item.name)} for ${item.sellPrice} coins?</div>`, [
-      { label: "SELL" }, // intentionally does nothing yet - see the note above
+      { label: "SELL", cls: "danger" }, // intentionally does nothing yet - see the note above
       { label: "CANCEL", cls: "ghost" },
     ]);
   }
@@ -498,7 +489,7 @@ const Collection = (() => {
       titleEl.textContent = SKIN_TITLES[kind];
       scrollEl.innerHTML =
         sortedItems(kind, skinItems(kind).filter((it) => isListed(kind, it)))
-          .map((it) => skinRowHtml(kind, it, skinActionHtml(kind, it), "", Economy.isNewSkin(kind, it.id)))
+          .map((it) => skinRowHtml(kind, it, skinActionHtml(kind, it), "", Economy.isNewSkin(kind, it.id), it.rarity === "default"))
           .join("") + `<div class="list-soon">More coming soon!</div>`; // (under the last card: the default one)
       fitNames();
       centerOn(Economy.getEquipped(kind)); // opens on what is equipped

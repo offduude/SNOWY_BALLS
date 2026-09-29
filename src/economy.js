@@ -631,9 +631,11 @@ const Economy = (() => {
   }
 
   // Sells `n` of a skin (2026-09-29). Returns false (and changes nothing) if the player doesn't have that many -
-  // same delete-at-zero shape as useProjectile/takeBuff above. Not yet wired to actually pay out coins anywhere
-  // (see collection.js's own note) - the real mutation waits for a server-authoritative sellSkin, same reasoning
-  // as economy.json's _boxOddsSecurityNote.
+  // same delete-at-zero shape as useProjectile/takeBuff above. Selling the currently EQUIPPED skin down to 0 is
+  // allowed (collection.js's own note) - this function itself doesn't re-equip anything if that happens, since
+  // it isn't called by anything real yet: the real mutation (and the "fall back to the kind's default the
+  // moment that empties out what's equipped" behaviour that goes with it) waits for a server-authoritative
+  // sellSkin, same reasoning as economy.json's _boxOddsSecurityNote.
   function removeSkin(kind, id, n = 1) {
     const before = getSkinCount(kind, id);
     if (before < n) return false;

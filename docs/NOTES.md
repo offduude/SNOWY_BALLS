@@ -3142,3 +3142,39 @@ real. CANCEL and Banan's own popup (legendary, correctly showing "Sell Banan for
 the same way. Tapping the disabled default-skin SELL button opened nothing at all. No coins/skins/equip
 state left changed this round (nothing was actually mutated, by design).
 - `src/saves.js`, `src/collection.js`, `index.html`.
+
+## SELL: equipped skins sellable, popup matches the list's red, default skins drop both extras (2026-09-29)
+
+Three more owner-called refinements on the same SELL feature:
+
+- **Selling the equipped skin is now allowed.** `skinActionHtml` no longer disables/relabels SELL for
+  whatever's currently equipped - that whole equip-aware branch (and `refreshButtons()`'s matching SELL loop)
+  is gone, since SELL has nothing left to react to. The "equipped but 0 owned" problem this used to guard
+  against doesn't need a client-side guard: once selling is real, the Cloud Function performing the sale will
+  fall back to re-equipping the kind's default itself the moment a sale empties out whatever was equipped -
+  documented on `Economy.removeSkin` and `skinActionHtml` now, ready for whoever builds `sellSkin` later.
+- **The popup's SELL button is the same red `.pick-sell` uses in the list** (`#8b3a2b`, `:active #6e2c20`) -
+  reused `.modal-btn`'s existing `danger` variant rather than inventing a new one (it already meant "the
+  destructive option" for the account-overwrite warning's CONTINUE, so SELL fits it exactly; retinting it
+  changed that button's colour too, which reads as more appropriate for "this cannot be undone," not less).
+- **The default skin of a kind now shows neither SELL nor its owned-count line.** `skinActionHtml` goes back
+  to returning `null` for it (falls through to skinRowHtml's own plain lone EQUIP button, same as before SELL
+  existed at all) instead of rendering a permanently-greyed SELL - the owner's call: a default skin is always
+  owned exactly one and never sellable, a grey button and an "x1" both said nothing worth saying. The
+  browsing-list render call now also passes `hideAmount = it.rarity === "default"` into `skinRowHtml` to drop
+  the count line specifically for it.
+
+Net effect: only two states left for SELL now - present and fully active (any non-default skin, equipped or
+not), or entirely absent (the default skin, exactly like before this feature existed). The whole "off"/
+"unsellable"/"confirming" CSS and JS machinery from the last two entries is gone with it.
+
+Version bumps: `src/economy.js?v=47 -> 48` (comment only), `src/collection.js?v=85 -> 86`.
+
+Verified live (test origin): fresh tab, no console errors. With Banan (legendary) equipped, its card showed
+EQUIPPED *and* an active red SELL side by side - tapping it opened "Sell Banan for 149985 coins?" with a SELL
+button visibly the same red as the list's own, and closing it (CANCEL) left coins, Banan's owned count, and
+the equipped character all genuinely unchanged (checked the real values, not just appearance). Andek
+(default) showed only EQUIP - no SELL, no "x1" anywhere on its card. Restored the equipped character back to
+Andek afterward (equip state had drifted to Banan from earlier testing this session, not the owner's own
+play - the test save's baseline, harmless either way, but restored for cleanliness).
+- `economy.js`, `src/collection.js`, `index.html`.

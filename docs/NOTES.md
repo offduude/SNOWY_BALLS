@@ -3363,3 +3363,82 @@ already mint real inventory for free through the other Functions) is designed bu
 together with the rest of Part 3 of the plan, once Cloud Functions exist. See the plan file and the updated
 `snowy-balls-blaze-migration` memory for the full design.
 - `src/main.js`, `src/cloud.js`.
+
+## Cloud Functions + emulator scaffold built and verified (2026-09-29)
+
+The first real build of the Blaze migration's Cloud Functions (Part 3 of the plan), plus the Firebase Local
+Emulator Suite tooling this whole migration has always said it would be built and tested against before
+anything real. All nine planned Functions now exist and are proven against the emulator: `purchase`, `useBuff`,
+`openBox`, `sellSkin`, `claimThrow` (`functions/economy.js`) and `proposeTrade`, `acceptTrade`, `declineTrade`,
+`cancelTrade` (`functions/trading.js`). Nothing has been deployed anywhere real - `firebase deploy` has never
+been run, rules are still hand-pasted into the console per the existing discipline.
+
+**Scaffold:** this project's first-ever `package.json` (root, dev-only - `firebase-tools`/`firebase`/
+`firebase-admin`, nothing shipped to players), `firebase.json` (Firestore + Functions + Auth emulator config),
+`.firebaserc` (project id `snowy-balls-5f7a5` - safe even though it's the real project id, since
+`firebase emulators:start`/`exec` never contact the real Firestore project regardless), and `functions/`
+(`lib/admin.js`, `lib/auth.js`, `lib/rateLimit.js`, `lib/saves.js`, `lib/economyData.js`, `economy.js`,
+`trading.js`, `index.js`). Needed installing Node.js (this machine had none) and a newer JDK (only Java 8 was
+present; the Firestore/Auth emulators need 11+) - both via `winget`, both dev-machine-only, neither shipped
+anywhere.
+
+**God-mode's redesign shipped in full:** `god` is no longer a save field anywhere - `functions/lib/auth.js`
+hardcodes `ADMIN_UID = "zrHVHG8QVXfZfMhUn0PJHf9TEKO2"`, checked against `context.auth.uid` (unforgeable without
+controlling that real Google account). `purchase`/`useBuff`/`openBox`/`sellSkin`/`claimThrow` each skip real
+cost/stock validation only for that exact uid; `proposeTrade`/`acceptTrade`/`declineTrade`/`cancelTrade` apply
+ZERO special-casing to it anywhere, per the owner's explicit call - the admin account trades under exactly the
+same rules as everyone else, since it can already mint free inventory through the other five.
+
+**Every Function requires `request.auth != null` as its first step** (`requireAuth()`, `lib/auth.js`) -
+directly answers this session's "make sure players who aren't logged in cannot trade" ask, and applies
+uniformly to every Function, not just the trade ones. `firestore.rules` also gained a `trades/{tradeId}` block
+(`allow write: if false` - Admin SDK only, same shape as every other server-owned collection) and a
+`rateLimits/{uid}` block (same), plus `privateInventory`/`skinCounts` added to `leaderboard/{uid}`'s allow-list
+as OPTIONAL fields (not required - required would break every write from a still-live OLD client the moment
+these rules publish, before the new client that actually sends them ships; see the smooth-version-transitions
+memory). `saves/{uid}`'s write rule needed NO change at all - its existing `keys().hasOnly(['data', 'updatedAt',
+'session'])` already rejects a client write containing any server-owned field outright.
+
+**Two real bugs found by actually running this against the emulator, not just reading the code back:**
+1. `admin.firestore.FieldValue` (the legacy namespaced API) came back `undefined` specifically inside the
+   Functions Emulator's runtime - a lazy-loading quirk that did not reproduce running the same file with plain
+   `node`. Fixed by switching to the modular `firebase-admin/firestore` import (`getFirestore`/`FieldValue`) in
+   `functions/lib/admin.js` - the currently-recommended pattern anyway.
+2. A more serious, general one: writing the whole server-owned save object via `tx.set(ref, save, { merge: true
+   })` looked right but was subtly broken - Firestore's `merge: true` deep-merges NESTED maps (`skinCounts.
+   character`, `buffItems`, `projectiles`) key by key, so deleting a JS key (the normal "sold/spent down to
+   zero, remove it" pattern used everywhere) never actually removed that field from the STORED document - merge
+   only adds/overwrites keys present in the new data, it can't tell "deleted on purpose" from "never touched."
+   A sold skin would silently keep existing in Firestore forever underneath the count that said it was gone.
+   Fixed with `{ mergeFields: [...] }` instead (`writeSave`/`writeLeaderboardMirror`, `functions/lib/saves.js`):
+   each listed top-level field is replaced WHOLESALE with whatever's in the in-memory object, correctly dropping
+   anything deleted, while `data`/`updatedAt`/`session` (not listed) stay completely untouched. Caught this
+   because the emulator smoke test actually asserted the post-trade state read back from Firestore, not just
+   the Function's own return value - a return-value-only test would have passed while the bug shipped.
+
+**`functions/test/run.js`** (run via `npm run emulators:test`, wraps `firebase emulators:exec`): seeds two
+throwaway uids directly in the Firestore emulator, signs into each via `signInWithCustomToken` against the Auth
+emulator (`admin.auth().createCustomToken` - no real Google OAuth involved, this uid has no connection to any
+real account), and calls the real Functions through the real client SDK pointed at the Functions emulator.
+19 checks, all passing: the auth gate (every Function refuses a signed-out caller, purchase and trade alike),
+purchase/useBuff/openBox/sellSkin behaving correctly against real economy.json prices/odds, the full propose ->
+accept trade flow (escrow, atomic swap, leaderboard mirror), a second outgoing offer refused, cancel/decline,
+only-the-recipient-can-decline, a private-inventory target refusing `proposeTrade` server-side, the admin
+account's free economy but fully-normal trading, and the `proposeTrade` rate limit (3/300s) actually tripping.
+
+**Known, documented gaps, not fixed here (out of scope for this pass, flagged rather than hidden):**
+- `purchase` can't yet confirm an item was actually the one rolled into the caller's current shop slot - the
+  Cloud Scheduler-generated server stock doc (plan item 5) doesn't exist yet. It still validates the real price/
+  amount range from economy.json rather than trusting whatever the client claims, which is a real improvement,
+  just not the complete picture.
+- `claimThrow` is a RANGE check (`[0, baseHitValue x activeCoinMultipliers x MAX_EVENT_FACE_MULTIPLIER]`), not a
+  full recomputation of the client's event/streak/window-hit logic - reproducing all of that server-side is its
+  own future task.
+- `src/cloud.js`'s `syncNow()` still writes `saves/{uid}` and `leaderboard/{uid}` with a plain (non-merge)
+  `batch.set(...)` - harmless today since the client doesn't touch any server-owned field yet, but it WILL wipe
+  them the moment the client is wired up to read/write alongside them (the plan's "Client UI wave" step) unless
+  fixed to merge first. Flagged in `functions/lib/saves.js`'s own header comment so it isn't missed.
+
+Version bumps: none needed this round - nothing in `src/*.js`/`index.html` changed, this was all-new
+`functions/` source plus config files outside the versioned client bundle.
+- `firestore.rules`, `package.json`, `firebase.json`, `.firebaserc`, `functions/` (new).

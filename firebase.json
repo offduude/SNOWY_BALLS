@@ -1,0 +1,16 @@
+{
+  "_readme": "Emulator-only config (see docs/NOTES.md, snowy-balls-blaze-migration memory). `firebase deploy` is never run from here - firestore.rules is still hand-pasted into the console, and Cloud Functions get their own manual deploy step once the owner is ready to publish for real. `firebase emulators:start` never touches the real project no matter what project id this file names.",
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "functions": {
+    "source": "functions"
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "functions": { "port": 5001 },
+    "ui": { "enabled": true, "port": 4000 },
+    "singleProjectMode": true
+  }
+}

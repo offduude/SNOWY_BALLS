@@ -17,11 +17,20 @@ service cloud.firestore {
     // sanitizeAccountDescription) before it ever gets here - the 400-byte cap below is deliberately looser than that
     // client cap (a short string can still be a few hundred UTF-8 bytes once accented/non-Latin characters are involved),
     // it only exists to block a client that skipped the cleaning entirely.
+    // `privateInventory` and `skinCounts` (added 2026-09-29 for the trading feature - see the approved plan and the
+    // snowy-balls-blaze-migration memory) are OPTIONAL here on purpose, not required: rules+Functions publish
+    // BEFORE the client build that actually sends them (the migration's own standing sequencing rule), so if they
+    // were required every write from the OLD, still-live client would start failing the moment these rules go up -
+    // exactly the kind of break the snowy-balls-smooth-version-transitions memory exists to prevent. `skinCounts`
+    // is only ever written by a Cloud Function (Admin SDK, which bypasses these rules entirely) mirroring a
+    // player's saves/{uid} totals here as a PUBLIC read source for another player's profile-inspect skins gallery -
+    // a client never legitimately sends it itself; it's allow-listed here only so a client's own unrelated write
+    // (name/coins/character/description) to a doc that already has these fields isn't rejected for containing them.
     match /leaderboard/{uid} {
       allow read: if true;
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.data.keys().hasOnly(['name', 'coins', 'character', 'description', 'updatedAt'])
+                   && request.resource.data.keys().hasOnly(['name', 'coins', 'character', 'description', 'updatedAt', 'privateInventory', 'skinCounts'])
                    && request.resource.data.name is string
                    && request.resource.data.name.size() > 0
                    && request.resource.data.name.size() <= 60
@@ -31,7 +40,9 @@ service cloud.firestore {
                    && (request.resource.data.character == null || (request.resource.data.character is string && request.resource.data.character.size() <= 60))
                    && request.resource.data.description is string
                    && request.resource.data.description.size() <= 400
-                   && request.resource.data.updatedAt == request.time; // the server's clock, not a value the client can pick
+                   && request.resource.data.updatedAt == request.time // the server's clock, not a value the client can pick
+                   && (!('privateInventory' in request.resource.data) || request.resource.data.privateInventory is bool)
+                   && (!('skinCounts' in request.resource.data) || request.resource.data.skinCounts is map);
     }
 
     // The actual cloud save - PRIVATE, unlike the leaderboard: only the owning account can read or write it (nobody else's
@@ -47,6 +58,14 @@ service cloud.firestore {
     // `session` (added 2026-09-22): a short random token src/cloud.js writes on every save write, so the same account
     // signed in on two devices at once can't silently overwrite each other - see that file's header comment for the
     // full mechanism. Required on every write (never optional) since the client always sends one from here on.
+    // UNCHANGED since before the trading feature - and that's exactly what makes the server-owned economy fields
+    // (coins, skinCounts, buffItems, projectiles, buffs, equipped, reserved, outgoingTradeId - see
+    // functions/lib/saves.js) safe: `keys().hasOnly(['data', 'updatedAt', 'session'])` already rejects a client
+    // write containing ANY of them outright, with no rule change needed here. Only a Cloud Function's Admin SDK
+    // write (which bypasses these rules entirely) can ever touch those fields - a client can never set its own
+    // coins or skin counts directly, only ask a Function to do it. Every one of those Functions checks
+    // request.auth != null as its first step (see functions/lib/auth.js's requireAuth) - a signed-out caller is
+    // refused before it ever reaches a mutation, purchase and trade functions alike.
     match /saves/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null
@@ -58,6 +77,25 @@ service cloud.firestore {
                    && request.resource.data.session.size() > 0
                    && request.resource.data.session.size() <= 100
                    && request.resource.data.updatedAt == request.time;
+    }
+
+    // Trade offers (2026-09-29, see the approved plan's Part 3 and functions/trading.js): a client can READ a
+    // trade only if it's one of the two participants (never a public list of everyone's offers), and can NEVER
+    // write one directly, signed in or not - proposeTrade/acceptTrade/declineTrade/cancelTrade (Cloud Functions,
+    // Admin SDK) are the only path that can ever create or change a trades/{tradeId} doc. This is the same
+    // separate-read/write-block shape the 2026-09-22 incident established (`request.resource` only exists on a
+    // write - `resource` is the existing doc on a read; a combined rule using `request.resource` in a read branch
+    // fails every read with an error indistinguishable from "not published yet").
+    match /trades/{tradeId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
+      allow write: if false;
+    }
+
+    // Rate-limit bookkeeping (functions/lib/rateLimit.js) - Admin SDK only, exactly like trades above; a client
+    // has no legitimate reason to ever read or write its own rate-limit counters.
+    match /rateLimits/{uid} {
+      allow read, write: if false;
     }
 
     // Nothing else is stored in Firestore - deny everything else by default, so a later addition here can't accidentally

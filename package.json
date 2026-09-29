@@ -1,0 +1,15 @@
+{
+  "name": "snowy-balls-tooling",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Dev-only tooling for Snowy Balls - the game itself ships as a static site (index.html + src/*.js), nothing here is deployed to players. Used to run the Firebase Local Emulator Suite (Firestore + Functions + Auth) for testing Cloud Functions against a fully local, throwaway sandbox that never touches the real project - see docs/NOTES.md and the snowy-balls-blaze-migration memory.",
+  "scripts": {
+    "emulators": "firebase emulators:start",
+    "emulators:test": "firebase emulators:exec --project snowy-balls-5f7a5 \"node functions/test/run.js\""
+  },
+  "devDependencies": {
+    "firebase": "^10.8.0",
+    "firebase-admin": "^12.0.0",
+    "firebase-tools": "^13.0.0"
+  }
+}

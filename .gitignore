@@ -1,3 +1,12 @@
 .DS_Store
 Thumbs.db
 *.log
+
+# Emulator/Cloud Functions tooling (see docs/NOTES.md, snowy-balls-blaze-migration memory) - dev-only, never shipped
+node_modules/
+functions/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/
+emulator-data/

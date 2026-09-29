@@ -44,6 +44,28 @@ function projectileHitValue(projectileId) {
   return typeof p.hitValue === "number" ? p.hitValue : rarityProjectileHitValue(p.rarity);
 }
 
+// The rarity id of a shop item - mirrors src/rarity.js's Rarity.ofItem exactly: a projectile-category item's
+// rarity lives with the projectile's own numbers (projectiles.<id>.rarity), a consumable's on the item itself.
+function rarityOfItem(item) {
+  if (item.category === "projectile") {
+    const p = projectileIndex[item.id];
+    return p ? p.rarity : undefined;
+  }
+  return item.rarity;
+}
+
+// What ONE costs - mirrors src/shop.js's own price() exactly: a stack item (category "projectile") is always its
+// fixed unitPrice (bought one unit at a time - see functions/shop.js's purchase()); everything else is its fixed
+// price UNLESS ignorePriceOverride is false/absent, in which case the shop-wide testing override
+// (economy.json shop.priceOverride) replaces it. Every item in today's catalog sets ignorePriceOverride: true, so
+// priceOverride is currently inert for all of them - ported faithfully anyway in case that ever changes.
+function priceOf(item) {
+  if (item.amount) return item.unitPrice;
+  if (item.ignorePriceOverride) return item.price;
+  const o = eco.shop.priceOverride;
+  return o !== null && o !== undefined ? o : item.price;
+}
+
 // The highest faceMultiplier any event can pay (economy.json events._eventSummonPricingNote /
 // heavyGuitarWindow/discoWindow) - used as a generous, honest upper bound for claimThrow's range check (see
 // functions/economy.js) rather than simulating which specific event is actually active. 1.75 is both the disco's
@@ -62,5 +84,7 @@ module.exports = {
   boxPool,
   rarityProjectileHitValue,
   projectileHitValue,
+  rarityOfItem,
+  priceOf,
   MAX_EVENT_FACE_MULTIPLIER,
 };

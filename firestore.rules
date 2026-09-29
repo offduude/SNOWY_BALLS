@@ -98,6 +98,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // The global shop stock (2026-09-29, plan item 5 - see functions/shop.js/functions/lib/shopStock.js): public
+    // to READ, signed in or not, same reasoning as the leaderboard - every client needs to see what's currently
+    // on sale to render the SHOP tab at all, and there's nothing private in a rolled stock list. NEVER writable by
+    // a client, under any circumstance - only the Cloud Scheduler-triggered rerollShop / the admin-only
+    // forceRerollShop (both Admin SDK, bypass these rules entirely) ever touch this doc. This is the actual fix
+    // for the multi-tab reroll exploit: one server-generated roll every client reads, instead of each tab
+    // computing its own.
+    match /shopStock/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Nothing else is stored in Firestore - deny everything else by default, so a later addition here can't accidentally
     // leave something else world-writable.
     match /{document=**} {

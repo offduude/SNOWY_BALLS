@@ -9,6 +9,7 @@ const { db } = require("./lib/admin");
 const { requireAuth, isAdmin } = require("./lib/auth");
 const { applyRateLimits } = require("./lib/rateLimit");
 const { normalize, spendableCoins, spendableSkinCount, savesRef, writeSave, writeLeaderboardMirror } = require("./lib/saves");
+const { shopStockRef, normalize: normalizeStock } = require("./lib/shopStock");
 const eco = require("./lib/economyData");
 
 function bad(msg) {
@@ -16,50 +17,59 @@ function bad(msg) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// purchase({ itemId, amount, clientVersion }) - buys a shop item (a consumable buff, or a stack of a consumable
-// projectile). KNOWN GAP, flagged rather than hidden (see functions/lib/economyData.js's own note and
-// docs/NOTES.md): the shop's CURRENT ROLLED STOCK is not server-tracked yet (that's the Cloud Scheduler piece,
-// item 5 of the migration plan, not built) - so this validates the item's real price/amount-range from
-// economy.json and charges/grants it honestly, but cannot yet confirm the item was actually the one rolled into
-// the caller's shop slot at that moment. Closing that gap fully requires the scheduler-generated stock doc; until
-// then this is still a real improvement over today's pure-client purchase (price and amount are no longer
-// whatever the client claims), just not the complete picture.
+// purchase({ itemId, clientVersion }) - buys a shop item (a consumable buff, or one unit of a projectile stack),
+// validated against the REAL global stock doc (functions/shop.js, functions/lib/shopStock.js - the item 5 Cloud
+// Scheduler piece) rather than trusting the client's word for what's currently on sale. Mirrors src/shop.js's own
+// buy() exactly: a projectile-category item always grants exactly ONE unit per call (never a client-chosen
+// amount - "clicking it once buys only a single projectile" per that file's own comment) at its fixed unitPrice,
+// decrementing the SHARED slot's remaining offer.amount (clearing the slot at 0); a consumable always empties its
+// slot on any single purchase, same as the client always has. Reading+writing both saves/{uid} AND shopStock/
+// current inside the SAME transaction is what makes two players racing for the last unit in a slot resolve
+// correctly - Firestore's optimistic-concurrency retry means only one of them can actually win it.
 exports.purchase = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const itemId = typeof data.itemId === "string" ? data.itemId : null;
   const item = itemId ? eco.shopItemIndex.get(itemId) : null;
-  if (!item) throw bad("Unknown item.");
+  if (!item || (item.category !== "consumable" && item.category !== "projectile")) throw bad("Unknown item.");
 
   return db.runTransaction(async (tx) => {
+    const stockSnap = await tx.get(shopStockRef());
+    const stock = normalizeStock(stockSnap.exists ? stockSnap.data() : null);
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
 
     await applyRateLimits(tx, [{ uid, key: "purchase", limit: 20, windowMs: 60000 }]);
 
-    let cost, grant;
-    if (item.category === "consumable") {
-      cost = item.price;
-      grant = () => {
-        save.buffItems[itemId] = (save.buffItems[itemId] || 0) + 1;
-      };
-    } else if (item.category === "projectile") {
-      const amount = Number.isInteger(data.amount) ? data.amount : null;
-      const range = item.amount || { min: 1, max: 1 };
-      if (amount === null || amount < range.min || amount > range.max) throw bad("Amount out of range for this item.");
-      cost = item.unitPrice * amount;
-      grant = () => {
-        save.projectiles[itemId] = (save.projectiles[itemId] || 0) + amount;
-      };
-    } else {
-      throw bad("This item isn't purchasable through this function.");
-    }
+    const slot = stock.stock.indexOf(itemId);
+    if (slot === -1) throw new functions.https.HttpsError("failed-precondition", "Not currently in stock.");
 
+    const cost = eco.priceOf(item);
     if (!isAdmin(uid)) {
+      const buffMax = eco.eco.shop.buffMax;
+      if (item.category === "consumable" && Number.isInteger(buffMax) && (save.buffItems[itemId] || 0) >= buffMax) {
+        throw new functions.https.HttpsError("failed-precondition", "Already holding the most of this buff.");
+      }
       if (spendableCoins(save) < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
       save.coins -= cost;
     }
-    grant();
 
+    if (item.category === "consumable") {
+      save.buffItems[itemId] = (save.buffItems[itemId] || 0) + 1;
+      stock.stock[slot] = null;
+      stock.offers[slot] = null;
+    } else {
+      save.projectiles[itemId] = (save.projectiles[itemId] || 0) + 1;
+      const offer = stock.offers[slot];
+      const remaining = (offer && offer.amount > 0 ? offer.amount : 0) - 1;
+      if (remaining > 0) {
+        stock.offers[slot] = { amount: remaining };
+      } else {
+        stock.stock[slot] = null;
+        stock.offers[slot] = null;
+      }
+    }
+
+    tx.set(shopStockRef(), { stock: stock.stock, offers: stock.offers, nextRerollAt: stock.nextRerollAt, generatedAt: stock.generatedAt });
     writeSave(tx, uid, save);
     return { coins: save.coins, buffItems: save.buffItems, projectiles: save.projectiles };
   });

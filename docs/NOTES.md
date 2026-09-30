@@ -3767,3 +3767,62 @@ those run first and `eventName` needs the value from before that) plus a delta-b
 still-local-only spending from purchase/openBox/sellSkin, which the server knows nothing about yet and must not
 be overwritten by). Then `purchase`, `openBox`, `sellSkin` - the only three gameplay paths still fully local
 after that.
+
+## claimThrow wired to the real Cloud Function (2026-09-30)
+
+The piece flagged as "next up" immediately above, done the same session. `main.js`'s `finishThrow(hit, win,
+stickX, stickHeight, faceHit, escaped)` now captures `eventNameForClaim = faceHit ? this.activeEvent : null` at
+the top of the `if (hit)` branch - BEFORE the `if (faceHit)` sub-block runs `onSongEnd()`/`triggerBananaHit()`,
+both of which null out `this.activeEvent` as part of ending the event. Getting this ordering right was the
+whole reason this spot needed identifying ahead of time rather than just wiring it inline - grabbing
+`this.activeEvent` after those calls would have silently sent `eventName: null` on every single face-hit,
+forever losing the bonus verification claimThrow was built for.
+
+New `reportThrowToServer(hit, faceHit, eventName, localReward)` (right after `finishThrow` in the Scene class):
+same Option B shape as trading/useBuff - the local reward already paid out instantly, unchanged, for the same
+smoothness reasoning; this fires `Cloud.callFunction("claimThrow", {projectileId: this.projectileId, hit,
+faceHit, eventName})` in the background and reconciles by DELTA (`res.reward - localReward`, via
+`Economy.addCoins`) rather than ever setting local coins outright - local coins still reflect other,
+still-local-only spending (shop/boxes/buffs inventory) the server has no idea about, so a blind overwrite would
+erase that. Skipped entirely while signed out or while local god mode is active (same two guards `useBuff`
+already established) - a rejected/skipped call changes nothing, gameplay stays exactly what it already was.
+
+A delta is expected to actually fire fairly often, and that's fine, not a sign of anything wrong: the client's
+own fractional coin-carry (`Economy.takePayout`) and the server's plain `Math.round` can each land on a
+different whole number for the same real value (off by at most 1, invisible against the "+N coins" message
+which already fired before this resolves); and - the actual point of this whole migration - a buff that
+expired between "tap to aim" (when `this.aim.coinMultiplier` was snapshotted) and the throw actually landing
+now genuinely stops counting, corrected via this same delta, exactly as designed.
+
+**A known gap, flagged rather than fixed here** (same discipline `claimThrow`'s own header comment already
+uses for the natural-event gap): a projectile saved by a `saveProjectile` buff (Water Bottle) is never
+decremented LOCALLY (that random roll happens earlier, in `consumeProjectile()`, well before a throw resolves),
+but `claimThrow` has no "was this saved" input and always deducts one real unit server-side for a consumable
+projectile - so the two projectile counts can drift apart by exactly that buff's own trigger rate. Deliberately
+NOT reconciling local projectile counts from this response at all (only coins are touched) - teaching
+`claimThrow` a trusted `saved` flag, or moving projectile consumption server-side too, is a real design
+decision for later, not something to bury inside this wiring pass.
+
+**Verification, as thorough as useBuff's own (a real `firebase emulators:start` session, not just the
+automated suite):** seeded `saves/{ADMIN_UID}` directly with a genuine active `kaiser_roll` buff (1.2x
+coinMultiplier, real `endsAt`) via a scratch Admin SDK script, signed the live browser into the admin account
+via a minted custom token, then called `scene.reportThrowToServer(true, false, null, 4)` directly (the exact
+method `finishThrow` calls, with the exact arguments a real snowball hit would pass with NO local multiplier
+applied) through devtools. The server genuinely computed `reward: 5` (`round(4 x 1.2)` - read straight from the
+real Firestore buff, not trusted from the call) and the client's own delta math landed local coins on exactly
+`1` (`5 - 4`), confirmed via `Economy.getCoins()` - not just "the call didn't error", the actual server-verified
+multiplier really reached the player's balance. Then: a miss (`localReward: 0`) correctly produced zero change
+(`missCoins` is 0 today); signed out, an identical call produced zero network requests and zero state change;
+local god mode active (signed in as admin, `godMode()` toggled on) produced zero network requests and zero
+state change too. Reran the full 41-check automated suite clean afterward (unaffected either way - this
+change is entirely client-side).
+
+Version bump: `src/main.js?v=197 -> 198`.
+- `src/main.js`, `index.html`.
+
+**Next up:** `purchase`, `openBox`, `sellSkin` - the three remaining gameplay paths still fully local. Worth
+noting before starting any of them: for a REAL (not test-seeded) account, `saves/{uid}`'s top-level economy
+fields are still just the schema defaults today - nothing has ever written them, since the one-time production
+migration (item 6) hasn't run and nothing is deployed to the real project yet. Every one of these calls is
+therefore expected to reject cleanly for a real account until that migration happens; that's the intended,
+already-documented state, not a bug to chase down here.

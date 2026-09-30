@@ -2234,6 +2234,11 @@ class MainScene extends Phaser.Scene {
       let coins = this.proj.hitValue; // one hit value, for both goal windows: it comes from the projectile's rarity (see prepareProjectiles)
       // (The streak is only counted and shown - it no longer adds coins.)
 
+      // Captured BEFORE the faceHit branch below runs - onSongEnd()/triggerBananaHit() both null out
+      // this.activeEvent as part of ending the event, so claimThrow's own eventName argument (see
+      // reportThrowToServer) has to be read now or it would always see null by the time this throw reports.
+      const eventNameForClaim = faceHit ? this.activeEvent : null;
+
       if (faceHit) {
         if (SONG_EVENTS[this.activeEvent]) {
           // A song event's face hit (disco, guitar, heavy guitar) now pays once and ends the song right there -
@@ -2268,12 +2273,15 @@ class MainScene extends Phaser.Scene {
       this.updateStreakHud();
       // (a buff that saved the projectile - Water Bottle - adds a "Saved Projectile" line at the bottom)
       this.showMessage("HIT\n+" + coins + " coins" + (this.savedBy ? "\nSaved Projectile" : ""));
+      this.reportThrowToServer(true, faceHit, eventNameForClaim, coins);
     } else {
       this.streak = 0;
       Economy.setStreak(0);
-      if (this.eco.rewards.missCoins) Economy.addCoins(this.eco.rewards.missCoins);
+      const missReward = this.eco.rewards.missCoins || 0;
+      if (missReward) Economy.addCoins(missReward);
       this.updateStreakHud();
       this.showMessage("MISS" + (this.savedBy ? "\nSaved Projectile" : ""));
+      this.reportThrowToServer(false, false, null, missReward);
     }
 
     if (this.savedBy) this.flashAmmoSaved(); // the counter's outline flashes bright white once, alongside the "Saved Projectile" message
@@ -2289,6 +2297,40 @@ class MainScene extends Phaser.Scene {
     this.time.delayedCall(1400, () => {
       if (this.state === STATE.RESULT) this.resetForNextThrow();
     });
+  }
+
+  // Server-authoritative claimThrow (2026-09-30, unblocked once useBuff started genuinely reporting real buffs
+  // - see the blaze-migration memory items 20-21). Same Option B shape as every other Cloud Function wired this
+  // session: the LOCAL reward above already paid out, instantly, for the smoothness the owner chose over
+  // blocking on a round trip - this just fires the real call in the background and RECONCILES BY DELTA
+  // (`serverReward - localReward`, never a blind set) if the server's own, independently-computed reward
+  // differs. A delta is expected to fire fairly often even with nothing resembling cheating going on: the
+  // client's own fractional coin-carry (Economy.takePayout) and the server's plain Math.round can each land on
+  // a different whole number for the exact same real value, and - the actual point of this whole migration - a
+  // buff that expired between "tap to aim" (this.aim.coinMultiplier's snapshot moment) and this throw landing
+  // now genuinely stops counting, exactly as designed. A REJECTED call (not signed in, rate limited, no real
+  // server-side projectile - expected for any not-yet-migrated account, and for the real deployed site full
+  // stop, since nothing's published there) changes nothing and only logs a warning - gameplay already is
+  // whatever it was before this call existed.
+  //
+  // KNOWN GAP, flagged rather than silently shipped (same discipline claimThrow's own natural-event note
+  // uses): a projectile saved by a saveProjectile buff (Water Bottle) is never decremented LOCALLY
+  // (consumeProjectile's own random roll, well before this point), but claimThrow has no "was this saved" input
+  // and always deducts one real unit for a consumable projectile - the two projectile counts can drift apart by
+  // exactly that buff's own trigger rate. Deliberately NOT reconciling local projectile/inventory counts from
+  // this response at all (only coins) - teaching claimThrow a trusted `saved` flag, or moving projectile
+  // consumption server-side too, is a real design decision for later, not something to bury in this pass.
+  reportThrowToServer(hit, faceHit, eventName, localReward) {
+    if (typeof Cloud === "undefined" || !Cloud.getUser || !Cloud.getUser()) return; // signed out, or Cloud isn't set up - nothing to reconcile against yet
+    if (typeof Economy !== "undefined" && Economy.isGod && Economy.isGod()) return; // a god save's local economy is never real, never synced - see cloud.js's own mutual signIn()/godMode() guard
+    Cloud.callFunction("claimThrow", { projectileId: this.projectileId, hit, faceHit, eventName })
+      .then((res) => {
+        const delta = res.reward - localReward;
+        if (delta !== 0) Economy.addCoins(delta); // silent correction - see this method's own note above
+      })
+      .catch((err) => {
+        console.warn("claimThrow (server) skipped:", err && err.message);
+      });
   }
 
   // ---- The face of the event that is running NOW (the one a hit gives a bonus for, and the one the purple / yellow dot marks) ----

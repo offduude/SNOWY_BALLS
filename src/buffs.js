@@ -185,7 +185,27 @@ const Buffs = (() => {
     Economy.setLastUsedBuff(id); // the BUFFS list opens on the buff used last
     // Push this use to the cloud right away, not on the normal cadence - see Cloud.noteBuffUse's own note.
     if (typeof Cloud !== "undefined" && Cloud.noteBuffUse) Cloud.noteBuffUse();
+    reportUseToServer(id);
     return true;
+  }
+
+  // Server-authoritative useBuff (2026-09-30 - the next step in the plan's own stated order,
+  // "purchase -> useBuff -> claimThrow": useBuff has to be real BEFORE claimThrow can trust its own `buffs`
+  // array, since that's the only thing that ever populates it - see the blaze-migration memory item 19).
+  // Same shape as every other Option-B call this migration has used since claimThrow's own tightening: the LOCAL
+  // activate() above already happened, instantly, for the same smoothness reasoning - this just fires the real
+  // Cloud Function in the background and does NOT roll anything back if it's refused. A refusal is expected and
+  // harmless today: a real (not yet migrated - see item 6) account's server-side `buffItems` is empty, so
+  // useBuff correctly has nothing to take; on the actual deployed site it's simply not published there at all
+  // yet. Either way gameplay is already exactly what it was before this call existed - only claimThrow's OWN
+  // reconciliation (once that's wired next) can ever notice the gap, and even then only by not honoring a bonus
+  // it can't verify, never by touching what's already in the player's pocket.
+  function reportUseToServer(id) {
+    if (typeof Cloud === "undefined" || !Cloud.getUser || !Cloud.getUser()) return; // signed out, or Cloud isn't set up - nothing to report yet
+    if (typeof Economy !== "undefined" && Economy.isGod && Economy.isGod()) return; // a god save's local buffs are never real inventory - see cloud.js's own mutual signIn()/godMode() guard
+    Cloud.callFunction("useBuff", { buffId: id }).catch((err) => {
+      console.warn("useBuff (server) skipped:", err && err.message);
+    });
   }
 
   // Starts the buff (a running one restarts its timer - it does not stack the effect).

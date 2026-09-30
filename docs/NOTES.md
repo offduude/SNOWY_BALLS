@@ -3717,3 +3717,53 @@ in case it recurs.
 Version bumps: `src/cloud.js?v=29 -> 30`, `src/saves.js?v=29 -> 30`, `src/collection.js?v=87 -> 88`.
 - `src/cloud.js`, `src/saves.js`, `src/collection.js`, `index.html`, `firestore.rules` (comment only, no rule
   logic changed), `functions/test/run.js`.
+
+## useBuff wired to the real Cloud Function (2026-09-30)
+
+Continuing the "build the next step" pattern from earlier the same session: trading is done, so the next piece
+in line is the plan's own stated order for the rest of the economy - `purchase -> useBuff -> claimThrow`.
+Started digging into wiring `claimThrow` directly (the more obviously-flagged "next round of work" from the
+claimThrow-tightening entry) and found a real reason NOT to: `claimThrow`'s reward computation reads the
+caller's server-side `buffs` array for BOTH the coinMultiplier stacking AND the face-hit bonus check - and
+`buffs` is populated by nothing except `useBuff`. Wiring claimThrow first would mean the server silently
+disagrees with (and reconciliation would claw back) every real buff bonus a real player ever legitimately
+earns, purely because the buff was never reported, not because of anything resembling cheating. This is
+exactly why the plan sequenced useBuff BEFORE claimThrow in the first place - confirmed the hard way by reading
+the actual server code (functions/economy.js) rather than just trusting the ordering.
+
+`src/buffs.js`'s `use(id)` keeps its existing LOCAL activation completely unchanged (instant UI feedback - same
+Option B smoothness reasoning already established for claimThrow/trading) and now also fires
+`Cloud.callFunction("useBuff", {buffId: id})` in the background via a new `reportUseToServer(id)`. Nothing
+rolls back on a server refusal - a rejection is expected and harmless for any account whose server-side
+`buffItems` hasn't been populated yet (no real player has been migrated - item 6 - and nothing is deployed to
+the real project regardless), so gameplay is already exactly what it was before this call existed either way.
+Skipped entirely while signed out (nothing to report against) or while a LOCAL god save is active (its
+`fillGod()` counts are cosmetic test data, never real inventory - reporting them would be reporting a lie, not
+a legitimate use).
+
+**Verification, thorough since this is the first gameplay-earning-adjacent path to go live (not just a
+mockup-to-real UI swap like trading was):** ran a real end-to-end check against `firebase emulators:start`
+(kept up, not `:exec`) rather than just the automated suite - seeded `saves/{ADMIN_UID}` with a real
+`skyr_orange` buff item via a scratch Admin SDK script, signed the LIVE browser session in as the admin account
+via a minted custom token (`signInWithCustomToken` - the same stand-in-for-Google-OAuth trick
+`functions/test/run.js` already uses, just driven from the real page this time instead of a test script), then
+called `Buffs.use("skyr_orange")` exactly as the BUFFS tab's own click handler would. Confirmed via the network
+tab (`useBuff` POST -> 200 OK) and by reading `saves/{ADMIN_UID}` back with the Admin SDK afterward that the
+server's `buffs` array now genuinely holds `{id:"skyr_orange", endsAt:<real ms>}` - not just "the call didn't
+error", the actual state claimThrow will need next is really there. (`buffItems.skyr_orange` staying at 1
+instead of decrementing is CORRECT, not a bug - the admin account's whole point is free/unlimited, per
+`isAdmin(uid)` in `useBuff` itself.) Then repeated signed OUT: local activation still worked identically, and
+the network tab showed no new request at all - the guard holds both ways. Re-ran the full automated emulator
+suite afterward too (unaffected by this change, since it only touches client-side src/buffs.js - a pure
+regression check).
+
+Version bump: `src/buffs.js?v=33 -> 34`.
+- `src/buffs.js`, `index.html`.
+
+**Next up:** `claimThrow` itself - now unblocked. Wiring it into `main.js`'s `finishThrow()` (the exact spot
+identified this session: capture `this.activeEvent` BEFORE `onSongEnd()`/`triggerBananaHit()` null it out, since
+those run first and `eventName` needs the value from before that) plus a delta-based reconciliation
+(`Economy.addCoins(serverReward - locallyAppliedReward)`, never a blind `set` - local coins also reflect
+still-local-only spending from purchase/openBox/sellSkin, which the server knows nothing about yet and must not
+be overwritten by). Then `purchase`, `openBox`, `sellSkin` - the only three gameplay paths still fully local
+after that.

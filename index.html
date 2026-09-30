@@ -2100,16 +2100,15 @@
 
     /* The leaderboard's inspect popup (saves.js: clicking a card) - lives over the LIST panel (list-open), not
        the shop (the shop tab no longer has an inspect popup of its own since it became a plain list, 2026-09-27).
-       A column now (2026-09-29), not just the card centered alone - #board-inspect-skins (the inventory preview
-       PROPOSE TRADE reads from) stacks under it. */
+       Just the card, centered (2026-09-30: no longer a column - the standalone inventory preview that used to
+       stack under it was removed; another player's inventory is only ever shown in the trade-compose screen now,
+       see saves.js targetSkinsCatalog). */
     #board-inspect {
       position: absolute;
       inset: 0;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: calc(var(--u) * 1.4);
       background: rgba(0, 0, 0, 0.55);
       opacity: 0;
       pointer-events: none;
@@ -2128,38 +2127,8 @@
       color: #3b2412;
     }
 
-    /* The inspected player's owned skins (saves.js skinsGalleryHtml, 2026-09-29) - same cream panel and icon-tile
-       look BOXES' own odds popup already established (.box-inspect-cell/.box-inspect-icon, reused verbatim). Only
-       ever shown for your OWN card today - another player's real inventory isn't synced to the cloud yet (see
-       skinsGalleryHtml's own note), so theirs reads as a plain placeholder line instead of an empty gallery. */
-    #board-inspect-skins {
-      width: 60%;
-      box-sizing: border-box;
-      max-height: calc(var(--u) * 24);
-      overflow-y: auto;
-      background: #f4ead0;
-      border: 2px solid #7a5230;
-      border-radius: 6px;
-      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
-      padding: calc(var(--u) * 1.4);
-      font-family: "Press Start 2P", monospace;
-    }
-
-    #board-inspect-skins:empty { display: none; }
-
-    .inv-head {
-      color: #8a6a44;
-      font-size: calc(var(--u) * 1);
-      letter-spacing: 0.05em;
-      margin-bottom: calc(var(--u) * 1);
-    }
-
-    .inv-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: calc(var(--u) * 1.2);
-    }
-
+    /* .inv-count/.inv-note: shared by the trade-compose "YOU WANT" tiles (a target's owned quantity badge) and
+       its own empty-state messages (saves.js targetSkinsCatalog/renderTradeSide). */
     .inv-count {
       color: #8a6a44;
       font-size: calc(var(--u) * 0.85);
@@ -2311,6 +2280,41 @@
     #trade-compose-buttons .save-icon-btn { flex: 1; }
     .save-icon-btn.ghost { background: #dcc9a0; border-color: #7a5230; color: #3b2412; }
     .save-icon-btn.ghost:active { background: #cbb789; }
+
+    /* INBOX rows (2026-09-30, saves.js tradeRowHtml) - same cream-card family as .board-card, but a taller
+       column layout (name, then the GIVES/WANTS terms block reused from the trade confirm modal, then its
+       action buttons) since a trade row carries more than a leaderboard card's single line. */
+    .inbox-row {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--u) * 0.9);
+      padding: calc(var(--u) * 1.2) calc(var(--u) * 1.4);
+      background: #f4ead0;
+      border: 2px solid #7a5230;
+      border-radius: 3px;
+      color: #3b2412;
+      font-size: calc(var(--u) * 1.1);
+    }
+
+    .inbox-row-head {
+      color: #8a6a44;
+      font-size: calc(var(--u) * 1);
+      letter-spacing: 0.05em;
+    }
+
+    .inbox-row .trade-confirm-block { margin: 0; }
+
+    .inbox-row-actions {
+      display: flex;
+      gap: calc(var(--u) * 1);
+    }
+
+    .inbox-row-actions .save-icon-btn {
+      flex: 1;
+      padding: calc(var(--u) * 0.6) calc(var(--u) * 0.8);
+      font-size: calc(var(--u) * 0.95);
+    }
 
     /* A fixed height (as tall as a full 60-character bio ever needs, wrapped) - a safety net alongside the length cap and
        the word-break above, not the thing doing the capping: the card clips rather than grows if it's ever exceeded. */
@@ -2464,9 +2468,9 @@
       <div id="box-open-result"><span id="box-open-rarity"></span><span id="box-open-name"></span></div>
       <div id="box-open-caption">TAP to CONTINUE</div>
     </div>
-    <div id="board-inspect"><div id="board-inspect-card"></div><div id="board-inspect-skins"></div></div>
-    <!-- Trade compose (2026-09-29, saves.js openTradeCompose) - a mockup, see that function's own note: SEND
-         only ever shows a summary and closes, nothing is created anywhere yet. -->
+    <div id="board-inspect"><div id="board-inspect-card"></div></div>
+    <!-- Trade compose (2026-09-29, saves.js openTradeCompose; SEND OFFER wired to the real proposeTrade
+         Cloud Function 2026-09-30 - see sendTradeOffer). -->
     <div id="trade-compose">
       <div id="trade-compose-panel">
         <div id="trade-compose-title">PROPOSE TRADE</div>
@@ -2535,7 +2539,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
-  <script src="src/version.js?v=322"></script>
+  <script src="src/version.js?v=323"></script>
   <script src="src/economy.js?v=49"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2563,14 +2567,14 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=29"></script>
+  <script src="src/cloud.js?v=30"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=33"></script>
   <script src="src/shop.js?v=42"></script>
   <script src="src/boxes.js?v=9"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=29"></script>
-  <script src="src/collection.js?v=87"></script>
+  <script src="src/saves.js?v=30"></script>
+  <script src="src/collection.js?v=88"></script>
   <script src="src/main.js?v=197"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on

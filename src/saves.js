@@ -396,27 +396,100 @@ const Saves = (() => {
     boardEl.innerHTML = rows.map((row, i) => leaderboardCardHtml(row, i + 1)).join("");
   }
 
-  // ---------- INBOX (2026-09-29): a sub-view of the LEADERBOARD screen (top-right button, #inbox-btn), meant to
-  // hold both trade offers and - later, the owner's own idea - a "letter"/postcard item's messages, in one
-  // newest-first feed. There is no trades/{tradeId} collection yet (see the trading plan's Part 3 - proposeTrade
-  // is a Cloud Function that doesn't exist), so this always reads empty today; Cloud.refreshTrades (once it
-  // exists) plugs in here, replacing the empty-state check below with real rows sorted the same way
-  // Cloud.refreshLeaderboard's own cache already is.
+  // ---------- INBOX (2026-09-29, wired to real trades 2026-09-30): a sub-view of the LEADERBOARD screen
+  // (top-right button, #inbox-btn), meant to hold both trade offers and - later, the owner's own idea - a
+  // "letter"/postcard item's messages, in one newest-first feed (each row still just `{type:"trade",...}` shaped
+  // today, so a future `{type:"letter",...}` can slot into the same list later without restructuring this).
+  // Reads Cloud.getTradesCache() - real trades/{tradeId} docs, fetched read-on-open the same way the leaderboard
+  // itself is (see collection.js open("leaderboard")) plus a light heartbeat() piggyback (cloud.js) so the
+  // notification dot stays current even while this screen isn't open.
   let inboxOpen = false;
 
-  function renderInbox(el) {
-    el.innerHTML = `<div class="board-empty">No trade offers yet.</div>`;
+  function tradeRowHtml(trade) {
+    const me = Cloud.getUser();
+    const isOutgoing = me && trade.fromUid === me.uid;
+    const otherUid = isOutgoing ? trade.toUid : trade.fromUid;
+    const otherRow = (Cloud.getLeaderboardCache() || []).find((r) => r.uid === otherUid);
+    const name = esc(otherRow ? otherRow.name : "a player");
+    const actions = isOutgoing
+      ? `<button type="button" class="save-icon-btn ghost" data-trade-act="cancel" data-trade-id="${esc(trade.id)}">CANCEL</button>`
+      : `<button type="button" class="save-icon-btn" data-trade-act="accept" data-trade-id="${esc(trade.id)}">ACCEPT</button>` +
+        `<button type="button" class="save-icon-btn ghost" data-trade-act="decline" data-trade-id="${esc(trade.id)}">DECLINE</button>`;
+    return (
+      `<div class="inbox-row">` +
+      `<div class="inbox-row-head">${isOutgoing ? "TO" : "FROM"} ${name}</div>` +
+      `<div class="trade-confirm-block">` +
+      `<div class="trade-confirm-row"><span class="trade-confirm-label">GIVES</span><span>${tradeSummaryLine(trade.offer)}</span></div>` +
+      `<div class="trade-confirm-row"><span class="trade-confirm-label">WANTS</span><span>${tradeSummaryLine(trade.request)}</span></div>` +
+      `</div>` +
+      `<div class="inbox-row-actions">${actions}</div>` +
+      `</div>`
+    );
   }
 
+  function renderInbox(el) {
+    // Signed out is a DIFFERENT reason for an empty cache than "still fetching" (Cloud.refreshTrades is a no-op
+    // while signed out - see its own guard - so `rows` would otherwise stay null forever and this would show
+    // "Loading..." permanently instead of the real reason).
+    if (!Cloud.getUser()) {
+      el.innerHTML = `<div class="board-empty">Sign in to see trade offers.</div>`;
+      return;
+    }
+    const rows = Cloud.getTradesCache();
+    if (rows === null) {
+      el.innerHTML = `<div class="board-empty">Loading...</div>`;
+      return;
+    }
+    if (!rows.length) {
+      el.innerHTML = `<div class="board-empty">No trade offers yet.</div>`;
+      return;
+    }
+    el.innerHTML = rows.map(tradeRowHtml).join("");
+  }
+
+  // Rebuilds the button's whole innerHTML every call (not just its label via textContent) - textContent would
+  // wipe out #inbox-dot along with the old label text, since it's a child of this same button (a real bug this
+  // fixes, 2026-09-30: the dot could never have shown before, it got deleted the first time this ran). Doubles as
+  // the dot's own update: "show" whenever this account has at least one pending INCOMING offer.
   function updateInboxButton() {
     const btn = document.getElementById("inbox-btn");
-    if (btn) btn.textContent = inboxOpen ? "LEADERBOARD" : "INBOX";
+    if (!btn) return;
+    const rows = Cloud.getTradesCache() || [];
+    const me = Cloud.getUser();
+    const pendingIncoming = me ? rows.filter((t) => t.toUid === me.uid).length : 0;
+    btn.innerHTML = `${inboxOpen ? "LEADERBOARD" : "INBOX"}<span id="inbox-dot" class="notif-dot${pendingIncoming > 0 ? " show" : ""}"></span>`;
   }
 
   function toggleInbox() {
     if (typeof playUiClick === "function") playUiClick();
     inboxOpen = !inboxOpen;
     renderBoardContent();
+  }
+
+  // ACCEPT/DECLINE/CANCEL (2026-09-30) - ACCEPT gets its own confirm (real coins/skins move immediately and
+  // irreversibly, same "danger" weight as SEND OFFER below); DECLINE/CANCEL just void an offer, no confirm needed.
+  function runTradeAction(fnName, tradeId) {
+    Cloud.callFunction(fnName, { tradeId })
+      .then(() => Cloud.refreshTrades(() => refresh()))
+      .catch((err) => {
+        openModal("TRADE", `<div class="modal-text">${esc((err && err.message) || "Something went wrong.")}</div>`, [{ label: "OK" }]);
+      });
+  }
+
+  function onInboxAction(action, tradeId) {
+    if (typeof playUiClick === "function") playUiClick();
+    if (action === "accept") {
+      openModal(
+        "ACCEPT TRADE?",
+        `<div class="modal-text">This exchanges coins/skins immediately. This cannot be undone.</div>`,
+        [
+          { label: "ACCEPT", cls: "danger", onClick: () => runTradeAction("acceptTrade", tradeId) },
+          { label: "CANCEL", cls: "ghost" },
+        ]
+      );
+      return;
+    }
+    runTradeAction(action === "decline" ? "declineTrade" : "cancelTrade", tradeId);
   }
 
   // ---- click a leaderboard card to inspect it ----
@@ -434,9 +507,9 @@ const Saves = (() => {
     const row = rows[i];
     const me = Cloud.getUser();
     const isMe = me && me.uid === uid;
-    // TRADE (2026-09-29): hidden only when the target has explicitly gone private - `row.privateInventory` is
-    // `undefined` for every real leaderboard row today (the field isn't synced to the cloud yet, see
-    // Economy.setPrivateInventory's own note), which is falsy, so the button shows by default until that changes.
+    // TRADE (2026-09-29, real as of 2026-09-30): hidden when the target has gone private - `row.privateInventory`
+    // is now actually synced both ways (cloud.js syncNow() pushes Economy.getPrivateInventory(), refreshLeaderboard
+    // reads it back), not the always-undefined placeholder it was before.
     const tradeBtn = isMe || row.privateInventory ? "" : `<button type="button" class="save-icon-btn" data-act="trade" data-uid="${esc(uid)}">TRADE</button>`;
     // Coins + TRADE stacked in their own column with real spacing between them (2026-09-29 - they used to just
     // sit side by side in .pick-action's own flow with no gap, reading as cramped once TRADE was added next to
@@ -446,12 +519,13 @@ const Saves = (() => {
       : `<div class="board-action-col"><span class="board-coins"><i class="coin"></i>${formatBoardCoins(row.coins)}</span>${tradeBtn}</div>`;
     inspectOpenedAt = Date.now();
     inspectEl.querySelector("#board-inspect-card").innerHTML = accountCardHtml(row.name, row.character, row.description, action, boardTierClass(i + 1), i + 1);
-    inspectEl.querySelector("#board-inspect-skins").innerHTML = skinsGalleryHtml(uid, row);
     inspectEl.classList.add("show");
   }
 
   // The rarity-tint trick every icon-tile popup in the game uses (boxes.js tintAttrs is the original - duplicated
-  // here rather than exported, since it's three lines and boxes.js has no reason to know saves.js exists).
+  // here rather than exported, since it's three lines and boxes.js has no reason to know saves.js exists). Used by
+  // the trade-compose tiles below (the leaderboard inspect popup no longer shows any inventory of its own - see
+  // targetSkinsCatalog's header note).
   function invTintAttrs(item) {
     const r = typeof Rarity !== "undefined" && Rarity.info(item.rarity);
     if (!r) return "";
@@ -460,34 +534,6 @@ const Saves = (() => {
     if (!m) return "";
     const n = parseInt(m[1], 16);
     return ` box-inspect-icon tinted" style="--tint: rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.22)`;
-  }
-
-  // The inspected player's owned (non-default) skins, read-only - reuses BOXES' own .box-inspect-cell/-icon tile
-  // look. Only ever real for YOUR OWN card (Economy has your own skinCounts locally); another player's inventory
-  // isn't broadcast to leaderboard/{uid} yet (no `skins` field there today - see the trading plan's Part 3), so
-  // their card gets an honest placeholder instead of a gallery that pretends to know what they own.
-  function skinsGalleryHtml(uid, row) {
-    const me = Cloud.getUser();
-    if (!(me && me.uid === uid)) {
-      if (row.privateInventory) return ""; // no PROPOSE TRADE either in this case - nothing to preview
-      return `<div class="inv-note">This player's inventory isn't available to preview yet.</div>`;
-    }
-    if (typeof Collection === "undefined" || typeof Economy === "undefined") return "";
-    const cells = [];
-    for (const kind of ["character", "scenery", "weather"]) {
-      for (const item of Collection.skinItems(kind)) {
-        const n = Economy.getSkinCount(kind, item.id);
-        if (item.rarity === "default" || n <= 0) continue;
-        cells.push(
-          `<div class="box-inspect-cell" title="${esc(item.name)}">` +
-          `<span class="box-inspect-icon${invTintAttrs(item)}"><img src="${esc(item.image || "")}" alt="" draggable="false" /></span>` +
-          `<span class="inv-count">x${n}</span>` +
-          `</div>`
-        );
-      }
-    }
-    if (!cells.length) return `<div class="inv-note">No skins yet.</div>`;
-    return `<div class="inv-head">INVENTORY</div><div class="inv-grid">${cells.join("")}</div>`;
   }
 
   function onInspectClick(e) {
@@ -506,23 +552,35 @@ const Saves = (() => {
     if (!e.target.closest(".pick-row")) closeInspect(); // outside the card
   }
 
-  // ---------- Trade compose (2026-09-29) ----------
-  // A MOCKUP, same standing as SELL: SEND opens a summary and closes, nothing is actually created anywhere (no
-  // trades/{tradeId} collection exists yet - that's Cloud Functions work, see the trading plan's Part 3). This
-  // is here to review the layout and the picking flow, not to move anything real yet.
+  // ---------- Trade compose (2026-09-29, wired to the real proposeTrade Cloud Function 2026-09-30) ----------
+  // SEND OFFER now calls Cloud.callFunction("proposeTrade", ...) for real (see sendTradeOffer below) - on the
+  // emulator (127.0.0.1) this creates a genuine trades/{tradeId} doc and reserves the offered coins/skins
+  // server-side; on the real (not yet deployed) project it fails cleanly with a "couldn't reach" error, same as
+  // any other callFunction call before rules+Functions are published.
   let tradeComposeEl = null;
-  let tradeTarget = null; // { uid, name } | null
-  let tradeGive = { coins: 0, skins: [] }; // skins: [{kind,id}] - one of each, no stacking (kept simple for the mockup)
+  let tradeTarget = null; // { uid, name, rank } | null
+  let tradeGive = { coins: 0, skins: [] }; // skins: [{kind,id}] - one of each, no stacking (kept simple; sendTradeOffer adds qty:1 per entry when sending)
   let tradeWant = { coins: 0, skins: [] };
 
-  // "YOU WANT" has nothing real to pick from yet - the target's actual inventory isn't synced to the cloud (see
-  // skinsGalleryHtml's own note) - so it offers the whole catalog instead, the same fallback the trading plan
-  // already designs for a Private Inventory target: you can ask for anything, it just wouldn't be valid to
-  // accept unless they really own it, which only a real acceptTrade Cloud Function could ever check.
-  function allSkinsCatalog() {
+  // "YOU WANT" browses the target's REAL inventory (2026-09-30) - reads row.skinCounts, now that
+  // cloud.js refreshLeaderboard mirrors it back into the cache. Before this, it offered the whole catalog as a
+  // stand-in (the target's inventory wasn't readable at all yet); that fallback is gone - a target whose
+  // inventory hasn't synced yet (most players, until the migration + client wiring for openBox/sellSkin/etc lands)
+  // now honestly shows "nothing to pick from" instead of pretending every skin in the game is fair game to ask
+  // for. This is also now the ONLY place another player's inventory is ever shown - the leaderboard inspect
+  // popup's own standalone preview below an account card was removed the same day, per the owner's call: another
+  // player's inventory is visible only at the moment it's actually useful (picking what to ask for), never as
+  // idle browsing.
+  function targetSkinsCatalog() {
+    const row = tradeTarget && (Cloud.getLeaderboardCache() || []).find((r) => r.uid === tradeTarget.uid);
+    const counts = row && row.skinCounts;
+    if (!counts) return null; // not synced yet - distinct from "synced, owns nothing" (empty array)
     const out = [];
     for (const kind of ["character", "scenery", "weather"]) {
-      for (const item of Collection.skinItems(kind)) if (item.rarity !== "default") out.push({ kind, item });
+      for (const item of Collection.skinItems(kind)) {
+        const n = (counts[kind] && counts[kind][item.id]) || 0;
+        if (item.rarity !== "default" && n > 0) out.push({ kind, item, n });
+      }
     }
     return out;
   }
@@ -537,20 +595,35 @@ const Saves = (() => {
     return out;
   }
 
-  function tradeTileHtml(kind, item, selected) {
+  // `count` (the target's real owned amount) only ever shows on the WANT side - GIVE already only lists skins
+  // you have at least one of (mySkinsCatalog), same as before.
+  function tradeTileHtml(kind, item, selected, count) {
     return (
       `<div class="box-inspect-cell${selected ? " selected" : ""}" data-kind="${esc(kind)}" data-id="${esc(item.id)}" title="${esc(item.name)}">` +
       `<span class="box-inspect-icon${invTintAttrs(item)}"><img src="${esc(item.image || "")}" alt="" draggable="false" /></span>` +
+      (typeof count === "number" ? `<span class="inv-count">x${count}</span>` : "") +
       `</div>`
     );
   }
 
   function renderTradeSide(side) {
     const state = side === "give" ? tradeGive : tradeWant;
-    const catalog = side === "give" ? mySkinsCatalog() : allSkinsCatalog();
-    tradeComposeEl.querySelector(`.trade-skins-grid[data-side="${side}"]`).innerHTML = catalog.length
-      ? catalog.map(({ kind, item }) => tradeTileHtml(kind, item, state.skins.some((s) => s.kind === kind && s.id === item.id))).join("")
-      : `<div class="inv-note">${side === "give" ? "You have no sellable skins yet." : "Nothing to pick from yet."}</div>`;
+    const grid = tradeComposeEl.querySelector(`.trade-skins-grid[data-side="${side}"]`);
+    if (side === "give") {
+      const catalog = mySkinsCatalog();
+      grid.innerHTML = catalog.length
+        ? catalog.map(({ kind, item }) => tradeTileHtml(kind, item, state.skins.some((s) => s.kind === kind && s.id === item.id))).join("")
+        : `<div class="inv-note">You have no sellable skins yet.</div>`;
+    } else {
+      const catalog = targetSkinsCatalog();
+      if (catalog === null) {
+        grid.innerHTML = `<div class="inv-note">Their inventory hasn't synced yet.</div>`;
+      } else if (!catalog.length) {
+        grid.innerHTML = `<div class="inv-note">They own no tradeable skins yet.</div>`;
+      } else {
+        grid.innerHTML = catalog.map(({ kind, item, n }) => tradeTileHtml(kind, item, state.skins.some((s) => s.kind === kind && s.id === item.id), n)).join("");
+      }
+    }
     tradeComposeEl.querySelector(`.trade-coins-input[data-side="${side}"]`).value = state.coins;
   }
 
@@ -577,10 +650,13 @@ const Saves = (() => {
     return item ? item.name : id;
   }
 
+  // `s.qty` is always 1 from THIS client's own compose state (no stacking - see tradeGive/tradeWant's own note),
+  // but a real trade doc read back from the server (tradeRowHtml above) could in principle carry a higher qty, so
+  // this stays qty-aware rather than assuming 1.
   function tradeSummaryLine(state) {
     const parts = [];
     if (state.coins > 0) parts.push(`${state.coins} coins`);
-    parts.push(...state.skins.map((s) => skinLabel(s.kind, s.id)));
+    parts.push(...state.skins.map((s) => (s.qty > 1 ? `${s.qty}x ` : "") + skinLabel(s.kind, s.id)));
     return parts.length ? esc(parts.join(", ")) : "nothing";
   }
 
@@ -588,8 +664,7 @@ const Saves = (() => {
   // a bordered GIVE/WANT block instead of a plain sentence, the target's leaderboard rank next to their name,
   // and SEND OFFER styled `danger` (the same red every other real, consequential confirm in the game uses - SELL,
   // the account-overwrite warning) rather than a throwaway "OK". CANCEL backs out to the compose screen, still
-  // open underneath, without sending anything - only SEND OFFER closes it. The "preview, not live yet" line
-  // stays, just demoted to a small status note under the real terms instead of being the headline.
+  // open underneath, without sending anything - only SEND OFFER closes it.
   function handleTradeSend() {
     if (!tradeGive.coins && !tradeGive.skins.length && !tradeWant.coins && !tradeWant.skins.length) {
       openModal("TRADE OFFER", `<div class="modal-text">Offer at least a coin or a skin on one side first.</div>`, [{ label: "OK" }]);
@@ -601,13 +676,36 @@ const Saves = (() => {
         `<div class="trade-confirm-block">` +
         `<div class="trade-confirm-row"><span class="trade-confirm-label">YOU GIVE</span><span>${tradeSummaryLine(tradeGive)}</span></div>` +
         `<div class="trade-confirm-row"><span class="trade-confirm-label">YOU WANT</span><span>${tradeSummaryLine(tradeWant)}</span></div>` +
-        `</div>` +
-        `<div class="modal-status">Preview only - trading isn't live yet.</div>`,
+        `</div>`,
       [
-        { label: "SEND OFFER", cls: "danger", onClick: () => closeTradeCompose() },
+        { label: "SEND OFFER", cls: "danger", onClick: () => sendTradeOffer() },
         { label: "CANCEL", cls: "ghost" },
       ]
     );
+  }
+
+  // The actual proposeTrade call (2026-09-30) - replaces what used to be a pure mockup (SEND just closed the
+  // popup, nothing was ever created). Fires after the confirm modal above closes; a follow-up modal reports
+  // success or the server's own rejection reason (not enough spendable coins, target went private since the
+  // compose screen opened, an outgoing offer already exists, the rate limit, ...) - never applied optimistically,
+  // same discipline callFunction's own header comment documents for every Cloud Function call.
+  function sendTradeOffer() {
+    const target = tradeTarget;
+    closeTradeCompose(); // closes the compose screen underneath the confirm modal; tradeTarget captured above first
+    const payload = {
+      toUid: target.uid,
+      offer: { coins: tradeGive.coins, skins: tradeGive.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) },
+      request: { coins: tradeWant.coins, skins: tradeWant.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) },
+      clientVersion: typeof GAME_VERSION_TEXT !== "undefined" ? GAME_VERSION_TEXT : null,
+    };
+    Cloud.callFunction("proposeTrade", payload)
+      .then(() => {
+        openModal("TRADE OFFER SENT", `<div class="modal-text">Your offer is on its way to <b>${esc(target.name)}</b> - check the INBOX to see when it's answered.</div>`, [{ label: "OK" }]);
+        Cloud.refreshTrades(() => refresh());
+      })
+      .catch((err) => {
+        openModal("TRADE OFFER FAILED", `<div class="modal-text">${esc((err && err.message) || "Something went wrong.")}</div>`, [{ label: "OK" }]);
+      });
   }
 
   function onTradeComposeClick(e) {
@@ -653,7 +751,12 @@ const Saves = (() => {
     inspectEl.addEventListener("click", onInspectClick);
     root.addEventListener("click", (e) => {
       const card = e.target.closest(".board-card[data-uid]");
-      if (card) openInspect(card.dataset.uid);
+      if (card) {
+        openInspect(card.dataset.uid);
+        return;
+      }
+      const tradeBtn = e.target.closest("[data-trade-act]");
+      if (tradeBtn) onInboxAction(tradeBtn.dataset.tradeAct, tradeBtn.dataset.tradeId);
     });
     tradeComposeEl = document.getElementById("trade-compose");
     if (tradeComposeEl) {

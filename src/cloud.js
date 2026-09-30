@@ -48,9 +48,10 @@ const Cloud = (() => {
   let app = null;
   let auth = null;
   let db = null;
-  let functions = null; // Cloud Functions (functions/*.js) - see callFunction() below; only actually used once the
-  // client is wired to call purchase/useBuff/openBox/sellSkin/claimThrow/the trade functions instead of mutating
-  // Economy locally (not done yet - see docs/NOTES.md and the snowy-balls-blaze-migration memory)
+  let functions = null; // Cloud Functions (functions/*.js) - see callFunction() below. Only the four trade
+  // functions call through it so far (saves.js proposeTrade/acceptTrade/declineTrade/cancelTrade, 2026-09-30) -
+  // purchase/useBuff/openBox/sellSkin/claimThrow still mutate Economy locally (see docs/NOTES.md and the
+  // snowy-balls-blaze-migration memory)
   let ready = false; // FIREBASE_CONFIG looks real and the SDK loaded - false leaves every call below a harmless no-op
   let user = null; // { uid, name } | null
   let revealUser = true; // false only while a fresh interactive signIn() is still deciding upload vs download - see
@@ -282,7 +283,16 @@ const Cloud = (() => {
   // (interval, visibility in either direction, pagehide, a purchase flush) must check first, never call syncNow()
   // directly, or this same race reopens through whichever path skipped the check.
   function heartbeat() {
-    return checkSession().then((displaced) => { if (!displaced) syncNow(); });
+    return checkSession().then((displaced) => {
+      if (displaced) return;
+      syncNow();
+      // A cheap piggyback (2026-09-30, per the plan's Part 2) on the existing sync cadence, just to keep the
+      // INBOX notification dot current without a live listener - refreshLeaderboard has no such need (a stale
+      // leaderboard rank is harmless; a stale "you have a pending trade" dot is the one thing here worth polling for).
+      refreshTrades(() => {
+        if (typeof Saves !== "undefined") Saves.refresh();
+      });
+    });
   }
 
   function setConfirmOverwrite(fn) {
@@ -503,6 +513,12 @@ const Cloud = (() => {
     // A custom name (set via CHANGE NAME) overrides the Google account name everywhere the leaderboard shows it; "" means
     // it was never set, so the Google name is still what publishes.
     const name = (typeof Economy !== "undefined" && Economy.getAccountName()) || user.name;
+    // privateInventory (2026-09-30): pushed here now too, not just read locally - this is what actually makes the
+    // OPTIONS toggle (Economy.setPrivateInventory) mean anything server-side: proposeTrade checks the TARGET's
+    // leaderboard doc for this flag before allowing an offer, and refreshLeaderboard below reads it back into the
+    // cache so the client can hide the TRADE button and skip the target-inventory picker for the same player. A
+    // plain client field, unlike skinCounts below - the client is the only source of truth for this one.
+    const privateInventory = typeof Economy !== "undefined" ? Economy.getPrivateInventory() : false;
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
     // { merge: true } on both writes (2026-09-29, found while building the Cloud Functions migration - see
@@ -516,7 +532,7 @@ const Cloud = (() => {
     // eventually, `character`/skin-related fields) entirely, since a Cloud Function already mirrors the
     // authoritative value here on every action that changes it (see acceptTrade/openBox/sellSkin) and this
     // client-side push would otherwise race it and sometimes win with a stale number.
-    batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, updatedAt: now }, { merge: true });
+    batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, privateInventory, updatedAt: now }, { merge: true });
     if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now, session: mySession.token }, { merge: true });
     return batch
       .commit()
@@ -540,6 +556,12 @@ const Cloud = (() => {
   // Read-on-open, not a live listener (cheap and predictable rather than real-time). Call this once when the player
   // actually OPENS the leaderboard. `onUpdated` fires once, only when a fresh read lands (not for an already-in-flight
   // one this call reuses).
+  //
+  // skinCounts/privateInventory (2026-09-30): now actually read back into the cache, not just allow-listed in
+  // firestore.rules - this is what the trade-compose "YOU WANT" picker reads a target's real skins from
+  // (saves.js targetSkinsCatalog), and what gates the TRADE button/picker off entirely for a private player. Most
+  // rows won't have `skinCounts` yet (only openBox/sellSkin/acceptTrade write it, via a Cloud Function, and
+  // nothing is deployed to the real project yet) - `null` here means exactly that: "not synced", not "owns nothing".
   function refreshLeaderboard(onUpdated) {
     if (!ready || leaderboardLoading) return;
     leaderboardLoading = true;
@@ -548,7 +570,15 @@ const Cloud = (() => {
       .limit(LEADERBOARD_SIZE)
       .get()
       .then((snap) => {
-        leaderboardRows = snap.docs.map((d) => ({ uid: d.id, name: d.data().name, coins: d.data().coins, character: d.data().character || null, description: d.data().description || "" }));
+        leaderboardRows = snap.docs.map((d) => ({
+          uid: d.id,
+          name: d.data().name,
+          coins: d.data().coins,
+          character: d.data().character || null,
+          description: d.data().description || "",
+          privateInventory: d.data().privateInventory === true,
+          skinCounts: d.data().skinCounts || null,
+        }));
         leaderboardLoading = false;
         if (onUpdated) onUpdated();
       })
@@ -557,13 +587,46 @@ const Cloud = (() => {
       });
   }
 
+  // ---- trades (2026-09-30): the INBOX's own read-on-open cache, same convention as the leaderboard above - a
+  // one-shot get(), never a live listener. Two separate equality queries (fromUid==me, toUid==me), merged and
+  // sorted client-side rather than one compound query, since a trade's own two participant fields can never both
+  // match the same uid at once (no dedup needed) and this avoids requiring any composite Firestore index. Only
+  // ever "pending" trades - the INBOX shows what still needs a decision, not history (see the plan's Part 2: "your
+  // one outgoing offer (with CANCEL) and every pending incoming offer (ACCEPT/DECLINE)"). ----
+  let tradesRows = null; // cache: [{id, fromUid, toUid, offer, request, createdAt}] | null = never fetched (or signed out)
+  let tradesLoading = false;
+
+  function getTradesCache() {
+    return tradesRows;
+  }
+
+  function refreshTrades(onUpdated) {
+    if (!ready || !user || tradesLoading) return;
+    tradesLoading = true;
+    const col = db.collection("trades");
+    Promise.all([col.where("fromUid", "==", user.uid).where("status", "==", "pending").get(), col.where("toUid", "==", user.uid).where("status", "==", "pending").get()])
+      .then(([fromSnap, toSnap]) => {
+        const rows = [...fromSnap.docs, ...toSnap.docs].map((d) => {
+          const t = d.data();
+          return { id: d.id, fromUid: t.fromUid, toUid: t.toUid, offer: t.offer, request: t.request, createdAt: t.createdAt && t.createdAt.toMillis ? t.createdAt.toMillis() : 0 };
+        });
+        rows.sort((a, b) => b.createdAt - a.createdAt);
+        tradesRows = rows;
+        tradesLoading = false;
+        if (onUpdated) onUpdated();
+      })
+      .catch(() => {
+        tradesLoading = false; // offline, signed out, or not published to this project yet - whatever was cached is all there is
+      });
+  }
+
   // Calls a server-authoritative Cloud Function (functions/economy.js, functions/trading.js, functions/shop.js)
   // and resolves to its `data` - the caller applies ONLY this returned value, never an optimistic local guess
   // (the same discipline the Functions themselves are built around - see the plan's Part 3). Rejects with the
   // Function's own HttpsError shape ({ code: "functions/failed-precondition", message: "..." }, etc.) on
   // failure - callers should read `.message` for a player-facing reason, `.code` only to branch on specific
-  // cases (e.g. "functions/unauthenticated" meaning "you need to sign in first"). Not called by anything yet -
-  // this is just the wiring; each gameplay path (shop, boxes, sell, buffs, throws, trading) still mutates
+  // cases (e.g. "functions/unauthenticated" meaning "you need to sign in first"). Called by saves.js for the four
+  // trade functions as of 2026-09-30; every other gameplay path (shop, boxes, sell, buffs, throws) still mutates
   // Economy locally until it's individually rewired to call through here instead (see docs/NOTES.md).
   function callFunction(name, data) {
     if (!ready || !functions) return Promise.reject(new Error("Not signed in, or the account system isn't available."));
@@ -585,6 +648,8 @@ const Cloud = (() => {
     setConfirmOverwrite,
     getLeaderboardCache,
     refreshLeaderboard,
+    getTradesCache,
+    refreshTrades,
     checkSession, // exposed mainly for testing - the timer/visibility cadence already calls this itself
     callFunction,
   };

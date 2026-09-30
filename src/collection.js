@@ -517,7 +517,12 @@ const Collection = (() => {
       buttons.projectile.classList.remove("active");
       // A fresh read, only now (opening it) - not every time the list happens to redraw (see cloud.js). Guarded so a
       // fetch that resolves after the player already left this screen doesn't clobber whatever is open by then.
-      if (typeof Cloud !== "undefined") Cloud.refreshLeaderboard(() => openKind === "leaderboard" && Saves.refresh());
+      if (typeof Cloud !== "undefined") {
+        Cloud.refreshLeaderboard(() => openKind === "leaderboard" && Saves.refresh());
+        // Same read-on-open convention for the INBOX (2026-09-30) - keeps its notification dot and row list
+        // current the moment this whole screen is opened, not just when INBOX itself is toggled to.
+        Cloud.refreshTrades(() => openKind === "leaderboard" && Saves.refresh());
+      }
       return;
     }
     if (kind === "buff") {

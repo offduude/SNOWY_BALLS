@@ -21,11 +21,15 @@ service cloud.firestore {
     // snowy-balls-blaze-migration memory) are OPTIONAL here on purpose, not required: rules+Functions publish
     // BEFORE the client build that actually sends them (the migration's own standing sequencing rule), so if they
     // were required every write from the OLD, still-live client would start failing the moment these rules go up -
-    // exactly the kind of break the snowy-balls-smooth-version-transitions memory exists to prevent. `skinCounts`
-    // is only ever written by a Cloud Function (Admin SDK, which bypasses these rules entirely) mirroring a
-    // player's saves/{uid} totals here as a PUBLIC read source for another player's profile-inspect skins gallery -
-    // a client never legitimately sends it itself; it's allow-listed here only so a client's own unrelated write
-    // (name/coins/character/description) to a doc that already has these fields isn't rejected for containing them.
+    // exactly the kind of break the snowy-balls-smooth-version-transitions memory exists to prevent. `privateInventory`
+    // IS now sent by the client itself (cloud.js syncNow(), 2026-09-30 - a plain preference, not server-owned).
+    // `skinCounts` is only ever written by a Cloud Function (Admin SDK, which bypasses these rules entirely)
+    // mirroring a player's saves/{uid} totals here - a client never legitimately sends it itself; it's
+    // allow-listed here only so a client's own unrelated write (name/coins/character/description) to a doc that
+    // already has these fields isn't rejected for containing them. PUBLIC read on this whole doc is what lets the
+    // trade-compose "YOU WANT" picker browse a target's real skins (saves.js targetSkinsCatalog) - the ONLY place
+    // another player's inventory is ever shown client-side (2026-09-30: the leaderboard inspect popup's own
+    // standalone preview was removed).
     match /leaderboard/{uid} {
       allow read: if true;
       allow write: if request.auth != null

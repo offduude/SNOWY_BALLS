@@ -12,7 +12,7 @@ const admin = require("firebase-admin");
 const { initializeApp } = require("firebase/app");
 const { getAuth, connectAuthEmulator, signInWithCustomToken, signOut } = require("firebase/auth");
 const { getFunctions, connectFunctionsEmulator, httpsCallable } = require("firebase/functions");
-const { getFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, serverTimestamp } = require("firebase/firestore");
+const { getFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } = require("firebase/firestore");
 
 const PROJECT_ID = "snowy-balls-5f7a5"; // same id as production - safe: emulators never touch the real project regardless (see firebase.json's own note)
 const ADMIN_UID = "zrHVHG8QVXfZfMhUn0PJHf9TEKO2"; // must match functions/lib/auth.js exactly
@@ -481,6 +481,45 @@ async function main() {
     }
     const after = (await db.collection("saves").doc(UID_A).get()).data();
     assert.strictEqual(after.coins, 500, "the real value must be completely untouched by the rejected write");
+  });
+
+  console.log("\n-- Client-side leaderboard/trades reads (2026-09-30): what cloud.js's refreshLeaderboard/refreshTrades actually query, against the real rules --");
+  // These exist for the same reason the saves/{uid} section above does - everything else in this file uses the
+  // ADMIN SDK, which bypasses firestore.rules entirely. cloud.js never calls a Cloud Function to read the
+  // leaderboard or trades - it queries Firestore directly with the client SDK, so THAT is what needs proving here,
+  // not the Functions (already covered above).
+  await check("syncNow()'s own leaderboard write shape (now including privateInventory) succeeds and reads back", async () => {
+    await asUid(UID_A);
+    await setDoc(
+      doc(clientDb, "leaderboard", UID_A),
+      { name: "Trader A", coins: 50000, character: "andek", description: "", privateInventory: true, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    const after = (await db.collection("leaderboard").doc(UID_A).get()).data();
+    assert.strictEqual(after.privateInventory, true, "privateInventory must actually reach the doc, not just be allow-listed");
+    // Reset to false for the trade-visibility checks below (a private target can't be proposed to - not what this section tests).
+    await setDoc(doc(clientDb, "leaderboard", UID_A), { privateInventory: false, updatedAt: serverTimestamp() }, { merge: true });
+  });
+
+  const UID_C = "test-trader-c"; // a genuine bystander - must see neither side of A<->B's trade below
+  await check("cloud.js refreshTrades' own two-query pattern finds exactly the right trade for each participant, and nothing for a bystander", async () => {
+    await resetRateLimit(UID_A);
+    await asUid(UID_A);
+    const proposed = await call("proposeTrade", { toUid: UID_B, offer: { coins: 50 }, request: {} });
+    const tradesFor = async (uid) => {
+      await asUid(uid);
+      const col = collection(clientDb, "trades");
+      const [fromSnap, toSnap] = await Promise.all([
+        getDocs(query(col, where("fromUid", "==", uid), where("status", "==", "pending"))),
+        getDocs(query(col, where("toUid", "==", uid), where("status", "==", "pending"))),
+      ]);
+      return [...fromSnap.docs, ...toSnap.docs].map((d) => d.id);
+    };
+    assert.deepStrictEqual(await tradesFor(UID_A), [proposed.data.tradeId], "the sender must see its own outgoing offer");
+    assert.deepStrictEqual(await tradesFor(UID_B), [proposed.data.tradeId], "the recipient must see the same offer as incoming");
+    assert.deepStrictEqual(await tradesFor(UID_C), [], "a bystander must see neither query return anything");
+    await asUid(UID_A);
+    await call("cancelTrade", { tradeId: proposed.data.tradeId }); // clean up - leaves no pending trade behind for a later run
   });
 
   console.log(`\n${passed} passed, ${failed} failed.`);

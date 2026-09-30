@@ -3826,3 +3826,50 @@ fields are still just the schema defaults today - nothing has ever written them,
 migration (item 6) hasn't run and nothing is deployed to the real project yet. Every one of these calls is
 therefore expected to reject cleanly for a real account until that migration happens; that's the intended,
 already-documented state, not a bug to chase down here.
+
+## saveProjectile roll moved server-side, closing the flagged drift gap (2026-09-30)
+
+Same session, right after wiring claimThrow: the owner's follow-up on the known gap flagged above ("wdym Water
+Bottle can drift counts apart") - asked to move the roll itself onto the server instead of leaving it as a
+documented limitation. `functions/economy.js`'s `claimThrow` (v1 of this specific piece - the reward/faceHit
+logic itself is unchanged) used to unconditionally deduct one real unit for every consumable projectile claim,
+with no concept of a save chance at all - a guaranteed, one-directional drift every time a real Water Bottle
+(or Mints, or the others) actually saved a projectile locally, since the client's own inventory stayed put
+while the server's kept dropping regardless.
+
+New `saveProjectileChance(buffs)` mirrors `src/buffs.js`'s own `modifiers()` formula exactly (independent
+rolls: `1 - product(1 - value_i)` across every active buff with a `saveProjectile` effect, capped at
+`economy.json buffCaps.saveProjectile`, 0.9 today). `claimThrow` now rolls `Math.random() < saveProjectileChance(save.buffs)`
+itself - using the REAL active buffs (the same list `useBuff` populates, checked at the moment this call is
+processed, same "count buffs realistically right now" discipline the coinMultiplier/faceHit checks already
+use) - and only decrements `saves/{uid}.projectiles` if that roll says no. The roll applies whenever the
+projectile is a real consumable, regardless of `hit`/`miss` (matches `consumeProjectile()`'s own timing - the
+save chance is about the AMMO, not the outcome). The response now includes `saved: boolean`.
+
+**This does NOT make the client's own local "Saved Projectile" message match the server's decision on any
+given throw** - `src/main.js`'s `consumeProjectile()` still rolls its own chance locally, at aim time, before
+the throw even resolves, purely so the message and the client's still-local, still-unreconciled inventory count
+can show up instantly (Option B). Two independent rolls of the same real probability will simply disagree on
+some individual throws. What changes is the SHAPE of the drift: before, it only ever grew in one direction
+(every local save was a guaranteed server-side loss on top of it); now both sides are losing roughly the same
+SHARE of their ammo over time to their own independent rolls of the same real chance - an unbiased wobble
+around zero instead of a one-way ratchet. Actually eliminating the wobble entirely would mean either teaching
+`claimThrow` a trusted `saved` input (reopens a trust question: could a modified client always claim "saved"
+for free ammo?) or moving the roll fully server-side and blocking the throw's own local resolution on it
+(costs the round-trip latency Option B was chosen specifically to avoid) - left alone deliberately, not
+silently forgotten.
+
+**Verification:** `functions/test/run.js` gained two checks (43 total now) - no active saveProjectile buff
+saves nothing across a real call (`saved: false`, projectile count actually drops - chance 0 is `Math.random() <
+0`, always false, no RNG needed to prove it deterministically); four REAL shop items stacked (water_bottle 10%
++ mints 20% + mints_epic 50% + stanczak_mayo 50% = 82% combined, the exact independent-rolls formula) genuinely
+save most of 20 real `claimThrow` calls (asserts at least 10 of 20 saved - a deliberately generous floor against
+the ~16.4 expected, so this can't plausibly false-fail while still only passing if the real 82% is actually
+being read rather than some placeholder). Ran the full suite clean against a real emulator session.
+
+No client changes needed for this one - `main.js`'s `reportThrowToServer` already ignores everything about
+projectiles in the response by design (see its own header comment), so it required nothing new to keep doing
+exactly that.
+
+No version bump - this change is entirely inside `functions/`, not deployed anywhere real yet.
+- `functions/economy.js`, `functions/test/run.js`.

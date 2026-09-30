@@ -230,6 +230,32 @@ exports.sellSkin = functions.https.onCall(async (data, context) => {
 // bonus on top of it, which is a meaningfully larger thing to get wrong on every single throw. Flagged as a
 // known, deliberate gap, not silently shipped: closing it fully means moving natural event spawning
 // server-side too (own future work, not part of this pass).
+//
+// The saveProjectile roll (Water Bottle etc.) is now taken HERE, server-side (2026-09-30) - not trusted from
+// the client at all, and not mirroring a client-side roll either. `src/main.js consumeProjectile()` still rolls
+// its OWN chance locally, at aim time, purely for the instant "Saved Projectile" message and the client's own
+// (still-local, still-unreconciled) inventory count - see main.js reportThrowToServer's own note on why that
+// stays. This roll is the actual, authoritative one that decides whether saves/{uid}.projectiles moves, using
+// the REAL active buffs (same list useBuff populates, same "count buffs realistically at the moment of the
+// throw" discipline the coinMultiplier/faceHit checks already use) - not the unconditional "always deduct one"
+// v1 had, which meant the two projectile counts could only ever drift apart in ONE direction, growing every
+// single time a save-chance buff actually saved something locally. Rolling independently server-side doesn't
+// make the two sides agree on any INDIVIDUAL throw (the client already decided and displayed its own outcome
+// before this call resolves - blocking on a round trip for that would cost this migration's whole "Option B"
+// smoothness point), but it does mean the drift is now an unbiased random walk around zero instead of a
+// one-way ratchet - both sides losing roughly the same share of their ammo over time, not one side bleeding out
+// relative to the other.
+function saveProjectileChance(buffs) {
+  let notSaved = 1;
+  for (const b of buffs) {
+    const it = eco.shopItemIndex.get(b.id);
+    const eff = it && (it.effects || []).find((e) => e.type === "saveProjectile");
+    if (eff) notSaved *= 1 - eff.value; // independent rolls, same formula src/buffs.js modifiers() uses
+  }
+  const cap = eco.eco.buffCaps && typeof eco.eco.buffCaps.saveProjectile === "number" ? eco.eco.buffCaps.saveProjectile : 0.9;
+  return Math.min(cap, 1 - notSaved);
+}
+
 exports.claimThrow = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const projectileId = typeof data.projectileId === "string" ? data.projectileId : null;
@@ -245,20 +271,25 @@ exports.claimThrow = functions.https.onCall(async (data, context) => {
 
     await applyRateLimits(tx, [{ uid, key: "claimThrow", limit: 30, windowMs: 60000 }]);
 
+    const now = Date.now();
+    save.buffs = save.buffs.filter((b) => b.endsAt > now); // sweep expired ones once, up front - shared by the save-roll below (hit or miss) and the reward math further down (hit only)
+
     const projDef = eco.projectileIndex[projectileId];
     const isConsumable = projDef && !projDef.infinite && !projDef.regen;
+    let saved = false; // whether THIS throw's projectile was saved server-side - applies regardless of hit/miss, same as the client's own roll
     if (isConsumable && !isAdmin(uid)) {
       if (!(save.projectiles[projectileId] > 0)) throw new functions.https.HttpsError("failed-precondition", "You don't have that projectile.");
-      save.projectiles[projectileId] -= 1;
-      if (save.projectiles[projectileId] <= 0) delete save.projectiles[projectileId];
+      saved = Math.random() < saveProjectileChance(save.buffs);
+      if (!saved) {
+        save.projectiles[projectileId] -= 1;
+        if (save.projectiles[projectileId] <= 0) delete save.projectiles[projectileId];
+      }
     }
 
     let reward;
     if (!hit) {
       reward = eco.eco.rewards.missCoins || 0; // economy.json rewards.missCoins - 0 today, respected either way
     } else {
-      const now = Date.now();
-      save.buffs = save.buffs.filter((b) => b.endsAt > now); // sweep expired ones while we're here - also what makes the check below honest
       let multiplier = 1;
       for (const b of save.buffs) {
         const it = eco.shopItemIndex.get(b.id);
@@ -283,6 +314,6 @@ exports.claimThrow = functions.https.onCall(async (data, context) => {
     save.lifetimeCoins += reward;
 
     writeSave(tx, uid, save);
-    return { coins: save.coins, projectiles: save.projectiles, reward };
+    return { coins: save.coins, projectiles: save.projectiles, reward, saved };
   });
 });

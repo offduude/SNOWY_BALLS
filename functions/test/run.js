@@ -242,7 +242,39 @@ async function main() {
     const res = await call("claimThrow", { projectileId: "chestnut", hit: true, faceHit: true, eventName: "disco" });
     assert.strictEqual(res.data.reward, 16); // no bonus, but still a normal successful hit
   });
-  await seedSave(UID_A, { coins: 50000 }); // reset for the tests below, which assume a healthy balance
+
+  console.log("\n-- claimThrow's saveProjectile roll is taken server-side now, not trusted from (or mirrored to) the client (2026-09-30) --");
+  await resetRateLimit(UID_A); // a clean claimThrow counter - the section above already used several calls of its own
+  await check("no active saveProjectile buff: never saved, always consumes (chance 0 is deterministic, no RNG needed to prove it)", async () => {
+    await seedSave(UID_A, { buffs: [], projectiles: { chestnut: 5 } });
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: true });
+    assert.strictEqual(res.data.saved, false);
+    assert.strictEqual(res.data.projectiles.chestnut, 4);
+  });
+  await check("a real, stacked saveProjectile buff genuinely saves most throws - a real independent roll against real buff data, not a client-trusted flag", async () => {
+    // water_bottle (10%) + mints (20%) + mints_epic (50%) + stanczak_mayo (50%), all real shop items with a real
+    // saveProjectile effect: combined chance = 1 - (0.9 x 0.8 x 0.5 x 0.5) = 82%.
+    const endsAt = Date.now() + 60000;
+    await seedSave(UID_A, {
+      buffs: [
+        { id: "water_bottle", endsAt },
+        { id: "mints", endsAt },
+        { id: "mints_epic", endsAt },
+        { id: "stanczak_mayo", endsAt },
+      ],
+      projectiles: { chestnut: 500 },
+    });
+    const TRIALS = 20;
+    let saved = 0;
+    for (let i = 0; i < TRIALS; i++) {
+      const res = await call("claimThrow", { projectileId: "chestnut", hit: true });
+      if (res.data.saved) saved++;
+    }
+    // A generous floor (expected ~16.4 of 20 at 82%) - astronomically unlikely to false-fail (binomial tail),
+    // while still only passing if the roll is genuinely reading the real 82% instead of, say, always false.
+    assert.ok(saved >= 10, `expected most of ${TRIALS} throws to be saved at an 82% chance, only ${saved} were`);
+  });
+  await seedSave(UID_A, { coins: 50000, buffs: [] }); // reset for the tests below, which assume a healthy balance
 
   await check("openBox draws from the real pool and charges the real price", async () => {
     const before = (await db.collection("saves").doc(UID_A).get()).data().coins;

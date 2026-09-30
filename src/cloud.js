@@ -38,6 +38,15 @@ const FIREBASE_CONFIG = {
 const SYNC_INTERVAL_MS = 30 * 1000;
 const LEADERBOARD_SIZE = 20; // plenty for a 5-person group with room to grow
 const SAVES_COLLECTION = "saves";
+// The owner's own testing account (src/main.js has its own copy of this same literal, GODMODE_UID - this file
+// loads before that one, so it can't just reference it - see that file's own note on why it isn't a save field).
+// Never appears on the real leaderboard (2026-09-30, the owner's ask): syncNow() below skips writing its own
+// leaderboard/{uid} doc for this uid at all, and refreshLeaderboard() filters it out of whatever it reads back
+// regardless - a Cloud Function (openBox/sellSkin/acceptTrade's writeLeaderboardMirror) can still create a
+// partial doc for it, purely for the trade-compose "YOU WANT" picker's own read - the client-side READ filter
+// is what actually guarantees this account is never visible in the standings, independent of every possible
+// write path.
+const ADMIN_UID = "zrHVHG8QVXfZfMhUn0PJHf9TEKO2";
 const SESSION_KEY = "snowyBallsSession"; // this device's own remembered { uid, token } - separate from Economy's save data (see resetLocalSave/claimSession)
 // How recently saves/{uid} must have been touched to count as "someone is actively playing on it right now" (see
 // signIn()). Set explicitly to "just over a minute" (not tied to SYNC_INTERVAL_MS by a multiplier) - the game already
@@ -532,7 +541,12 @@ const Cloud = (() => {
     // eventually, `character`/skin-related fields) entirely, since a Cloud Function already mirrors the
     // authoritative value here on every action that changes it (see acceptTrade/openBox/sellSkin) and this
     // client-side push would otherwise race it and sometimes win with a stale number.
-    batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, privateInventory, updatedAt: now }, { merge: true });
+    // Never for the admin/testing account (2026-09-30, the owner's ask - see ADMIN_UID's own note above): it
+    // still needs saves/{uid} synced (below, unconditionally) for its own continuity across devices/reloads,
+    // just never a public leaderboard card.
+    if (user.uid !== ADMIN_UID) {
+      batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, privateInventory, updatedAt: now }, { merge: true });
+    }
     if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now, session: mySession.token }, { merge: true });
     return batch
       .commit()
@@ -567,18 +581,28 @@ const Cloud = (() => {
     leaderboardLoading = true;
     db.collection("leaderboard")
       .orderBy("coins", "desc")
-      .limit(LEADERBOARD_SIZE)
+      // +1, not just LEADERBOARD_SIZE (2026-09-30): the admin/testing account's own coins are effectively
+      // infinite now (functions/lib/auth.js ADMIN_COINS) - if its doc exists at all (a Cloud Function can still
+      // create a bare one, see ADMIN_UID's own note above), it would sort to rank #1 and, filtered out AFTER a
+      // plain top-20 fetch, would silently shrink real players down to 19 instead of 20. Fetching one extra and
+      // re-slicing AFTER excluding it keeps the real top LEADERBOARD_SIZE intact either way. A query-level
+      // exclude (`where(documentId(), "!=", ADMIN_UID)`) was the other option - skipped because Firestore
+      // requires an inequality's own field to be the first orderBy, which would conflict with ordering by coins.
+      .limit(LEADERBOARD_SIZE + 1)
       .get()
       .then((snap) => {
-        leaderboardRows = snap.docs.map((d) => ({
-          uid: d.id,
-          name: d.data().name,
-          coins: d.data().coins,
-          character: d.data().character || null,
-          description: d.data().description || "",
-          privateInventory: d.data().privateInventory === true,
-          skinCounts: d.data().skinCounts || null,
-        }));
+        leaderboardRows = snap.docs
+          .filter((d) => d.id !== ADMIN_UID)
+          .slice(0, LEADERBOARD_SIZE)
+          .map((d) => ({
+            uid: d.id,
+            name: d.data().name,
+            coins: d.data().coins,
+            character: d.data().character || null,
+            description: d.data().description || "",
+            privateInventory: d.data().privateInventory === true,
+            skinCounts: d.data().skinCounts || null,
+          }));
         leaderboardLoading = false;
         if (onUpdated) onUpdated();
       })

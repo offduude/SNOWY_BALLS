@@ -6,7 +6,7 @@
 // value, never an optimistic local guess (same discipline the plan's trading Functions use).
 const functions = require("firebase-functions");
 const { db } = require("./lib/admin");
-const { requireAuth, isAdmin } = require("./lib/auth");
+const { requireAuth, isAdmin, ADMIN_COINS } = require("./lib/auth");
 const { applyRateLimits } = require("./lib/rateLimit");
 const { normalize, spendableCoins, spendableSkinCount, savesRef, writeSave, writeLeaderboardMirror } = require("./lib/saves");
 const { shopStockRef, normalize: normalizeStock } = require("./lib/shopStock");
@@ -37,21 +37,22 @@ exports.purchase = functions.https.onCall(async (data, context) => {
     const stock = normalizeStock(stockSnap.exists ? stockSnap.data() : null);
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
+    if (isAdmin(uid)) save.coins = ADMIN_COINS; // forced on every read, not a skip-the-check branch - see lib/auth.js's own note
 
     await applyRateLimits(tx, [{ uid, key: "purchase", limit: 20, windowMs: 60000 }]);
 
     const slot = stock.stock.indexOf(itemId);
     if (slot === -1) throw new functions.https.HttpsError("failed-precondition", "Not currently in stock.");
 
-    const cost = eco.priceOf(item);
     if (!isAdmin(uid)) {
       const buffMax = eco.eco.shop.buffMax;
       if (item.category === "consumable" && Number.isInteger(buffMax) && (save.buffItems[itemId] || 0) >= buffMax) {
         throw new functions.https.HttpsError("failed-precondition", "Already holding the most of this buff.");
       }
-      if (spendableCoins(save) < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
-      save.coins -= cost;
     }
+    const cost = eco.priceOf(item);
+    if (spendableCoins(save) < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
+    save.coins -= cost;
 
     if (item.category === "consumable") {
       save.buffItems[itemId] = (save.buffItems[itemId] || 0) + 1;
@@ -157,20 +158,21 @@ exports.openBox = functions.https.onCall(async (data, context) => {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
+    if (isAdmin(uid)) save.coins = ADMIN_COINS; // forced on every read, not a skip-the-check branch - see lib/auth.js's own note
 
     await applyRateLimits(tx, [{ uid, key: "openBox", limit: 20, windowMs: 60000 }]);
 
-    if (!isAdmin(uid)) {
-      if (spendableCoins(save) < boxDef.price) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
-      save.coins -= boxDef.price;
-    }
+    if (spendableCoins(save) < boxDef.price) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
+    save.coins -= boxDef.price;
     const item = drawBox(kind);
     if (!item) throw new functions.https.HttpsError("internal", "This box's pool is empty.");
     save.skinCounts[kind][item.id] = (save.skinCounts[kind][item.id] || 0) + 1;
 
     writeSave(tx, uid, save);
     // Mirrored onto the PUBLIC leaderboard doc too (Admin SDK write, bypasses firestore.rules) - the read source
-    // another player's profile-inspect popup uses for this account's skins gallery (saves/{uid} itself is private).
+    // the trade-compose "YOU WANT" picker uses to browse a target's real skins (saves/{uid} itself is private) -
+    // see src/saves.js targetSkinsCatalog. Never actually reaches admin's OWN leaderboard doc in practice, since
+    // cloud.js's own syncNow() never creates one for that uid in the first place - see that file's own note.
     writeLeaderboardMirror(tx, uid, { skinCounts: save.skinCounts });
     return { coins: save.coins, kind, itemId: item.id, rarity: item.rarity, skinCounts: save.skinCounts };
   });

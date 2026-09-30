@@ -3930,3 +3930,45 @@ Version bumps: `src/economy.js?v=49 -> 50`, `src/boxes.js?v=9 -> 10`, `src/colle
 Cloud-Scheduler-driven `shopStock/current` doc) plus wiring BUY to the real `purchase` Cloud Function. The
 last of the five original gameplay-mutation paths (purchase/useBuff/openBox/sellSkin/claimThrow) still fully
 local.
+
+## Admin account: an effectively infinite coin balance, and never on the leaderboard (2026-09-30)
+
+Two follow-up asks from the owner, same session, right after the openBox/sellSkin wiring: (1) simplify the
+scattered "if (!isAdmin(uid)) { cost check; deduct }" pattern in purchase/openBox into just giving the admin
+account a bottomless coin balance instead, and (2) make sure that account never shows up in the real
+leaderboard (it currently could - the owner's own testing this session, signed in normally rather than in
+LOCAL god mode, would have published a real `leaderboard/{ADMIN_UID}` card).
+
+**Infinite coins.** New `ADMIN_COINS = 999999999` (functions/lib/auth.js, same order of magnitude as the
+LOCAL god-mode convention - src/economy.js fillGod - purely for consistency, not shared with it). `purchase`
+and `openBox` now force `save.coins = ADMIN_COINS` right after reading the save, for that one uid, then run
+their normal `spendableCoins()`/deduction code completely UNCONDITIONALLY for everyone - no more
+`if (!isAdmin(uid))` wrapped around the cost check at all. This is genuinely self-healing, not just "a big
+number that happens not to run out": the override applies fresh on every transaction's read, so whatever the
+Firestore-stored value drifted down to after the last purchase is simply ignored and reset to the full
+ADMIN_COINS again before this one runs - the account can never actually deplete, no matter how many purchases
+happen. `purchase`'s buffMax ("already holding the most of this buff") check is UNRELATED to coins and still
+skips for admin exactly as before - only the coin-cost half of that function changed.
+
+**Never on the leaderboard.** New `ADMIN_UID` constant in `src/cloud.js` (main.js has its own copy,
+`GODMODE_UID` - cloud.js loads first, so it can't reference that one). Two layers, because a Cloud Function can
+still create a bare `leaderboard/{ADMIN_UID}` doc independent of anything the client does (openBox/sellSkin/
+acceptTrade's own `writeLeaderboardMirror`, unconditional, no admin special-casing there by design - see item
+10's own trading note): `syncNow()` simply never writes a leaderboard card for that uid at all (still syncs
+`saves/{uid}` normally, for the account's own continuity); `refreshLeaderboard()` is the actual guarantee -
+fetches `LEADERBOARD_SIZE + 1` (21, not 20) so filtering the admin uid out afterward and re-slicing to 20 can
+never silently shrink the REAL top 20 down to 19 the one time admin's bare doc happens to rank #1 (which,
+at an effectively infinite balance, it always would if it existed at all). A query-level exclude
+(`where(documentId(), "!=", ADMIN_UID)`) was considered and dropped - Firestore requires an inequality's own
+field to be the first `orderBy`, which would conflict with ordering by `coins`.
+
+**Verification:** 3 new/updated emulator tests (48 total) - purchase and openBox both proven to force a REAL
+deduction from the forced balance (seeded at 0 coins, asserts `ADMIN_COINS - price` back, not "unchanged" -
+the old assertion, since the mechanism genuinely changed); the leaderboard query+filter proven directly by
+seeding a worst-case `leaderboard/{ADMIN_UID}` doc at `coins: ADMIN_COINS` (ranking it #1) and confirming the
+exact client-side query+filter+re-slice cloud.js runs still excludes it while keeping a real player's row -
+through the real client SDK against the real rules, same discipline as every other client-read test in this
+file. Ran the full suite clean.
+
+Version bump: `src/cloud.js?v=30 -> 31`.
+- `src/cloud.js`, `functions/lib/auth.js`, `functions/economy.js`, `functions/test/run.js`, `index.html`.

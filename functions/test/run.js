@@ -12,10 +12,11 @@ const admin = require("firebase-admin");
 const { initializeApp } = require("firebase/app");
 const { getAuth, connectAuthEmulator, signInWithCustomToken, signOut } = require("firebase/auth");
 const { getFunctions, connectFunctionsEmulator, httpsCallable } = require("firebase/functions");
-const { getFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } = require("firebase/firestore");
+const { getFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, serverTimestamp, collection, query, where, orderBy, limit, getDocs } = require("firebase/firestore");
 
 const PROJECT_ID = "snowy-balls-5f7a5"; // same id as production - safe: emulators never touch the real project regardless (see firebase.json's own note)
 const ADMIN_UID = "zrHVHG8QVXfZfMhUn0PJHf9TEKO2"; // must match functions/lib/auth.js exactly
+const ADMIN_COINS = 999999999; // must match functions/lib/auth.js exactly
 const UID_A = "test-trader-a";
 const UID_B = "test-trader-b";
 
@@ -445,14 +446,19 @@ async function main() {
     }
   });
 
-  console.log("\n-- Admin account: free economy, but normal trading --");
-  await check("purchase is free for the admin uid", async () => {
+  console.log("\n-- Admin account: an effectively bottomless coin balance (2026-09-30), but normal trading --");
+  await check("purchase never actually runs out for the admin uid - coins are FORCED to ADMIN_COINS on every read, not just skipped", async () => {
     await asUid(ADMIN_UID);
-    await seedSave(ADMIN_UID, { coins: 0 });
+    await seedSave(ADMIN_UID, { coins: 0 }); // deliberately seeded at 0 - proves the override is unconditional, not "happened to already be enough"
     await seedStock(["daniels_coin"], [null]); // needs to actually be in stock too - admin gets no special-casing on THAT check
     const res = await call("purchase", { itemId: "daniels_coin" }); // price 6750 - would fail for anyone else at 0 coins
-    assert.strictEqual(res.data.coins, 0); // never charged
+    assert.strictEqual(res.data.coins, ADMIN_COINS - 6750, "a REAL deduction from the forced balance, not a skipped check");
     assert.strictEqual(res.data.buffItems.daniels_coin, 1);
+  });
+  await check("openBox never actually runs out for the admin uid either", async () => {
+    await seedSave(ADMIN_UID, { coins: 0 });
+    const res = await call("openBox", { kind: "character" }); // price 9999
+    assert.strictEqual(res.data.coins, ADMIN_COINS - 9999);
   });
   await check("trading applies zero special-casing to the admin uid - it still needs real inventory to offer", async () => {
     await seedSave(ADMIN_UID, { coins: 0, skinCounts: { character: {}, scenery: {}, weather: {} } });
@@ -543,6 +549,20 @@ async function main() {
     assert.strictEqual(after.privateInventory, true, "privateInventory must actually reach the doc, not just be allow-listed");
     // Reset to false for the trade-visibility checks below (a private target can't be proposed to - not what this section tests).
     await setDoc(doc(clientDb, "leaderboard", UID_A), { privateInventory: false, updatedAt: serverTimestamp() }, { merge: true });
+  });
+
+  await check("cloud.js refreshLeaderboard's own query+filter never surfaces the admin uid, even ranked #1 by coins", async () => {
+    // Admin's coins are now effectively infinite (ADMIN_COINS) - if its leaderboard doc exists at all (a Cloud
+    // Function's writeLeaderboardMirror can create a bare one), it would sort ahead of every real player. Seed
+    // exactly that worst case directly (Admin SDK - a client could never write this itself, see firestore.rules'
+    // own uid check) and prove the CLIENT's own query+filter (orderBy coins desc, limit(LEADERBOARD_SIZE+1),
+    // then filter out ADMIN_UID and re-slice) still comes back clean.
+    await db.collection("leaderboard").doc(ADMIN_UID).set({ skinCounts: {}, coins: ADMIN_COINS }, { merge: true });
+    await asUid(UID_A);
+    const snap = await getDocs(query(collection(clientDb, "leaderboard"), orderBy("coins", "desc"), limit(21)));
+    const rows = snap.docs.filter((d) => d.id !== ADMIN_UID).slice(0, 20);
+    assert.ok(!rows.some((d) => d.id === ADMIN_UID), "the admin uid must never survive the filter");
+    assert.ok(rows.some((d) => d.id === UID_A), "a real player must still be present - the filter must not have swallowed everyone");
   });
 
   const UID_C = "test-trader-c"; // a genuine bystander - must see neither side of A<->B's trade below

@@ -117,12 +117,13 @@ const Boxes = (() => {
       .sort((a, b) => Rarity.rank(a.item.rarity) - Rarity.rank(b.item.rarity));
   }
 
-  // Per-kind animation state: "shaking" is just the quick can't-afford nudge. A real purchase instead opens the
-  // full-screen case-opening popup below (currentKind) - the box button itself goes straight back to its normal
-  // look, since the popup covers the whole screen anyway. Neither is saved - a reload mid-popup just shows the
-  // box normally, nothing is lost (the coins were already spent and the skin already added the moment the draw
-  // is decided, not when the popup finishes).
+  // Per-kind animation state: "shaking" is just the quick can't-afford (or, since 2026-09-30, server-refused)
+  // nudge. A real purchase instead opens the full-screen case-opening popup below (currentKind) - the box
+  // button itself goes straight back to its normal look, since the popup covers the whole screen anyway.
+  // Neither is saved - a reload mid-popup just shows the box normally, nothing is lost (the coins were already
+  // spent and the skin already added the moment the draw is decided, not when the popup finishes).
   let shaking = {};
+  let pending = {}; // { kind: true } while a real openBox Cloud Function call is in flight - blocks a second tap
 
   function boxCardHtml(kind) {
     const def = boxDef(kind);
@@ -143,17 +144,21 @@ const Boxes = (() => {
     root.innerHTML = `<div class="shop-grid">${KINDS.map(boxCardHtml).join("")}${soon}${soon}${soon}</div>`;
   }
 
-  function openBox(kind) {
-    if (shaking[kind] || currentKind) return; // already mid-animation: ignore a second tap
-    const def = boxDef(kind);
-    if (!def) return;
-    if (!Economy.spendCoins(def.price)) {
-      shaking[kind] = true;
+  function shakeBox(kind) {
+    shaking[kind] = true;
+    render();
+    setTimeout(() => {
+      shaking[kind] = false;
       render();
-      setTimeout(() => {
-        shaking[kind] = false;
-        render();
-      }, 300); // just the shake, same as a box that can't be afforded
+    }, 300);
+  }
+
+  // The original, fully-local purchase - unchanged, and still exactly what runs while signed out (matching
+  // every other Cloud Function call this migration has made: signed-out play keeps working exactly as it
+  // always has, see serverOpenBox's own note below on why "online" isn't forced just by being signed in yet).
+  function localOpenBox(kind, def) {
+    if (!Economy.spendCoins(def.price)) {
+      shakeBox(kind);
       return;
     }
     const item = draw(kind);
@@ -164,6 +169,62 @@ const Boxes = (() => {
     Economy.addSkin(kind, item.id, 1); // granted the instant the draw is decided, not when the popup finishes
     currentKind = kind;
     runReel(kind, item);
+  }
+
+  // Server-authoritative (2026-09-30): the openBox Cloud Function itself was built and emulator-tested weeks
+  // ago (see the blaze-migration memory) - this is the first time any client actually calls it. Its own header
+  // comment already says the intent plainly: "Returns the drawn item so the client can play its reel animation
+  // against the REAL result instead of deciding one itself" - so unlike useBuff/claimThrow (Option B: the local
+  // action already happened, the server call only reconciles afterward), this WAITS for the real draw before
+  // granting or animating anything, same shape trading already established (SEND OFFER doesn't grant anything
+  // optimistically either). Real coins are spent and a real prize is decided server-side, closing exactly the
+  // gap economy.json's own _boxOddsSecurityNote flags: devtools can no longer edit box odds, because nothing
+  // client-side decides them any more on this path.
+  //
+  // Gated on being signed in, same as every other Cloud Function call this migration has made - a signed-OUT
+  // player still gets the exact original localOpenBox above, unchanged. The "always-online required" end state
+  // the migration's own memory already accepts as a future trade-off isn't forced today just by being signed
+  // in - only once this is genuinely live (rules+Functions published, the coordinated cutover) does that
+  // become real; until then this whole branch stays unpushed, same discipline as everything else built this
+  // session.
+  function serverOpenBox(kind, def) {
+    pending[kind] = true;
+    Cloud.callFunction("openBox", { kind })
+      .then((res) => {
+        pending[kind] = false;
+        const item = (eco[KIND_LIST[kind]] || []).find((it) => it.id === res.itemId);
+        if (!item) {
+          console.warn("openBox: server drew an item this client's economy.json doesn't recognize:", res.itemId);
+          render();
+          return;
+        }
+        // The server already validated and spent real coins - applied here as the ACTUAL delta
+        // (res.coins - the local balance right now), never a blind -def.price (a real bug caught in live
+        // testing, 2026-09-30: openBox skips the cost entirely for the admin uid - see functions/economy.js
+        // isAdmin(uid) - so a flat -def.price wrongly docked a free admin pull the full box price locally, even
+        // though the server never charged it). Same "trust the server's own math, don't re-derive it" delta
+        // reconciliation claimThrow already established, not Economy.spendCoins (which would re-run an
+        // affordability check against a LOCAL balance the server has already moved past).
+        const delta = res.coins - Economy.getCoins();
+        if (delta !== 0) Economy.addCoins(delta);
+        Economy.addSkin(kind, item.id, 1);
+        currentKind = kind;
+        runReel(kind, item);
+      })
+      .catch((err) => {
+        pending[kind] = false;
+        console.warn("openBox (server) rejected:", err && err.message);
+        shakeBox(kind);
+      });
+  }
+
+  function openBox(kind) {
+    if (shaking[kind] || currentKind || pending[kind]) return; // already mid-animation, or a real call is already in flight: ignore a second tap
+    const def = boxDef(kind);
+    if (!def) return;
+    const online = typeof Cloud !== "undefined" && Cloud.getUser && Cloud.getUser() && !(typeof Economy !== "undefined" && Economy.isGod && Economy.isGod());
+    if (online) serverOpenBox(kind, def);
+    else localOpenBox(kind, def);
   }
 
   // ---------- CASE-OPENING POPUP (2026-09-27, CS:GO-style reel) ----------

@@ -289,6 +289,18 @@ async function main() {
     const res = await call("sellSkin", { kind: "character", id: "pryk", n: 1 }); // sellPrice 37496
     assert.strictEqual(res.data.coins, before + 37496);
   });
+  await check("sellSkin selling out the EQUIPPED skin re-equips the kind's default (2026-09-30)", async () => {
+    await seedSave(UID_A, { skinCounts: { character: { pryk: 1 }, scenery: {}, weather: {} }, equipped: { character: "pryk", scenery: "frosty", weather: "snow", projectile: "snowball" } });
+    const res = await call("sellSkin", { kind: "character", id: "pryk", n: 1 });
+    assert.strictEqual(res.data.equipped.character, "andek", "should fall back to the character kind's real default item");
+    const saveA = (await db.collection("saves").doc(UID_A).get()).data();
+    assert.strictEqual(saveA.equipped.character, "andek");
+  });
+  await check("sellSkin selling a skin that ISN'T equipped leaves `equipped` alone", async () => {
+    await seedSave(UID_A, { skinCounts: { character: { pryk: 2 }, scenery: {}, weather: {} }, equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" } });
+    const res = await call("sellSkin", { kind: "character", id: "pryk", n: 1 }); // still 1 left, not emptied either way
+    assert.strictEqual(res.data.equipped.character, "andek");
+  });
 
   console.log("\n-- Shop stock (Cloud Scheduler) --");
   await check("rerollIfDue(true) generates real stock: guaranteed ids present, offers rolled correctly", async () => {

@@ -244,10 +244,10 @@ const Collection = (() => {
   // button beside it. The default skin of a kind has neither a price nor any point in one (it's free and
   // permanent) - it gets `null` here, which falls all the way back to skinRowHtml's own plain lone EQUIP button
   // (no SELL, and the caller also passes hideAmount for it - see the open() call below - so its card drops the
-  // owned-count line too). Selling the EQUIPPED skin is allowed (the owner's call) - once wired for real, the
-  // Cloud Function that actually performs the sale re-equips the kind's default the moment a sale empties out
-  // whatever was equipped, so nothing is ever left "equipped" at 0 owned; nothing client-side needs to guard
-  // against that today since selling itself is still inert (see handleSellClick).
+  // owned-count line too). Selling the EQUIPPED skin is allowed (the owner's call) - a sale that empties out
+  // whatever was equipped re-equips the kind's default automatically (both server-side, in sellSkin, and
+  // locally in applySoldLocally/defaultItem - see handleSellClick), so nothing is ever left "equipped" at 0
+  // owned.
   function skinActionHtml(kind, item) {
     if (item.rarity === "default" || !item.sellPrice) return null;
     const equip = `<button class="pick-equip" type="button" data-id="${esc(item.id)}"></button>`;
@@ -255,22 +255,55 @@ const Collection = (() => {
     return `<div class="pick-action-row">${equip}${sell}</div>`;
   }
 
-  // ---- SELL (2026-09-29): a confirm popup (Saves.openModal - the same one CHANGE NAME's price warning uses)
-  // instead of collection.js's own bespoke inline state. Styled `danger` (red, the same colour .pick-sell
-  // itself uses in the list - the owner's ask) since it's the one confirm in the game that's genuinely
-  // destructive. NOT wired to pay out yet on purpose (see economy.json _boxOddsSecurityNote and
-  // _sellPriceNote) - selling has to become a server-authoritative Cloud Function alongside box-opening before
-  // it can safely hand out real coins (and, once it is, before it can safely re-equip the default on your
-  // behalf if you sold what you were wearing - see skinActionHtml above), so SELL in the popup is still a
-  // no-op for now; only the price data and the UI are meant to be reviewed at this stage.
+  // ---- SELL (2026-09-29, wired to the real sellSkin Cloud Function 2026-09-30): a confirm popup
+  // (Saves.openModal - the same one CHANGE NAME's price warning uses) instead of collection.js's own bespoke
+  // inline state. Styled `danger` (red, the same colour .pick-sell itself uses in the list - the owner's ask)
+  // since it's the one confirm in the game that's genuinely destructive.
   function handleSellClick(btn) {
     const { kind, sell: id } = btn.dataset;
     const item = skinItems(kind).find((x) => x.id === id);
     if (!item || !item.sellPrice) return;
     Saves.openModal("SELL", `<div class="modal-text">Sell ${esc(item.name)} for ${item.sellPrice} coins?</div>`, [
-      { label: "SELL", cls: "danger" }, // intentionally does nothing yet - see the note above
+      { label: "SELL", cls: "danger", onClick: () => sellSkin(kind, item) },
       { label: "CANCEL", cls: "ghost" },
     ]);
+  }
+
+  // The kind's own free, permanent item (economy.json rarity "default") - what falls back into `equipped` if a
+  // sale empties out whatever was equipped. Same lookup the server's own sellSkin now makes.
+  function defaultItem(kind) {
+    return skinItems(kind).find((it) => it.rarity === "default") || null;
+  }
+
+  // Applies a sale locally - the SAME mutation whether it was validated by the real Cloud Function (server
+  // path) or is running fully offline (local path, signed out): remove the skin, grant its coins, and re-equip
+  // the kind's default if selling it out emptied what was actually equipped (the gap both skinActionHtml's and
+  // economy.js removeSkin's own old comments flagged as waiting on this).
+  function applySoldLocally(kind, item) {
+    if (!Economy.removeSkin(kind, item.id, 1)) return;
+    Economy.addCoins(item.sellPrice);
+    if (Economy.getEquipped(kind) === item.id && Economy.getSkinCount(kind, item.id) <= 0) {
+      const def = defaultItem(kind);
+      if (def) Economy.setEquipped(kind, def.id);
+    }
+  }
+
+  // Server-authoritative (2026-09-30): the sellSkin Cloud Function itself was built and emulator-tested weeks
+  // ago; this is the first client call to it. Same Option-A shape as openBox/trading (waits for a real answer,
+  // nothing granted optimistically) - a sale is exactly as consequential as a box purchase, real coins for a
+  // real item. Signed out still gets applySoldLocally directly, unchanged - see boxes.js serverOpenBox's own
+  // note on why "online" isn't forced just by being signed in, before this is genuinely live.
+  function sellSkin(kind, item) {
+    const online = typeof Cloud !== "undefined" && Cloud.getUser && Cloud.getUser() && !(typeof Economy !== "undefined" && Economy.isGod && Economy.isGod());
+    if (!online) {
+      applySoldLocally(kind, item);
+      return;
+    }
+    Cloud.callFunction("sellSkin", { kind, id: item.id, n: 1 })
+      .then(() => applySoldLocally(kind, item)) // the server already validated the sale for real - apply the same known-good mutation locally, same reasoning openBox's own note uses
+      .catch((err) => {
+        Saves.openModal("SELL FAILED", `<div class="modal-text">${esc((err && err.message) || "Something went wrong.")}</div>`, [{ label: "OK" }]);
+      });
   }
 
   // The SKINS list itself: one card per category, and each is the card of the skin that is EQUIPPED in it (name, description, rarity, detail - exactly what

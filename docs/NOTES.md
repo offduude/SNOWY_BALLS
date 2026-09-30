@@ -3873,3 +3873,60 @@ exactly that.
 
 No version bump - this change is entirely inside `functions/`, not deployed anywhere real yet.
 - `functions/economy.js`, `functions/test/run.js`.
+
+## openBox and sellSkin wired to the real Cloud Functions (2026-09-30)
+
+Same session, right after the saveProjectile fix - the owner asked to build openBox/sellSkin next, in
+preference to purchase (which turns out to need a full shop.js rework first, since the shop rolls its own
+stock locally - see the "purchase scope" question and the owner's own read on it: "if we plan on making global
+shop rerolls then it definitely cant be rerolled locally" - correct, and exactly the multi-tab-reroll exploit
+this whole migration exists to close. Purchase is deliberately deferred until that rework happens).
+
+**Design call: Option A, not Option B.** Unlike useBuff/claimThrow (the local action already happened, the
+server call only reconciles afterward), openBox's own Cloud Function header comment already says the intent:
+"Returns the drawn item so the client can play its reel animation against the REAL result instead of deciding
+one itself." So both `boxes.js openBox()` and `collection.js handleSellClick()`'s real SELL now WAIT for the
+server's answer before granting or animating anything - same shape trading already established (SEND OFFER
+grants nothing optimistically either), since these are occasional, deliberate actions where a short round trip
+is imperceptible, not a high-frequency action like a throw. Signed out (or under local god mode) still gets the
+exact original, fully-local behavior, unchanged - `localOpenBox`/`applySoldLocally` are literally the old
+code, only now also reachable as the online path's own "apply the already-server-validated mutation" step.
+
+**A real bug found and fixed during live verification, not just assumed correct:** `serverOpenBox`'s first
+draft applied a flat `Economy.addCoins(-def.price)` after a successful server call - wrong, because `openBox`
+skips the cost entirely for the admin uid (`isAdmin(uid)` in functions/economy.js). Tested live as the admin
+account: the server correctly didn't charge, but the client blindly deducted the box price locally anyway,
+docking a "free" pull the full 9999 coins it never actually cost. Fixed to the same delta pattern claimThrow
+already established - `Economy.addCoins(res.coins - Economy.getCoins())`, the ACTUAL change the server made,
+never an assumed flat amount - then re-verified live: an admin pull now leaves local coins genuinely untouched,
+and a normal (non-admin) pull still deducts the real price exactly as before. `sellSkin` never had this
+problem (it charges/credits identically for every uid, no admin bypass exists there), so `applySoldLocally`'s
+flat `Economy.addCoins(item.sellPrice)` is correct as written.
+
+**A second real gap closed along the way, on both sides:** `sellSkin` never actually re-equipped the kind's
+default when a sale emptied out whatever was equipped - true of the ORIGINAL local-only `removeSkin` too (its
+own old comment said so explicitly: waiting on "a server-authoritative sellSkin"). Now genuinely fixed in both
+places - `functions/economy.js`'s `sellSkin` (falls back to `eco.skinList(kind).find(it => it.rarity ===
+"default")` when the sold item was equipped and the count hits zero, returns the new `equipped` too) and
+`collection.js`'s new `applySoldLocally`/`defaultItem` (the same lookup, client-side, for the signed-out path).
+
+**Verification:** 2 new emulator tests (45 total) - selling out the equipped skin re-equips the real default
+(`pryk` -> `andek`); selling a skin that ISN'T equipped leaves `equipped` alone. Then live, thoroughly, against
+a real `firebase emulators:start` session with the admin account signed in via a minted custom token (same
+technique as useBuff/claimThrow): clicked the REAL SELL button on an owned, equipped Pryk through the actual
+UI - network tab shows the genuine `sellSkin` POST, response shows `coins` credited, `skinCounts.character`
+emptied, and `equipped.character` flipped to `andek` server-side, all mirrored correctly into local Economy
+state. Then opened a real Character Box through the actual UI - network tab shows the genuine `openBox` POST,
+the reel animation lands on exactly the server's own drawn item (verified visually - "Black Andek", common),
+and (after the delta fix) local coins correctly stayed unchanged for the free admin pull. Then signed out and
+repeated both: identical local-only behavior, zero network calls either time - including the sell-triggered
+re-equip, confirmed working through the local fallback path too, not just the server one.
+
+Version bumps: `src/economy.js?v=49 -> 50`, `src/boxes.js?v=9 -> 10`, `src/collection.js?v=88 -> 89`.
+- `src/boxes.js`, `src/collection.js`, `src/economy.js` (comment only), `functions/economy.js`, `index.html`,
+  `functions/test/run.js`.
+
+**Next up:** `purchase` - the shop.js rework (switching its displayed stock from a local roll to the real,
+Cloud-Scheduler-driven `shopStock/current` doc) plus wiring BUY to the real `purchase` Cloud Function. The
+last of the five original gameplay-mutation paths (purchase/useBuff/openBox/sellSkin/claimThrow) still fully
+local.

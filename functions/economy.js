@@ -177,9 +177,11 @@ exports.openBox = functions.https.onCall(async (data, context) => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-// sellSkin({ kind, id, n, clientVersion }) - the real payout collection.js's SELL button has been wired to a
-// no-op handler for (see economy.json's _sellPriceNote for the pricing formula). Uses SPENDABLE count, not raw -
-// a skin currently escrowed in an outgoing trade offer can't also be sold out from under it.
+// sellSkin({ kind, id, n, clientVersion }) - the real payout collection.js's SELL button now calls (2026-09-30 -
+// see economy.json's _sellPriceNote for the pricing formula). Uses SPENDABLE count, not raw - a skin currently
+// escrowed in an outgoing trade offer can't also be sold out from under it. Selling out whatever's currently
+// EQUIPPED re-equips the kind's own default (free, permanent) item, same "never left equipped at 0 owned"
+// guarantee collection.js's client-side applySoldLocally makes for the signed-out/local path.
 exports.sellSkin = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const kind = typeof data.kind === "string" ? data.kind : null;
@@ -196,12 +198,18 @@ exports.sellSkin = functions.https.onCall(async (data, context) => {
 
     if (spendableSkinCount(save, kind, id) < n) throw new functions.https.HttpsError("failed-precondition", "You don't have that many to sell.");
     save.skinCounts[kind][id] -= n;
-    if (save.skinCounts[kind][id] <= 0) delete save.skinCounts[kind][id];
+    const emptied = save.skinCounts[kind][id] <= 0;
+    if (emptied) delete save.skinCounts[kind][id];
     save.coins += item.sellPrice * n;
+
+    if (emptied && save.equipped[kind] === id) {
+      const def = eco.skinList(kind).find((it) => it.rarity === "default");
+      if (def) save.equipped[kind] = def.id;
+    }
 
     writeSave(tx, uid, save);
     writeLeaderboardMirror(tx, uid, { skinCounts: save.skinCounts });
-    return { coins: save.coins, skinCounts: save.skinCounts };
+    return { coins: save.coins, skinCounts: save.skinCounts, equipped: save.equipped };
   });
 });
 

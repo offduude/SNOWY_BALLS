@@ -314,36 +314,28 @@ async function main() {
     assert.strictEqual(res.data.reward, 16); // no bonus, but still a normal successful hit
   });
 
-  console.log("\n-- claimThrow's saveProjectile roll is taken server-side now, not trusted from (or mirrored to) the client (2026-09-30) --");
+  console.log("\n-- claimThrow's `saved` claim is trusted directly from the client now, same trust level as `hit` (2026-09-30) --");
   await resetRateLimit(UID_A); // a clean claimThrow counter - the section above already used several calls of its own
-  await check("no active saveProjectile buff: never saved, always consumes (chance 0 is deterministic, no RNG needed to prove it)", async () => {
+  await check("no `saved` claim: consumes a real unit, regardless of buffs", async () => {
     await seedSave(UID_A, { buffs: [], projectiles: { chestnut: 5 } });
     const res = await call("claimThrow", { projectileId: "chestnut", hit: true });
     assert.strictEqual(res.data.saved, false);
     assert.strictEqual(res.data.projectiles.chestnut, 4);
   });
-  await check("a real, stacked saveProjectile buff genuinely saves most throws - a real independent roll against real buff data, not a client-trusted flag", async () => {
-    // water_bottle (10%) + mints (20%) + mints_epic (50%) + stanczak_mayo (50%), all real shop items with a real
-    // saveProjectile effect: combined chance = 1 - (0.9 x 0.8 x 0.5 x 0.5) = 82%.
-    const endsAt = Date.now() + 60000;
-    await seedSave(UID_A, {
-      buffs: [
-        { id: "water_bottle", endsAt },
-        { id: "mints", endsAt },
-        { id: "mints_epic", endsAt },
-        { id: "stanczak_mayo", endsAt },
-      ],
-      projectiles: { chestnut: 500 },
-    });
-    const TRIALS = 20;
-    let saved = 0;
-    for (let i = 0; i < TRIALS; i++) {
-      const res = await call("claimThrow", { projectileId: "chestnut", hit: true });
-      if (res.data.saved) saved++;
+  await check("a `saved: true` claim is trusted directly - no unit consumed, even with zero active saveProjectile buffs", async () => {
+    await seedSave(UID_A, { buffs: [], projectiles: { chestnut: 5 } });
+    const res = await call("claimThrow", { projectileId: "chestnut", hit: true, saved: true });
+    assert.strictEqual(res.data.saved, true);
+    assert.strictEqual(res.data.projectiles.chestnut, 5); // unchanged - trusted, not re-derived from buffs
+  });
+  await check("a `saved` claim still requires genuinely owning the projectile", async () => {
+    await seedSave(UID_A, { buffs: [], projectiles: {} });
+    try {
+      await call("claimThrow", { projectileId: "chestnut", hit: true, saved: true });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "functions/failed-precondition");
     }
-    // A generous floor (expected ~16.4 of 20 at 82%) - astronomically unlikely to false-fail (binomial tail),
-    // while still only passing if the roll is genuinely reading the real 82% instead of, say, always false.
-    assert.ok(saved >= 10, `expected most of ${TRIALS} throws to be saved at an 82% chance, only ${saved} were`);
   });
   await seedSave(UID_A, { coins: 50000, buffs: [] }); // reset for the tests below, which assume a healthy balance
 
@@ -547,6 +539,59 @@ async function main() {
     const res = await call("acceptTrade", { tradeId: proposed.data.tradeId });
     assert.strictEqual(res.data.coins, before + 500);
   });
+
+  console.log("\n-- Version gate (config/minVersion, functions/lib/version.js) --");
+  await asUid(UID_A);
+  await resetRateLimit(UID_A); // the sections above already used several claimThrow calls of their own
+  await check("the gate is OFF by default - no config/minVersion doc, every call proceeds normally regardless of clientVersion", async () => {
+    await db.collection("config").doc("minVersion").delete();
+    const res = await call("claimThrow", { projectileId: "snowball", hit: false, clientVersion: "v0.0.1" });
+    assert.ok(res.data);
+  });
+  await check("a stale build is refused with details.reason === 'outdated-client', not just any failed-precondition", async () => {
+    await db.collection("config").doc("minVersion").set({ build: 9999999 });
+    try {
+      await call("claimThrow", { projectileId: "snowball", hit: false, clientVersion: "v1.1.1" });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "functions/failed-precondition");
+      assert.strictEqual(e.details && e.details.reason, "outdated-client", `got: ${JSON.stringify(e.details)}`);
+    }
+  });
+  await check("a build at or above the minimum succeeds", async () => {
+    await db.collection("config").doc("minVersion").set({ build: 100 });
+    const res = await call("claimThrow", { projectileId: "snowball", hit: false, clientVersion: "v1.1.100" });
+    assert.ok(res.data);
+  });
+  await check("a missing clientVersion is refused (fail closed) once the gate is on", async () => {
+    try {
+      await call("claimThrow", { projectileId: "snowball", hit: false });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.details && e.details.reason, "outdated-client");
+    }
+  });
+  await check("a misconfigured minVersion doc (non-numeric build) fails OPEN, not closed", async () => {
+    await db.collection("config").doc("minVersion").set({ build: "not-a-number" });
+    const res = await call("claimThrow", { projectileId: "snowball", hit: false, clientVersion: "v0.0.1" });
+    assert.ok(res.data);
+  });
+  await check("config/minVersion is readable by a signed-OUT client (public read, per firestore.rules)", async () => {
+    await db.collection("config").doc("minVersion").set({ build: 1 });
+    await asUid(null);
+    const snap = await getDoc(doc(clientDb, "config", "minVersion"));
+    assert.ok(snap.exists());
+  });
+  await check("config/minVersion can never be written by a client, even signed in", async () => {
+    await asUid(UID_A);
+    try {
+      await setDoc(doc(clientDb, "config", "minVersion"), { build: 1 });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied", `expected the rule to reject this, got: ${e.code} ${e.message}`);
+    }
+  });
+  await db.collection("config").doc("minVersion").delete(); // leave the gate OFF for every section after this one
 
   console.log("\n-- Rate limiting --");
   await check("proposeTrade trips its 3-per-5-minutes cap", async () => {

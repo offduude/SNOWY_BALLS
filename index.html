@@ -1820,6 +1820,26 @@
       pointer-events: none;
     }
 
+    /* VERSION GATE (2026-09-30, src/cloud.js checkClientVersion / callFunction + src/saves.js showOutdatedOverlay):
+       shown once this build is confirmed stale (config/minVersion, functions/lib/version.js). z-index 101 -
+       strictly above #cleansing's 100, the previous highest layer in the app, so this can never be hidden behind
+       anything regardless of what else is open when it triggers. Deliberately translucent (matches #modal-layer's
+       own dim tone) rather than #cleansing's solid black - this greys out the screen, it doesn't replace it. Never
+       auto-dismisses, never tap-outside-closable, never auto-reloads - REFRESH is the only way out, because the
+       page genuinely cannot make another valid call until it does. */
+    #outdated-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 101;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.75);
+      font-family: "Press Start 2P", monospace;
+    }
+
+    #outdated-overlay.show { display: flex; }
+
     /* ---- OPTIONS list: the VOLUME section: a slider (0-100%, the master volume) and its value ---- */
     .vol-row {
       flex: none;
@@ -2454,6 +2474,14 @@
   <div id="game-container">
     <div id="loading-screen"><span id="loading-text">Loading - 0%</span></div>
     <div id="cleansing"><span>The grand cleansing has struck.</span></div>
+    <!-- Version gate (2026-09-30) - shown/wired by src/saves.js showOutdatedOverlay, signalled by src/cloud.js. -->
+    <div id="outdated-overlay">
+      <div class="modal-panel">
+        <div class="modal-title">OUTDATED</div>
+        <div class="modal-text">Refresh page to continue playing.</div>
+        <div class="modal-buttons"><button type="button" id="outdated-refresh-btn" class="modal-btn">REFRESH</button></div>
+      </div>
+    </div>
     <div id="message"></div>
     <!-- The corkboard/3x2 grid look used to be the SHOP tab's own; it's the BOXES feature's now (2026-09-27). -->
     <img id="boxes-board" src="assets/ui/shop_board.png" alt="" />
@@ -2539,7 +2567,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
-  <script src="src/version.js?v=331"></script>
+  <script src="src/version.js?v=332"></script>
   <script src="src/economy.js?v=50"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2567,15 +2595,15 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=33"></script>
+  <script src="src/cloud.js?v=34"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=35"></script>
   <script src="src/shop.js?v=44"></script>
   <script src="src/boxes.js?v=10"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=30"></script>
+  <script src="src/saves.js?v=31"></script>
   <script src="src/collection.js?v=89"></script>
-  <script src="src/main.js?v=198"></script>
+  <script src="src/main.js?v=199"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

@@ -2273,7 +2273,7 @@ class MainScene extends Phaser.Scene {
       this.updateStreakHud();
       // (a buff that saved the projectile - Water Bottle - adds a "Saved Projectile" line at the bottom)
       this.showMessage("HIT\n+" + coins + " coins" + (this.savedBy ? "\nSaved Projectile" : ""));
-      this.reportThrowToServer(true, faceHit, eventNameForClaim, coins);
+      this.reportThrowToServer(true, faceHit, eventNameForClaim, coins, !!this.savedBy);
     } else {
       this.streak = 0;
       Economy.setStreak(0);
@@ -2281,7 +2281,7 @@ class MainScene extends Phaser.Scene {
       if (missReward) Economy.addCoins(missReward);
       this.updateStreakHud();
       this.showMessage("MISS" + (this.savedBy ? "\nSaved Projectile" : ""));
-      this.reportThrowToServer(false, false, null, missReward);
+      this.reportThrowToServer(false, false, null, missReward, !!this.savedBy);
     }
 
     if (this.savedBy) this.flashAmmoSaved(); // the counter's outline flashes bright white once, alongside the "Saved Projectile" message
@@ -2313,17 +2313,15 @@ class MainScene extends Phaser.Scene {
   // stop, since nothing's published there) changes nothing and only logs a warning - gameplay already is
   // whatever it was before this call existed.
   //
-  // KNOWN GAP, flagged rather than silently shipped (same discipline claimThrow's own natural-event note
-  // uses): a projectile saved by a saveProjectile buff (Water Bottle) is never decremented LOCALLY
-  // (consumeProjectile's own random roll, well before this point), but claimThrow has no "was this saved" input
-  // and always deducts one real unit for a consumable projectile - the two projectile counts can drift apart by
-  // exactly that buff's own trigger rate. Deliberately NOT reconciling local projectile/inventory counts from
-  // this response at all (only coins) - teaching claimThrow a trusted `saved` flag, or moving projectile
-  // consumption server-side too, is a real design decision for later, not something to bury in this pass.
-  reportThrowToServer(hit, faceHit, eventName, localReward) {
+  // `saved` (whether consumeProjectile()'s own local roll saved this throw's projectile - Water Bottle etc.) is
+  // passed straight through and TRUSTED server-side (2026-09-30, the owner's own call: "just trust the client
+  // about saved projectiles, like we do with hit/miss - if it's ever an issue we'll pick it back up"). The two
+  // projectile counts (local and server) now agree by construction on every throw, same as hit/miss always has -
+  // no independent server roll, no drift to reconcile.
+  reportThrowToServer(hit, faceHit, eventName, localReward, saved) {
     if (typeof Cloud === "undefined" || !Cloud.getUser || !Cloud.getUser()) return; // signed out, or Cloud isn't set up - nothing to reconcile against yet
     if (typeof Economy !== "undefined" && Economy.isGod && Economy.isGod()) return; // a god save's local economy is never real, never synced - see cloud.js's own mutual signIn()/godMode() guard
-    Cloud.callFunction("claimThrow", { projectileId: this.projectileId, hit, faceHit, eventName })
+    Cloud.callFunction("claimThrow", { projectileId: this.projectileId, hit, faceHit, eventName, saved })
       .then((res) => {
         const delta = res.reward - localReward;
         if (delta !== 0) Economy.addCoins(delta); // silent correction - see this method's own note above

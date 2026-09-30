@@ -10,6 +10,7 @@ const { requireAuth, isAdmin, ADMIN_COINS } = require("./lib/auth");
 const { applyRateLimits } = require("./lib/rateLimit");
 const { normalize, spendableCoins, spendableSkinCount, savesRef, writeSave, writeLeaderboardMirror } = require("./lib/saves");
 const { shopStockRef, normalize: normalizeStock, generateStock, rerollMs } = require("./lib/shopStock");
+const { requireMinVersion } = require("./lib/version");
 const eco = require("./lib/economyData");
 
 function bad(msg) {
@@ -37,6 +38,7 @@ function bad(msg) {
 // buys only a single projectile", src/shop.js's own long-standing rule) at the item's fixed unitPrice.
 exports.purchase = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   const itemId = typeof data.itemId === "string" ? data.itemId : null;
   const item = itemId ? eco.shopItemIndex.get(itemId) : null;
   if (!item || (item.category !== "consumable" && item.category !== "projectile")) throw bad("Unknown item.");
@@ -138,6 +140,7 @@ const EVENT_TRIGGER_BUFF_IDS = new Set(Object.values(eco.EVENT_DEFS).map((d) => 
 
 exports.useBuff = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   const buffId = typeof data.buffId === "string" ? data.buffId : null;
   const item = buffId && eco.shopItemIndex.get(buffId);
   if (!item || item.category !== "consumable") throw bad("Unknown buff.");
@@ -220,6 +223,7 @@ function drawBox(kind) {
 
 exports.openBox = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   const kind = typeof data.kind === "string" ? data.kind : null;
   const boxDef = kind && eco.boxDefs.get(kind);
   if (!boxDef) throw bad("Unknown box.");
@@ -255,6 +259,7 @@ exports.openBox = functions.https.onCall(async (data, context) => {
 // guarantee collection.js's client-side applySoldLocally makes for the signed-out/local path.
 exports.sellSkin = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   const kind = typeof data.kind === "string" ? data.kind : null;
   const id = typeof data.id === "string" ? data.id : null;
   const n = Number.isInteger(data.n) && data.n > 0 ? data.n : 1;
@@ -310,37 +315,26 @@ exports.sellSkin = functions.https.onCall(async (data, context) => {
 // known, deliberate gap, not silently shipped: closing it fully means moving natural event spawning
 // server-side too (own future work, not part of this pass).
 //
-// The saveProjectile roll (Water Bottle etc.) is now taken HERE, server-side (2026-09-30) - not trusted from
-// the client at all, and not mirroring a client-side roll either. `src/main.js consumeProjectile()` still rolls
-// its OWN chance locally, at aim time, purely for the instant "Saved Projectile" message and the client's own
-// (still-local, still-unreconciled) inventory count - see main.js reportThrowToServer's own note on why that
-// stays. This roll is the actual, authoritative one that decides whether saves/{uid}.projectiles moves, using
-// the REAL active buffs (same list useBuff populates, same "count buffs realistically at the moment of the
-// throw" discipline the coinMultiplier/faceHit checks already use) - not the unconditional "always deduct one"
-// v1 had, which meant the two projectile counts could only ever drift apart in ONE direction, growing every
-// single time a save-chance buff actually saved something locally. Rolling independently server-side doesn't
-// make the two sides agree on any INDIVIDUAL throw (the client already decided and displayed its own outcome
-// before this call resolves - blocking on a round trip for that would cost this migration's whole "Option B"
-// smoothness point), but it does mean the drift is now an unbiased random walk around zero instead of a
-// one-way ratchet - both sides losing roughly the same share of their ammo over time, not one side bleeding out
-// relative to the other.
-function saveProjectileChance(buffs) {
-  let notSaved = 1;
-  for (const b of buffs) {
-    const it = eco.shopItemIndex.get(b.id);
-    const eff = it && (it.effects || []).find((e) => e.type === "saveProjectile");
-    if (eff) notSaved *= 1 - eff.value; // independent rolls, same formula src/buffs.js modifiers() uses
-  }
-  const cap = eco.eco.buffCaps && typeof eco.eco.buffCaps.saveProjectile === "number" ? eco.eco.buffCaps.saveProjectile : 0.9;
-  return Math.min(cap, 1 - notSaved);
-}
-
+// The saveProjectile roll (Water Bottle etc.) is TRUSTED directly from the client (2026-09-30, the owner's own
+// call), the same trust level as `hit`: "just trust the client about saved projectiles, like we do with
+// hit/miss - if it's ever an issue we'll pick it back up." A brief history for whoever revisits this: v1 always
+// deducted one real unit regardless of what the client saved locally (a one-way drift, growing every time a
+// save-chance buff actually saved something). v2 (same day) rolled an independent server-side chance against
+// the real active buffs - genuinely authoritative, but could never agree with the client's own local roll on
+// any INDIVIDUAL throw, since they're two separate dice. This, v3, is simpler than either: the client's own
+// local roll (src/main.js consumeProjectile(), still at aim time, for the instant "Saved Projectile" message)
+// IS the real outcome now - `data.saved` is read straight through, no server-side roll or buff check at all.
+// Known, accepted gap (unlike `hit`, which only ever inflates a bounded reward): a modified client claiming
+// `saved: true` on every throw gets unlimited free use of a consumable projectile it may not even have an
+// active save-chance buff for - an unbounded exploit, not a bounded one. Deliberately left open per the above.
 exports.claimThrow = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   const projectileId = typeof data.projectileId === "string" ? data.projectileId : null;
   const hit = data.hit === true;
   const faceHit = hit && data.faceHit === true; // a miss can never face-hit, whatever the client sends
   const eventName = typeof data.eventName === "string" ? data.eventName : null;
+  const saved = data.saved === true; // trusted directly - see note above
   const baseValue = projectileId ? eco.projectileHitValue(projectileId) : null;
   if (baseValue === null) throw bad("Unknown projectile.");
 
@@ -355,10 +349,8 @@ exports.claimThrow = functions.https.onCall(async (data, context) => {
 
     const projDef = eco.projectileIndex[projectileId];
     const isConsumable = projDef && !projDef.infinite && !projDef.regen;
-    let saved = false; // whether THIS throw's projectile was saved server-side - applies regardless of hit/miss, same as the client's own roll
     if (isConsumable && !isAdmin(uid)) {
       if (!(save.projectiles[projectileId] > 0)) throw new functions.https.HttpsError("failed-precondition", "You don't have that projectile.");
-      saved = Math.random() < saveProjectileChance(save.buffs);
       if (!saved) {
         save.projectiles[projectileId] -= 1;
         if (save.projectiles[projectileId] <= 0) delete save.projectiles[projectileId];

@@ -81,6 +81,44 @@ const Cloud = (() => {
   let authError = null; // the last sign-in failure, as a short readable line - shown in the ACCOUNT section (see saves.js) so it's
   // diagnosable without opening devtools; null once sign-in succeeds, restores a session, or the player just closed the popup themselves
   const authListeners = [];
+  let outdated = false; // true once this build has been confirmed stale (reactively, or via checkClientVersion) - sticky, never clears without a reload
+  const outdatedListeners = [];
+
+  function notifyOutdated() {
+    if (outdated) return;
+    outdated = true;
+    outdatedListeners.forEach((fn) => fn());
+  }
+  // Registers fn to run once this build is confirmed outdated (see requireMinVersion/config.minVersion below) -
+  // replays immediately if already stale by the time a late subscriber registers, same discipline onAuthChange
+  // already has. saves.js is the only current subscriber (shows the blocking overlay) - cloud.js itself never
+  // touches the DOM, it just signals.
+  function onOutdated(fn) {
+    outdatedListeners.push(fn);
+    if (outdated) fn();
+  }
+
+  // A lightweight, public-read check against config/minVersion (same shape/precedent as shopStock/current) -
+  // proactive, so a player idling in a menu (never triggering a mutating Cloud Function call) still gets caught
+  // within one heartbeat tick, not only reactively when they happen to try to act. See callFunction() below for
+  // the reactive half of this same signal.
+  function checkClientVersion() {
+    if (!ready || !db) return;
+    db.collection("config")
+      .doc("minVersion")
+      .get()
+      .then((doc) => {
+        if (!doc.exists) return; // gate disabled
+        const minBuild = doc.data().build;
+        if (typeof minBuild !== "number") return; // misconfigured - fail open, same as the server side
+        const m = typeof GAME_VERSION_TEXT === "string" && /\.(\d+)$/.exec(GAME_VERSION_TEXT);
+        const myBuild = m ? parseInt(m[1], 10) : null;
+        if (myBuild === null || myBuild < minBuild) notifyOutdated();
+      })
+      .catch(() => {
+        /* offline, or not published to this project yet - the next heartbeat tick retries */
+      });
+  }
 
   function isConfigured() {
     return Object.values(FIREBASE_CONFIG).every((v) => typeof v === "string" && v && !v.includes("REPLACE_ME"));
@@ -126,6 +164,7 @@ const Cloud = (() => {
     } catch (e) {
       return; // a bad config, or the SDK failed some other way: the game carries on without the account system
     }
+    checkClientVersion(); // once on load, regardless of signed-in state - config/minVersion is publicly readable
     mySession = loadMySession();
     // The real bug this fixes: without this, `dirty` was only ever set right after a sign-in or a name/description
     // edit - ordinary play (coins, shop purchases, buffs, equipping something) never marked the save dirty, so the
@@ -292,6 +331,7 @@ const Cloud = (() => {
   // (interval, visibility in either direction, pagehide, a purchase flush) must check first, never call syncNow()
   // directly, or this same race reopens through whichever path skipped the check.
   function heartbeat() {
+    checkClientVersion(); // fire-and-forget, unconditional - runs every tick regardless of sign-in state
     return checkSession().then((displaced) => {
       if (displaced) return;
       syncNow();
@@ -719,15 +759,29 @@ const Cloud = (() => {
   // cases (e.g. "functions/unauthenticated" meaning "you need to sign in first"). Called by saves.js for the four
   // trade functions as of 2026-09-30; every other gameplay path (shop, boxes, sell, buffs, throws) still mutates
   // Economy locally until it's individually rewired to call through here instead (see docs/NOTES.md).
+  // Every call carries the real GAME_VERSION_TEXT, overriding anything a caller passes - this is the ONLY place
+  // that needs to attach it, since every call site already funnels through here (2026-09-30, closing a real gap:
+  // only proposeTrade used to send it, manually, and every other call sent nothing at all). A rejection carrying
+  // details.reason === "outdated-client" (see functions/lib/version.js) fires the overlay signal - the error is
+  // then RE-THROWN unchanged, so every existing call site's own handling (a button shake, a console.warn, the
+  // openModal calls sellSkin/trading already use) still runs exactly as before; this is purely additive.
   function callFunction(name, data) {
     if (!ready || !functions) return Promise.reject(new Error("Not signed in, or the account system isn't available."));
-    return functions.httpsCallable(name)(data).then((res) => res.data);
+    const payload = Object.assign({}, data, { clientVersion: typeof GAME_VERSION_TEXT === "string" ? GAME_VERSION_TEXT : null });
+    return functions.httpsCallable(name)(payload).then(
+      (res) => res.data,
+      (err) => {
+        if (err && err.details && err.details.reason === "outdated-client") notifyOutdated();
+        throw err;
+      }
+    );
   }
 
   return {
     init,
     isConfigured,
     onAuthChange,
+    onOutdated,
     signIn,
     signOut,
     getUser,

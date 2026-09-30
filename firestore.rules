@@ -137,6 +137,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Version-gate config (2026-09-30 - see functions/lib/version.js). Public read, same reasoning as shopStock:
+    // every client needs to read config/minVersion itself for the proactive "am I already stale" check
+    // (src/cloud.js checkClientVersion), not just find out reactively when a Function rejects a call. NEVER
+    // writable by a client - only ever hand-set via the Firestore console (matching this project's existing
+    // discipline of hand-pasting rules rather than automating deploys), read by every callable Function via the
+    // Admin SDK, which bypasses these rules entirely.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Nothing else is stored in Firestore - deny everything else by default, so a later addition here can't accidentally
     // leave something else world-writable.
     match /{document=**} {

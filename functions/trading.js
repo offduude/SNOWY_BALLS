@@ -12,6 +12,7 @@ const { db, FieldValue } = require("./lib/admin");
 const { requireAuth } = require("./lib/auth");
 const { applyRateLimits } = require("./lib/rateLimit");
 const { normalize, spendableCoins, spendableSkinCount, savesRef, leaderboardRef, writeSave, writeLeaderboardMirror } = require("./lib/saves");
+const { requireMinVersion } = require("./lib/version");
 const eco = require("./lib/economyData");
 
 function bad(msg) {
@@ -45,6 +46,7 @@ function sideIsEmpty(side) {
 // ---------------------------------------------------------------------------------------------------------------
 exports.proposeTrade = functions.https.onCall(async (data, context) => {
   const fromUid = requireAuth(context);
+  await requireMinVersion(data);
   const toUid = typeof data.toUid === "string" ? data.toUid : null;
   if (!toUid || toUid === fromUid) throw bad("Invalid trade target.");
   const offer = cleanSide(data.offer);
@@ -94,6 +96,7 @@ exports.proposeTrade = functions.https.onCall(async (data, context) => {
 // ---------------------------------------------------------------------------------------------------------------
 exports.acceptTrade = functions.https.onCall(async (data, context) => {
   const accepterUid = requireAuth(context);
+  await requireMinVersion(data);
   const tradeId = typeof data.tradeId === "string" ? data.tradeId : null;
   if (!tradeId) throw bad("Missing tradeId.");
   const tradeRef = db.collection(TRADES_COLLECTION).doc(tradeId);
@@ -164,6 +167,7 @@ exports.acceptTrade = functions.https.onCall(async (data, context) => {
 // ---------------------------------------------------------------------------------------------------------------
 exports.declineTrade = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   const tradeId = typeof data.tradeId === "string" ? data.tradeId : null;
   if (!tradeId) throw bad("Missing tradeId.");
   const tradeRef = db.collection(TRADES_COLLECTION).doc(tradeId);
@@ -194,6 +198,7 @@ exports.declineTrade = functions.https.onCall(async (data, context) => {
 // ---------------------------------------------------------------------------------------------------------------
 exports.cancelTrade = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   const tradeId = typeof data.tradeId === "string" ? data.tradeId : null;
   if (!tradeId) throw bad("Missing tradeId.");
   const tradeRef = db.collection(TRADES_COLLECTION).doc(tradeId);

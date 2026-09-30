@@ -4,6 +4,7 @@ const functions = require("firebase-functions");
 const { db } = require("./lib/admin");
 const { requireAuth, isAdmin } = require("./lib/auth");
 const { shopStockRef, generateStock, normalize, isDue, rerollMs } = require("./lib/shopStock");
+const { requireMinVersion } = require("./lib/version");
 
 // Regenerates the stock doc if it's due (or unconditionally, if `force`) inside one transaction - a concurrent
 // purchase() call (functions/economy.js) reading the same doc either sees the old roll or the new one, never a
@@ -40,6 +41,7 @@ exports.rerollShop = functions.pubsub.schedule(`every ${rerollMinutes} minutes`)
 // exercise the same way every other Function in this project is tested, not just the direct in-process call.
 exports.forceRerollShop = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
+  await requireMinVersion(data);
   if (!isAdmin(uid)) throw new functions.https.HttpsError("permission-denied", "Admin only.");
   return rerollIfDue(!!(data && data.force === true));
 });

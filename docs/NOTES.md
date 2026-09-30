@@ -4129,3 +4129,113 @@ earlier this same session before it could repeat; bumped BEFORE live-testing thi
 stale-cache ghost again.
 - `functions/lib/saves.js`, `functions/economy.js`, `functions/test/run.js`, `src/cloud.js`, `src/shop.js`,
   `index.html`.
+
+## saveProjectile: the client's `saved` claim is now trusted directly, same as hit/miss (2026-09-30)
+
+The owner's own call, after walking through the tradeoffs (two independent rolls disagreeing per-throw by
+design, versus a shared-seed scheme, versus this): **"let's just trust the client about the saved projectiles,
+just like we do with hit/miss, if its ever an issue we'll pick it back up."** A brief history for whoever
+revisits this - v1 always deducted one real unit regardless of what the client saved locally (a one-way drift).
+v2 (same session, see the "saveProjectile roll moved server-side" entry above) rolled an independent server-side
+chance against the real active buffs - genuinely authoritative, but could never agree with the client's own
+local roll on any individual throw, since they're two separate dice. This, v3, is simpler than either: the
+client's own local roll (`src/main.js consumeProjectile()`, still at aim time, for the instant "Saved
+Projectile" message) IS the real outcome now.
+
+**`functions/economy.js` `claimThrow`**: dropped `saveProjectileChance()` and its server-side roll entirely.
+New `saved = data.saved === true` read straight off the request, same trust level as `hit`. The "do you
+actually own this projectile" check is unchanged and still unconditional (still throws `failed-precondition` if
+the caller has zero of it) - only whether a claimed-saved throw decrements now depends purely on the claim.
+
+**`src/main.js`**: `reportThrowToServer` gained a `saved` parameter, both call sites (hit and miss branches)
+now pass `!!this.savedBy` through to the `claimThrow` call. No change to `consumeProjectile()` itself - it was
+already the real, sole source of truth for this decision locally; now it's the server's source of truth too.
+
+**Known, accepted gap, stated plainly rather than buried**: unlike `hit` (which only ever inflates a *bounded*
+reward - a lie about hit rate still pays out through the same capped formula), a modified client claiming
+`saved: true` on every throw gets *unbounded* free use of a consumable projectile, even with zero active
+save-chance buffs - there's no server-side check that a matching buff is even running. This is a materially
+different risk shape than trusting hit/miss, and the owner made the call anyway, explicitly, with the
+understanding that it's easy to revisit (add a "claim only honored if a real saveProjectile buff is active"
+check, or bring back an independent/seeded server roll) if it's ever actually abused - not a oversight.
+
+Verification: rewrote the claimThrow saveProjectile test section - `saved:true` with zero buffs is honored and
+doesn't consume (proving the trust, not a probability floor); no claim still consumes normally; a `saved` claim
+against a projectile the player doesn't even own is still rejected. `index.html`'s `src/main.js` bumped
+`v=198 -> 199`.
+- `functions/economy.js`, `functions/test/run.js`, `src/main.js`, `index.html`.
+
+## Version gating: stale clients rejected server-side, a blocking OUTDATED overlay client-side (2026-09-30)
+
+`clientVersion` had been threaded through exactly one call (`proposeTrade`) as inert metadata, and five other
+Functions' own header comments documented a `clientVersion` param that was never actually implemented - stale,
+aspirational comments (confirmed by grep: zero reads of `data.clientVersion` anywhere). The owner's ask: once
+this is real and the server starts rejecting a stale build's calls, the player deserves to know why - "a
+notification in the middle greying out the whole screen" saying `OUTDATED / Refresh page to continue playing.`
+Scaffolding left entirely up to me; full plan at the session's own plan file (version-gating), same shape as
+implemented below.
+
+**`config/minVersion`**: new Firestore doc, `{ build: <integer> }` - does not exist by default (gate fully off,
+zero behavior change) until hand-set via the console, matching this project's existing discipline of
+hand-pasting `firestore.rules` rather than automating deploys. `src/version.js`'s `GAME_VERSION.build` is
+already a single, global, monotonically-increasing ordinal (bumped by the pre-commit hook on every commit = total
+commit count), so only the trailing integer parsed out of `GAME_VERSION_TEXT` ever gets compared - no need for
+major/minor at all. `firestore.rules` gained a `config/{docId}` block, byte-for-byte the same public-read/
+never-client-writable shape as the existing `shopStock/{docId}` precedent.
+
+**Server** (`functions/lib/version.js`, new): `requireMinVersion(data)` - a plain, non-transactional
+`config/minVersion` read, called as the literal SECOND line of every callable (right after
+`requireAuth(context)`, before `db.runTransaction()` starts - Firestore transactions require all reads before
+any writes, the same constraint `applyRateLimits` already works around). Fails OPEN on no doc or a misconfigured
+(non-numeric) `build` - a bad console edit must never lock out every player by accident. Fails CLOSED only once
+the gate is genuinely on and the caller's own build is missing, unparseable, or below the minimum - throwing
+`HttpsError("failed-precondition", "Update required.", { reason: "outdated-client" })`, using the `details`
+payload (not the message text) so the client's detection never depends on exact wording. Wired into all 9
+existing callables PLUS the admin-only `forceRerollShop` - "every callable, no exceptions" mirrors the existing
+`requireAuth` convention exactly, including for the admin account itself (deliberate: the owner's own build
+should be the first to run new code before they bump `minVersion` for everyone else, so being gated too is a
+useful sanity check, not something to special-case around).
+
+**Client, sending** (`src/cloud.js callFunction`): now attaches the real `clientVersion` to literally every
+call, overriding anything a caller passes - fixes a real, separate gap this surfaced (only `proposeTrade` ever
+sent a real value before; every other call site sent nothing). This is the ONLY client file that needed
+changing for the sending half, since every call site already funnels through this one wrapper. Cleanup: deleted
+the now-redundant manual `clientVersion` line from `src/saves.js`'s `sendTradeOffer()` (always overridden now
+anyway).
+
+**Client, reacting** - two paths feeding one signal (`Cloud.notifyOutdated()`/`onOutdated()`, a new callback
+list mirroring the existing `authListeners`/`onAuthChange` pair exactly, sticky once tripped, replays
+immediately for a late subscriber): *reactive* - `callFunction` checks a rejection's `err.details.reason ===
+"outdated-client"`, fires the signal, then RE-THROWS the original error unchanged, so every call site's own
+existing handling (a shake, a console.warn, the `openModal` calls sellSkin/trading already use) still runs
+exactly as before, purely additive; *proactive* - new `checkClientVersion()` reads `config/minVersion` directly
+via the client SDK (same public-read pattern as `shopStock/current`), called once at the top of `init()`
+(regardless of signed-in state) and again as the first line of the existing 30s `heartbeat()` - closes the gap
+the reactive path alone leaves, an idle player in a menu who never triggers a mutating call still gets caught
+within one tick. `cloud.js` stays DOM-free throughout (confirmed it has zero DOM access anywhere already - its
+one `document.*` call is an event-listener registration, not UI) - the actual overlay lives in `src/saves.js`,
+which already subscribes to `Cloud.onAuthChange`/`setConfirmOverwrite` the same way.
+
+**The overlay** (`#outdated-overlay`, `index.html`): z-index 101, strictly above `#cleansing`'s 100 (the
+previous highest layer in the app) so it can never be hidden behind anything. Translucent dimmed backdrop
+(matching `#modal-layer`'s own tone) rather than `#cleansing`'s solid black - greys out the screen rather than
+replacing it, per the owner's own wording. Reuses the existing `.modal-panel`/`.modal-title`/`.modal-text`/
+`.modal-buttons`/`.modal-btn` classes (no new panel CSS needed) - title OUTDATED, body "Refresh page to continue
+playing.", one plain REFRESH button wired to `location.reload()`. Every touch/mouse/pointer event gets
+`stopPropagation()` (matching `#cleansing`'s own technique), so a tap can never leak through to the game
+underneath. Never auto-dismisses, never tap-outside-closable, never auto-reloads - REFRESH is the only way out.
+
+**Verification**: 7 new emulator checks (61 total, all passing) - gate-off-by-default is a true no-op; a stale
+build is refused with exactly `details.reason === "outdated-client"`; a build at or above the minimum succeeds;
+a missing `clientVersion` fails closed once the gate is genuinely on; a misconfigured (non-numeric) `build`
+fails open; `config/minVersion` is readable by a signed-OUT client through the real rules; a client (signed in
+or not) can never write it. Then live, thoroughly, against a real `firebase emulators:start` session: seeded
+`config/minVersion` one build above the real `src/version.js` build via a scratch Admin SDK script; confirmed
+the PROACTIVE path alone (no sign-in, no mutating call at all - just a forced `visibilitychange` tick) shows the
+overlay; confirmed tapping the dimmed backdrop behind the panel does nothing and doesn't leak through to the
+PROJECTILES button underneath; confirmed REFRESH genuinely reloads the page, and the overlay correctly
+re-appears immediately afterward via `init()`'s own proactive check (config/minVersion was still set); cleared
+the doc and confirmed normal play resumed with zero leftover state. `index.html`'s `cloud.js`/`saves.js` bumped
+`v=33 -> 34` / `v=30 -> 31`.
+- `functions/lib/version.js` (new), `functions/economy.js`, `functions/trading.js`, `functions/shop.js`,
+  `firestore.rules`, `src/cloud.js`, `src/saves.js`, `index.html`, `functions/test/run.js`.

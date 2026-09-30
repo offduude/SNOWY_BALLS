@@ -696,7 +696,7 @@ const Saves = (() => {
       toUid: target.uid,
       offer: { coins: tradeGive.coins, skins: tradeGive.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) },
       request: { coins: tradeWant.coins, skins: tradeWant.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) },
-      clientVersion: typeof GAME_VERSION_TEXT !== "undefined" ? GAME_VERSION_TEXT : null,
+      // clientVersion is no longer set here - Cloud.callFunction now attaches the real one to every call unconditionally.
     };
     Cloud.callFunction("proposeTrade", payload)
       .then(() => {
@@ -767,9 +767,31 @@ const Saves = (() => {
     if (inboxBtn) inboxBtn.addEventListener("click", toggleInbox);
   }
 
+  // Version gate (2026-09-30, Cloud.onOutdated below - see src/cloud.js checkClientVersion/callFunction and
+  // functions/lib/version.js). No-ops if already shown - Cloud's own `outdated` flag is sticky too, but this is
+  // the cheap, local half of that same guard. Deliberately never closed by anything but the REFRESH button - see
+  // the stopPropagation wiring right below, which matches #cleansing's own "nothing underneath can be tapped"
+  // technique rather than openModal's tap-outside-to-cancel behavior (wrong here: the whole point is this cannot
+  // be dismissed without actually reloading).
+  function showOutdatedOverlay() {
+    const el = document.getElementById("outdated-overlay");
+    if (!el || el.classList.contains("show")) return;
+    el.classList.add("show");
+  }
+
+  const outdatedEl = document.getElementById("outdated-overlay");
+  if (outdatedEl) {
+    const refreshBtn = outdatedEl.querySelector("#outdated-refresh-btn");
+    if (refreshBtn) refreshBtn.addEventListener("click", () => location.reload());
+    ["touchstart", "touchend", "mousedown", "mouseup", "pointerdown", "pointerup", "click"].forEach((ev) =>
+      outdatedEl.addEventListener(ev, (e) => e.stopPropagation())
+    );
+  }
+
   if (typeof Cloud !== "undefined") {
     Cloud.onAuthChange(() => refresh());
     Cloud.setConfirmOverwrite(confirmCloudOverwrite);
+    Cloud.onOutdated(showOutdatedOverlay);
   }
 
   return { renderOptions, renderLeaderboard, wireLeaderboardClick, closeInspect, onClick, refresh, openModal, closeModal };

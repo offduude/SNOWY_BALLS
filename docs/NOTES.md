@@ -3666,3 +3666,54 @@ Session paused here (approaching a usage limit) - next up whenever picked back u
 boxes.js/buffs.js/collection.js to actually CALL the Cloud Functions instead of mutating `Economy` locally
 (still the single biggest remaining piece - see the "what's left" recap from earlier this session).
 - `src/main.js`, `index.html`.
+
+## Leaderboard inventory preview removed; trading wired to the real Cloud Functions (2026-09-30)
+
+The owner's call, on resuming: the standalone inventory gallery `saves.js` used to render below an inspected
+account card (`skinsGalleryHtml`, added 2026-09-29) only ever worked for your OWN card - another player's real
+inventory was never synced anywhere yet, so theirs always showed a placeholder line. Rather than leave that
+half-working preview in place, it's gone entirely (both the code and the `#board-inspect-skins` DOM
+element/CSS) - another player's inventory is now shown ONLY inside the trade-compose screen's "YOU WANT" side,
+at the moment it's actually useful for picking what to ask for, never as idle browsing.
+
+That side now reads something REAL instead of the old whole-catalog placeholder: `cloud.js`'s
+`refreshLeaderboard()` reads `skinCounts`/`privateInventory` back off each leaderboard doc (it was writing
+`privateInventory` to the allow-list in firestore.rules for weeks but never actually SENDING it from
+`syncNow()`, and never reading either field back into the cache - both real gaps, now fixed). `saves.js`'s new
+`targetSkinsCatalog()` uses that to show only skins the target genuinely owns (with real counts), and
+distinguishes "not synced yet" (most players today, until the migration + client wiring lands) from "synced,
+owns nothing" - no more pretending every skin in the game is up for grabs.
+
+**The bigger piece: trading itself is no longer a mockup.** SEND OFFER now calls the real `proposeTrade`
+Cloud Function (`Cloud.callFunction`, wired but unused since 2026-09-29 until now); a follow-up modal reports
+success or the server's own rejection reason, never applied optimistically. The INBOX renders real pending
+trades read from `trades/{tradeId}` (two separate `fromUid==me`/`toUid==me` equality queries, merged and
+sorted client-side rather than one compound query - avoids needing any composite Firestore index, and a
+trade's two participant fields can never both match the same uid so there's nothing to dedupe) with working
+ACCEPT (its own "this is irreversible" confirm, same weight as SEND OFFER)/DECLINE/CANCEL buttons calling
+`acceptTrade`/`declineTrade`/`cancelTrade` for real. `Cloud.refreshTrades()` piggybacks on the existing
+`heartbeat()` cadence (same as the plan called for) so the notification dot stays current without a live
+listener.
+
+**A real pre-existing bug found while touching this:** `updateInboxButton()` was setting the button's
+`textContent` to swap the "INBOX"/"LEADERBOARD" label - but the notification dot (`#inbox-dot`) is a CHILD
+element of that same button, so every redraw silently deleted it. The dot could never have shown even if
+something had set it to `.show` before now. Fixed by rebuilding the button's whole `innerHTML` each time
+(label + dot together), which also naturally became the dot's own update point.
+
+**Verification:** live at `127.0.0.1:5501` (never `localhost:5501`) - clean load, no console errors, INBOX
+renders "Sign in to see trade offers." correctly while signed out (a `null` trades cache means "never fetched"
+just as much as "signed out", so this needed its own explicit check - otherwise a signed-out player would see
+"Loading..." forever, since `refreshTrades()` is a no-op with no user). Against the Firebase Local Emulator
+Suite: 2 new checks (41 total, all passing) driving the exact Firestore calls `cloud.js` now makes through the
+REAL client SDK against the REAL rules (not the Admin SDK every other check uses) - `syncNow()`'s leaderboard
+write shape (now including `privateInventory`) actually reaching the doc, and `refreshTrades()`'s own
+two-query pattern returning exactly the right trade for each participant and nothing for a bystander uid. Hit
+the project's known `firebase emulators:exec` shutdown-hang quirk again during this session, but this time it
+was a genuine stall (the emulator's own debug log stopped growing entirely, not just slow output) - killed the
+orphaned Firestore emulator process (port 8080) and reran clean rather than waiting indefinitely; worth noting
+in case it recurs.
+
+Version bumps: `src/cloud.js?v=29 -> 30`, `src/saves.js?v=29 -> 30`, `src/collection.js?v=87 -> 88`.
+- `src/cloud.js`, `src/saves.js`, `src/collection.js`, `index.html`, `firestore.rules` (comment only, no rule
+  logic changed), `functions/test/run.js`.

@@ -3972,3 +3972,110 @@ file. Ran the full suite clean.
 
 Version bump: `src/cloud.js?v=30 -> 31`.
 - `src/cloud.js`, `functions/lib/auth.js`, `functions/economy.js`, `functions/test/run.js`, `index.html`.
+
+## purchase wired for real - the shop reads real server stock, plus a genuine per-player Toy Tank reroll (2026-09-30)
+
+The last of the five original gameplay-mutation paths (purchase/useBuff/openBox/sellSkin/claimThrow), and the
+biggest single piece of client wiring this whole migration has needed - confirmed with the owner before
+starting (see the "purchase scope" question): a real `purchase` can't coexist with `shop.js` rolling its own
+stock locally, since that's the exact multi-tab-reroll exploit this migration exists to close. Building it
+properly meant switching the shop's WHOLE displayed stock over to the real, Cloud-Scheduler-driven
+`shopStock/current` doc, not just bolting a Cloud Function call onto the existing local `buy()`.
+
+**Toy Tank got a real design change along the way.** Its old effect ("the entire shop should reroll the exact
+time the tank fires") used to call `Shop.rerollAll()` - a purely local, single-player reroll. Once rerolling is
+genuinely global, that can't mean "reroll everyone's shared stock" (one player yanking it out from under
+everyone mid-purchase would be a bad mechanic, and a global reroll is deliberately NOT something a normal
+player can trigger - `forceRerollShop` is admin-only). Asked the owner directly; the answer, with a concrete
+reference: **a real per-player PRIVATE reroll, "Grow a Garden"-style** - a personal restock that lasts only
+until the next REAL global reroll, then reverts to the shared stock on its own.
+
+**Server (`functions/lib/saves.js`, `functions/economy.js`):** new `personalShopStock: {stock, offers,
+expiresAt} | null` field on `saves/{uid}` (added to `SERVER_OWNED_FIELDS`/`defaults()`/`normalize()`, same
+defensive-default discipline as everything else there). `useBuff`, when `buffId === "toy_tank"`, generates a
+REAL stock roll (`generateStock()`, the exact same function the Cloud Scheduler itself uses) and sets
+`expiresAt` to the GLOBAL stock's own current `nextRerollAt` - the moment the personal roll and the real global
+reroll would naturally coincide again, so nothing has to actively expire or clean it up later; `purchase()`/the
+client both already treat a personal stock past its `expiresAt` as absent. `purchase` itself now checks
+`save.personalShopStock` FIRST (if genuinely still active) and only falls back to the shared `shopStock/current`
+doc otherwise - a personal purchase touches ONLY `saves/{uid}`, never the global doc at all, so it can never
+race another player the way a global purchase legitimately can.
+
+**A real bug caught by the automated test itself, not eyeballing the code:** the first draft read
+`shopStockRef()` inside the `toy_tank` branch, AFTER `applyRateLimits()` had already run - and
+`applyRateLimits` performs its own `tx.set()` writes at the end. Firestore transactions require every read
+across the WHOLE transaction to happen before any write; the emulator threw "transactions require all reads to
+be executed before all writes" on literally the very first attempt. Fixed by reading `shopStockRef()`
+unconditionally at the very top of the transaction (buffId is already known before the transaction even
+starts) - a good reminder that `applyRateLimits`'s own writes make it a de facto "no more reads after this
+point" boundary for every function that calls it, not just an isolated rate-limit check.
+
+**Client (`src/cloud.js`):** new `refreshShopStock()`/`getShopStockCache()` - read-on-open, same convention as
+the leaderboard/trades caches, but TWO reads combined into one cache: the shared global doc (public) AND, only
+if signed in, the caller's own `saves/{uid}.personalShopStock` (private) - the second read is what stops a page
+reload from losing track of an active personal reroll, which would otherwise only ever be known from a single
+`useBuff` response. New `setPersonalShopStock()` merges a fresh value straight in without a round trip, called
+from `buffs.js`'s own `useBuff` response handler (Toy Tank's real reroll rides along in THAT SAME response -
+no new client-to-server call needed at all for this feature).
+
+**Client (`src/shop.js`):** the biggest rewrite - `isOnline()`/`activeStock()`/`currentStockOffers()` decide,
+everywhere the old code read `Economy.getShopState()` directly, whether to read the real server stock (personal
+if active, else global) or fall back to the ORIGINAL local roll, UNCHANGED, while signed out (or under local
+god mode) - same two-path shape as every other Cloud Function wired this session. `buy()` now dispatches to
+`localBuy` (the old code, verbatim) or the new `serverBuy` (Option A - waits for the real answer, exactly like
+openBox/sellSkin, not Option B), which applies the SAME flat +1 grant the local path always has (never the
+server's full returned inventory maps as a snapshot) and reconciles coins by the ACTUAL delta
+(`res.coins - Economy.getCoins()`), not an assumed flat price - directly informed by the openBox bug from
+earlier this session (the admin uid's real cost can be 0, and this needs to be correct for that case too).
+`rerollAll()` itself is now a no-op while online (it used to be main.js's own `fireTank()` call site for Toy
+Tank; that call site is untouched, it just does nothing now when signed in, since the REAL personal reroll
+already happened via useBuff well before the tank's own animation finishes). The online countdown
+(`updateTimerText`) deliberately does NOT run through `realMs()`/`shopRate()` the way the offline one does - a
+shopSpeed skin effect is a local cosmetic thing with no bearing on when the Cloud Scheduler's real reroll
+actually happens; applying it to a server timestamp would just make the display lie. "New to the roll" red dots
+are a deliberately-dropped nicety for the online path (Economy's own `unseenIds` is a purely local concept) -
+not rebuilt as a server-tracked equivalent for this pass.
+
+**Two real test bugs found and fixed while getting this green (not just written and trusted)**: an assertion
+that toy_tank's own `useBuff` call produces an EMPTY `buffs` array - true of the mechanism, but the test forgot
+a leftover `snowy_cube` buff from an earlier section was still sitting there, so the assertion itself was wrong,
+not the product; and an assertion that any purchase always clears the bought item's stock slot - only true for
+a consumable, or a projectile stack that hits exactly 0 remaining (already covered, correctly, by the
+pre-existing global-stock tests) - not true for a stack with more left, which the personal roll can just as
+easily pick. Both fixed to assert what's actually universally true instead.
+
+**A THIRD real bug, this one only caught by live testing, not the automated suite at all:** `shop.js`'s
+`?v=42` cache-busting query string was never bumped after all these edits (same for `cloud.js`/`buffs.js`,
+each having grown new exports/hooks since their own last bump) - the built-in browser served a STALE, pre-edit
+copy of `shop.js` from earlier in this same session's testing, silently falling through to the OFFLINE local
+roll despite `isOnline()` genuinely being true, and the rendered shop showed items that were never in the real
+seeded stock at all. Traced by fetching the live script tag's `src` directly and comparing byte content against
+what the source file on disk actually contains - the automated Node test suite could never have caught this
+category of bug at all, since it never loads `index.html` or any client script, only calls the Cloud Functions
+directly. A real reminder that the version-bump convention is load-bearing for catching exactly this, not just
+cosmetic housekeeping - every client file actually touched needs its own bump, every time, or a live check can
+silently test the wrong code.
+
+**Verification, thoroughly, both automated and live:** 6 new/updated emulator tests (51 total) covering the
+`personalShopStock` generation, its exact `expiresAt`, priority over global stock, the global doc staying
+completely untouched by a personal purchase, and the fallback-to-global behavior once a personal stock has
+expired. Then live, against a real `firebase emulators:start` session with the admin account signed in via a
+minted custom token: opened the real SHOP tab and confirmed it rendered the REAL seeded global stock (not a
+local roll - proven by items that are locally-guaranteed but NOT in the real seed correctly showing NO STOCK,
+and vice versa); bought a real item through the actual UI (network tab confirms the real `purchase` POST,
+correct price, correct stock-slot clearing, correct delta-based coin reconciliation - admin's astronomical
+balance reconciled down to the exact server value in one jump); triggered Toy Tank's real personal reroll via
+`Cloud.callFunction("useBuff", {buffId:"toy_tank"})`, confirmed the shop UI genuinely switched to showing the
+personal stock (different items, fresh countdown) the moment the shop was reopened; bought from the personal
+stock through the actual UI and confirmed (via a direct Admin SDK read) the GLOBAL doc was byte-for-byte
+unchanged before and after; signed out and confirmed the exact original local-roll behavior still works,
+zero network calls either way.
+
+Version bumps: `src/shop.js?v=42 -> 43`, `src/cloud.js?v=31 -> 32`, `src/buffs.js?v=34 -> 35`.
+- `src/shop.js`, `src/cloud.js`, `src/buffs.js`, `functions/lib/saves.js`, `functions/economy.js`,
+  `functions/test/run.js`, `index.html`.
+
+This closes out ALL FIVE of the original gameplay-mutation paths (purchase/useBuff/openBox/sellSkin/claimThrow)
+- every one of them now calls its real Cloud Function while signed in, with the exact original local behavior
+preserved while signed out. Still ahead: the one-time production data migration (item 6), and the actual
+maintenance-window cutover (item 9) - nothing in this whole migration has been deployed anywhere real yet.

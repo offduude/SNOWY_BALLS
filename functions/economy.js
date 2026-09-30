@@ -9,7 +9,7 @@ const { db } = require("./lib/admin");
 const { requireAuth, isAdmin, ADMIN_COINS } = require("./lib/auth");
 const { applyRateLimits } = require("./lib/rateLimit");
 const { normalize, spendableCoins, spendableSkinCount, savesRef, writeSave, writeLeaderboardMirror } = require("./lib/saves");
-const { shopStockRef, normalize: normalizeStock } = require("./lib/shopStock");
+const { shopStockRef, normalize: normalizeStock, generateStock, rerollMs } = require("./lib/shopStock");
 const eco = require("./lib/economyData");
 
 function bad(msg) {
@@ -18,14 +18,18 @@ function bad(msg) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // purchase({ itemId, clientVersion }) - buys a shop item (a consumable buff, or one unit of a projectile stack),
-// validated against the REAL global stock doc (functions/shop.js, functions/lib/shopStock.js - the item 5 Cloud
-// Scheduler piece) rather than trusting the client's word for what's currently on sale. Mirrors src/shop.js's own
-// buy() exactly: a projectile-category item always grants exactly ONE unit per call (never a client-chosen
+// validated against the REAL stock the caller is actually looking at - their own PERSONAL reroll
+// (save.personalShopStock, a Toy Tank private restock - see useBuff below), if they have one still active, else
+// the shared global stock doc (functions/shop.js, functions/lib/shopStock.js - the item 5 Cloud Scheduler
+// piece) - rather than trusting the client's word for what's currently on sale either way. Mirrors src/shop.js's
+// own buy() exactly: a projectile-category item always grants exactly ONE unit per call (never a client-chosen
 // amount - "clicking it once buys only a single projectile" per that file's own comment) at its fixed unitPrice,
 // decrementing the SHARED slot's remaining offer.amount (clearing the slot at 0); a consumable always empties its
 // slot on any single purchase, same as the client always has. Reading+writing both saves/{uid} AND shopStock/
-// current inside the SAME transaction is what makes two players racing for the last unit in a slot resolve
-// correctly - Firestore's optimistic-concurrency retry means only one of them can actually win it.
+// current inside the SAME transaction is what makes two players racing for the last unit in a GLOBAL slot resolve
+// correctly - Firestore's optimistic-concurrency retry means only one of them can actually win it. A personal
+// stock never has this race at all (nobody else can ever read or write it), so a personal purchase only ever
+// touches saves/{uid} - the global doc isn't even written to in that case.
 exports.purchase = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const itemId = typeof data.itemId === "string" ? data.itemId : null;
@@ -34,14 +38,16 @@ exports.purchase = functions.https.onCall(async (data, context) => {
 
   return db.runTransaction(async (tx) => {
     const stockSnap = await tx.get(shopStockRef());
-    const stock = normalizeStock(stockSnap.exists ? stockSnap.data() : null);
+    const globalStock = normalizeStock(stockSnap.exists ? stockSnap.data() : null);
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
     if (isAdmin(uid)) save.coins = ADMIN_COINS; // forced on every read, not a skip-the-check branch - see lib/auth.js's own note
 
     await applyRateLimits(tx, [{ uid, key: "purchase", limit: 20, windowMs: 60000 }]);
 
-    const slot = stock.stock.indexOf(itemId);
+    const usingPersonal = !!(save.personalShopStock && save.personalShopStock.expiresAt > Date.now());
+    const activeStock = usingPersonal ? save.personalShopStock : globalStock;
+    const slot = activeStock.stock.indexOf(itemId);
     if (slot === -1) throw new functions.https.HttpsError("failed-precondition", "Not currently in stock.");
 
     if (!isAdmin(uid)) {
@@ -56,23 +62,27 @@ exports.purchase = functions.https.onCall(async (data, context) => {
 
     if (item.category === "consumable") {
       save.buffItems[itemId] = (save.buffItems[itemId] || 0) + 1;
-      stock.stock[slot] = null;
-      stock.offers[slot] = null;
+      activeStock.stock[slot] = null;
+      activeStock.offers[slot] = null;
     } else {
       save.projectiles[itemId] = (save.projectiles[itemId] || 0) + 1;
-      const offer = stock.offers[slot];
+      const offer = activeStock.offers[slot];
       const remaining = (offer && offer.amount > 0 ? offer.amount : 0) - 1;
       if (remaining > 0) {
-        stock.offers[slot] = { amount: remaining };
+        activeStock.offers[slot] = { amount: remaining };
       } else {
-        stock.stock[slot] = null;
-        stock.offers[slot] = null;
+        activeStock.stock[slot] = null;
+        activeStock.offers[slot] = null;
       }
     }
 
-    tx.set(shopStockRef(), { stock: stock.stock, offers: stock.offers, nextRerollAt: stock.nextRerollAt, generatedAt: stock.generatedAt });
+    if (usingPersonal) {
+      save.personalShopStock = { stock: activeStock.stock, offers: activeStock.offers, expiresAt: save.personalShopStock.expiresAt };
+    } else {
+      tx.set(shopStockRef(), { stock: activeStock.stock, offers: activeStock.offers, nextRerollAt: globalStock.nextRerollAt, generatedAt: globalStock.generatedAt });
+    }
     writeSave(tx, uid, save);
-    return { coins: save.coins, buffItems: save.buffItems, projectiles: save.projectiles };
+    return { coins: save.coins, buffItems: save.buffItems, projectiles: save.projectiles, stock: activeStock.stock, offers: activeStock.offers, usedPersonalStock: usingPersonal };
   });
 });
 
@@ -97,6 +107,13 @@ exports.useBuff = functions.https.onCall(async (data, context) => {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
+    // Read BEFORE applyRateLimits, not after (2026-09-30 bugfix, caught by the emulator test itself):
+    // applyRateLimits performs its own tx.set() writes at the end, and Firestore transactions require every
+    // tx.get() across the whole transaction to happen before ANY tx.set()/update() - a read down in the
+    // toy_tank branch below, after that call, threw "transactions require all reads to be executed before all
+    // writes" every single time. buffId is already known before the transaction even starts, so this can be
+    // read unconditionally up front instead.
+    const globalStockSnap = buffId === "toy_tank" ? await tx.get(shopStockRef()) : null;
 
     await applyRateLimits(tx, [{ uid, key: "useBuff", limit: 20, windowMs: 60000 }]);
 
@@ -117,8 +134,22 @@ exports.useBuff = functions.https.onCall(async (data, context) => {
       save.buffs.push({ id: buffId, endsAt: now + eco.GENEROUS_SONG_EVENT_MS });
     }
 
+    // Toy Tank (2026-09-30): "the entire shop should reroll the exact time the tank fires" (src/main.js
+    // fireTank's own old comment) - now a REAL, server-generated PERSONAL reroll for this player only, "Grow a
+    // Garden"-style per the owner's own reference: the shared global stock (shopStock/current) is completely
+    // untouched, every other player keeps seeing exactly what they already had. Lasts only until the next REAL
+    // global reroll, then reverts on its own with nothing more to do here - expiresAt is set to the global
+    // stock's own current nextRerollAt, the same moment the personal roll and the global one would naturally
+    // coincide again, and purchase()/the client both already treat an expired personalShopStock as absent.
+    if (buffId === "toy_tank") {
+      const globalStock = normalizeStock(globalStockSnap.exists ? globalStockSnap.data() : null);
+      const fresh = generateStock();
+      const expiresAt = typeof globalStock.nextRerollAt === "number" && globalStock.nextRerollAt > now ? globalStock.nextRerollAt : now + rerollMs();
+      save.personalShopStock = { stock: fresh.stock, offers: fresh.offers, expiresAt };
+    }
+
     writeSave(tx, uid, save);
-    return { buffItems: save.buffItems, buffs: save.buffs };
+    return { buffItems: save.buffItems, buffs: save.buffs, personalShopStock: save.personalShopStock };
   });
 });
 

@@ -203,9 +203,17 @@ const Buffs = (() => {
   function reportUseToServer(id) {
     if (typeof Cloud === "undefined" || !Cloud.getUser || !Cloud.getUser()) return; // signed out, or Cloud isn't set up - nothing to report yet
     if (typeof Economy !== "undefined" && Economy.isGod && Economy.isGod()) return; // a god save's local buffs are never real inventory - see cloud.js's own mutual signIn()/godMode() guard
-    Cloud.callFunction("useBuff", { buffId: id }).catch((err) => {
-      console.warn("useBuff (server) skipped:", err && err.message);
-    });
+    Cloud.callFunction("useBuff", { buffId: id })
+      .then((res) => {
+        // Toy Tank (2026-09-30): a real server-side personal shop reroll rides along in THIS response (see
+        // functions/economy.js useBuff's own note) - merged straight into the shop's cache here, so it's ready
+        // by the time src/main.js fireTank()'s own (now-online-guarded, no-op) rerollAll() call would have run.
+        // A no-op for every other buff (personalShopStock is simply absent/null on the response then).
+        if (typeof Cloud.setPersonalShopStock === "function") Cloud.setPersonalShopStock(res.personalShopStock);
+      })
+      .catch((err) => {
+        console.warn("useBuff (server) skipped:", err && err.message);
+      });
   }
 
   // Starts the buff (a running one restarts its timer - it does not stack the effect).

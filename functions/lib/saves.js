@@ -22,7 +22,7 @@ function leaderboardRef(uid) {
 }
 
 // Every server-owned top-level field on saves/{uid} - see defaults() below.
-const SERVER_OWNED_FIELDS = ["coins", "lifetimeCoins", "skinCounts", "buffItems", "projectiles", "buffs", "equipped", "reserved", "outgoingTradeId"];
+const SERVER_OWNED_FIELDS = ["coins", "lifetimeCoins", "skinCounts", "buffItems", "projectiles", "buffs", "equipped", "reserved", "outgoingTradeId", "personalShopStock"];
 
 // Writes the server-owned half of a save, found the hard way (2026-09-29, emulator smoke test) to need
 // `{ mergeFields: SERVER_OWNED_FIELDS }`, NOT a plain `{ merge: true }`: Firestore's `merge: true` recursively
@@ -58,6 +58,7 @@ function defaults() {
     equipped: { character: "andek", scenery: "frosty", weather: "snow", projectile: "snowball" },
     reserved: { coins: 0, skins: [] }, // trade escrow - see functions/trading.js
     outgoingTradeId: null,
+    personalShopStock: null, // a Toy Tank private reroll (2026-09-30 - see functions/economy.js useBuff's own note): { stock, offers, expiresAt } | null
   };
 }
 
@@ -84,6 +85,14 @@ function normalize(raw) {
         (s) => s && ["character", "scenery", "weather"].includes(s.kind) && typeof s.id === "string" && Number.isInteger(s.qty) && s.qty > 0
       )
     : [];
+  // Shape-only validation, deliberately NOT expiry-filtered here (2026-09-30) - "is this still active" is a
+  // per-call-site question (purchase/useBuff each check `expiresAt > Date.now()` themselves, the same way an
+  // expired `buffs` entry is only ever pruned where it's actually read, not scrubbed centrally here).
+  const pss = p.personalShopStock;
+  const personalShopStock =
+    pss && Array.isArray(pss.stock) && Array.isArray(pss.offers) && typeof pss.expiresAt === "number"
+      ? { stock: pss.stock.map((id) => (typeof id === "string" ? id : null)), offers: pss.offers.map((o) => (o && Number.isInteger(o.amount) ? { amount: o.amount } : null)), expiresAt: pss.expiresAt }
+      : null;
   return {
     coins: Number.isInteger(p.coins) && p.coins >= 0 ? p.coins : 0,
     lifetimeCoins: Number.isInteger(p.lifetimeCoins) && p.lifetimeCoins >= 0 ? p.lifetimeCoins : 0,
@@ -97,6 +106,7 @@ function normalize(raw) {
       skins: reservedSkins,
     },
     outgoingTradeId: typeof p.outgoingTradeId === "string" ? p.outgoingTradeId : null,
+    personalShopStock,
   };
 }
 

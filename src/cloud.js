@@ -644,6 +644,62 @@ const Cloud = (() => {
       });
   }
 
+  // ---- shop stock (2026-09-30, the "purchase" wiring): the REAL, server-generated stock src/shop.js reads
+  // while signed in, instead of rolling its own (src/shop.js's own header comment on why local rolling has to
+  // go once rerolling is genuinely global - the owner's own read: "if we plan on making global shop rerolls
+  // then it definitely cant be rerolled locally"). Read-on-open, same convention as the leaderboard/trades
+  // above. Two reads, not one: the shared global doc (shopStock/current, public) AND - only if signed in - the
+  // caller's OWN saves/{uid}.personalShopStock (private, a Toy Tank restock - see functions/economy.js useBuff),
+  // combined into one cache so a page reload doesn't lose track of an active personal reroll (the ONLY other
+  // place the client would otherwise ever learn about one is a single useBuff response, which a reload loses).
+  // An already-expired personal stock is treated as absent right here, not left for every caller to re-check. ----
+  let shopStockCache = null; // { global: {stock, offers, nextRerollAt}, personal: {stock, offers, expiresAt} | null } | null = never fetched
+  let shopStockLoading = false;
+
+  function getShopStockCache() {
+    return shopStockCache;
+  }
+
+  function refreshShopStock(onUpdated) {
+    if (!ready || shopStockLoading) return;
+    shopStockLoading = true;
+    const reads = [db.collection("shopStock").doc("current").get()];
+    if (user) reads.push(db.collection(SAVES_COLLECTION).doc(user.uid).get());
+    Promise.all(reads)
+      .then(([globalSnap, saveSnap]) => {
+        const g = globalSnap.exists ? globalSnap.data() : {};
+        const global = {
+          stock: Array.isArray(g.stock) ? g.stock : [],
+          offers: Array.isArray(g.offers) ? g.offers : [],
+          nextRerollAt: typeof g.nextRerollAt === "number" ? g.nextRerollAt : null,
+        };
+        let personal = null;
+        const p = saveSnap && saveSnap.exists ? saveSnap.data().personalShopStock : null;
+        if (p && Array.isArray(p.stock) && typeof p.expiresAt === "number" && p.expiresAt > Date.now()) {
+          personal = { stock: p.stock, offers: Array.isArray(p.offers) ? p.offers : [], expiresAt: p.expiresAt };
+        }
+        shopStockCache = { global, personal };
+        shopStockLoading = false;
+        if (onUpdated) onUpdated();
+      })
+      .catch(() => {
+        shopStockLoading = false; // offline, signed out, or not published to this project yet - whatever was cached is all there is
+      });
+  }
+
+  // Merges a fresh personalShopStock straight into the cache without a round trip - used right after a useBuff
+  // response (Toy Tank) or a purchase response (which echoes back whichever stock it actually bought from) so
+  // the shop's own render() reflects it immediately, same "apply the server's own returned value, never guess"
+  // discipline as everywhere else. A no-op if nothing's been fetched yet at all - the next real refreshShopStock()
+  // (shop-open, or the next heartbeat) picks it up from Firestore directly regardless.
+  function setPersonalShopStock(p) {
+    if (!shopStockCache) return;
+    shopStockCache.personal =
+      p && Array.isArray(p.stock) && typeof p.expiresAt === "number" && p.expiresAt > Date.now()
+        ? { stock: p.stock, offers: Array.isArray(p.offers) ? p.offers : [], expiresAt: p.expiresAt }
+        : null;
+  }
+
   // Calls a server-authoritative Cloud Function (functions/economy.js, functions/trading.js, functions/shop.js)
   // and resolves to its `data` - the caller applies ONLY this returned value, never an optimistic local guess
   // (the same discipline the Functions themselves are built around - see the plan's Part 3). Rejects with the
@@ -674,6 +730,9 @@ const Cloud = (() => {
     refreshLeaderboard,
     getTradesCache,
     refreshTrades,
+    getShopStockCache,
+    refreshShopStock,
+    setPersonalShopStock,
     checkSession, // exposed mainly for testing - the timer/visibility cadence already calls this itself
     callFunction,
   };

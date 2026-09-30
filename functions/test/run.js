@@ -186,6 +186,59 @@ async function main() {
     assert.strictEqual(res.data.buffs[0].id, "snowy_cube");
   });
 
+  console.log("\n-- Toy Tank: a real per-player personal shop reroll (2026-09-30), not a client-side local one --");
+  await seedStock(["water_bottle"], [null]); // a known GLOBAL stock, to prove personal purchases never touch it
+  await check("useBuff on toy_tank generates a real personalShopStock, expiring exactly when the global stock would reroll next", async () => {
+    await seedSave(UID_A, { buffItems: { toy_tank: 1 }, buffs: [] }); // buffs: [] - a real leftover buff from an earlier section would otherwise make the "no buffs entry" check below meaningless
+    const globalBefore = (await db.collection("shopStock").doc("current").get()).data();
+    const res = await call("useBuff", { buffId: "toy_tank" }); // charge item, no `duration` - only the personalShopStock branch should fire
+    assert.ok(res.data.personalShopStock, "expected a personalShopStock in the response");
+    assert.ok(Array.isArray(res.data.personalShopStock.stock) && res.data.personalShopStock.stock.length > 0, "expected a genuinely rolled stock, not an empty one");
+    assert.strictEqual(res.data.personalShopStock.expiresAt, globalBefore.nextRerollAt, "a personal reroll must expire exactly when the real global reroll would happen, not on its own separate timer");
+    assert.ok(!res.data.buffs.some((b) => b.id === "toy_tank"), "toy_tank itself still gets no `buffs` entry - unrelated to the personal reroll, see this function's own note");
+    const saveA = (await db.collection("saves").doc(UID_A).get()).data();
+    assert.deepStrictEqual(saveA.personalShopStock.stock, res.data.personalShopStock.stock, "must actually be persisted, not just returned");
+  });
+  await check("purchase prioritizes an active personal stock over the global one, and never touches the global doc", async () => {
+    const saveA = (await db.collection("saves").doc(UID_A).get()).data();
+    const personalItemId = saveA.personalShopStock.stock.find((id) => id); // any real (non-null) id from the personal roll
+    await seedSave(UID_A, { coins: 50000, buffItems: {}, projectiles: {} }); // clean counters so "+1 after buying" is unambiguous regardless of which item got picked
+    const globalBefore = (await db.collection("shopStock").doc("current").get()).data();
+    const res = await call("purchase", { itemId: personalItemId });
+    assert.strictEqual(res.data.usedPersonalStock, true);
+    const globalAfter = (await db.collection("shopStock").doc("current").get()).data();
+    assert.deepStrictEqual(globalAfter.stock, globalBefore.stock, "the GLOBAL stock must be completely untouched by a personal purchase");
+    // Whether the slot itself clears depends on the item's OWN category (a consumable always empties its slot; a
+    // projectile stack only does once its rolled amount hits 0 - already covered by the earlier, item-specific
+    // global-stock tests) - what THIS test actually claims is just "the purchase was granted, from the personal
+    // stock, real state changed", not the exact resulting stock shape for whichever id happened to get rolled.
+    const granted = (res.data.buffItems && res.data.buffItems[personalItemId]) || (res.data.projectiles && res.data.projectiles[personalItemId]);
+    assert.strictEqual(granted, 1, "exactly one unit of the bought item must have been granted");
+  });
+  await check("purchase rejects an item that's only in global stock while a personal stock is active and doesn't have it", async () => {
+    // water_bottle is real, real GLOBAL stock (seeded above) - but not necessarily in the personal roll, and
+    // personal takes priority whenever it's active, so this must fail exactly like "not currently in stock"
+    // unless water_bottle genuinely happens to also be in the personal roll (a real, if unlikely, possibility -
+    // guard against test flakiness by skipping the assertion in that one coincidental case).
+    const saveA = (await db.collection("saves").doc(UID_A).get()).data();
+    if (saveA.personalShopStock.stock.includes("water_bottle")) return; // coincidence - nothing meaningful to assert here
+    try {
+      await call("purchase", { itemId: "water_bottle" });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "functions/failed-precondition");
+    }
+  });
+  await check("an EXPIRED personal stock is ignored - purchase falls back to the real global stock", async () => {
+    await seedSave(UID_A, { personalShopStock: { stock: ["daniels_coin"], offers: [null], expiresAt: Date.now() - 1000 } }); // already expired
+    await seedStock(["daniels_coin"], [null]); // must now come from here, not the expired personal one
+    const before = (await db.collection("saves").doc(UID_A).get()).data().coins;
+    const res = await call("purchase", { itemId: "daniels_coin" }); // price 6750
+    assert.strictEqual(res.data.usedPersonalStock, false);
+    assert.strictEqual(res.data.coins, before - 6750);
+  });
+  await seedSave(UID_A, { personalShopStock: null }); // clean up for whatever runs after this section
+
   console.log("\n-- claimThrow: trusts hit/miss, computes (never trusts) the reward --");
   await seedSave(UID_A, { coins: 0, lifetimeCoins: 0, buffs: [], projectiles: {} });
   await check("a plain hit pays exactly the projectile's real base hit value", async () => {

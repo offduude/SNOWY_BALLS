@@ -151,9 +151,42 @@ const Shop = (() => {
     return item.category === "consumable" && Economy.getBuffCount(item.id) >= Economy.getBuffMax();
   }
 
+  // ---------- online/offline (2026-09-30, "purchase" wiring) ----------
+  // Signed in (and not local god mode, same two guards useBuff/claimThrow/openBox/sellSkin already use) means
+  // the shop reads the REAL server stock and BUY calls the real purchase Cloud Function; signed out (or god
+  // mode) keeps the exact original, fully-local behaviour below (rerollAll/localBuy), unchanged - see
+  // src/cloud.js refreshShopStock's own note on why local rolling can't coexist with a genuinely GLOBAL reroll.
+  function isOnline() {
+    return typeof Cloud !== "undefined" && Cloud.getUser && Cloud.getUser() && !(typeof Economy !== "undefined" && Economy.isGod && Economy.isGod());
+  }
+
+  // The stock the player is actually looking at right now: their own PERSONAL reroll (a Toy Tank restock - see
+  // functions/economy.js useBuff), if they have one still active, else the shared GLOBAL stock everyone else
+  // sees too. `null` only means "haven't fetched anything from the server yet" (see cloud.js refreshShopStock) -
+  // callers treat that the same as "nothing in stock" rather than showing stale/wrong data.
+  function activeStock() {
+    const cache = typeof Cloud !== "undefined" ? Cloud.getShopStockCache() : null;
+    if (!cache) return null;
+    if (cache.personal && cache.personal.expiresAt > Date.now()) return cache.personal;
+    return cache.global;
+  }
+
+  // What rowHtml/buy actually read from - the real server stock while online, the local save's own rolled stock
+  // while offline. Always returns real arrays (never undefined) so callers never need their own null-guards.
+  function currentStockOffers() {
+    if (isOnline()) {
+      const s = activeStock();
+      return { stock: (s && s.stock) || [], offers: (s && s.offers) || [] };
+    }
+    const st = Economy.getShopState();
+    return { stock: st.stock || [], offers: st.offers || [] };
+  }
+
   // The list (see render() below) shows every catalog item, not a slot - so buying is keyed by item id: it resolves
   // to whichever slot currently has it in stock (the first one, if it somehow rolled into more than one at once).
-  function buy(itemId) {
+  // This is the OFFLINE path only now (2026-09-30) - see serverBuy below for the real one; buy() itself just
+  // dispatches between the two (see its own definition further down).
+  function localBuy(itemId) {
     const st = Economy.getShopState();
     const slot = st.stock ? st.stock.indexOf(itemId) : -1;
     if (slot === -1) return { ok: false, reason: "unavailable" }; // not currently in the roll: greyed out, can't be bought
@@ -187,6 +220,62 @@ const Shop = (() => {
     return { ok: true, item };
   }
 
+  // The real path (2026-09-30): waits for the actual purchase Cloud Function before granting or animating
+  // anything - same Option A shape as openBox/sellSkin (a purchase is a deliberate, occasional action; one
+  // round trip is imperceptible, unlike a throw). `onResult(ok)` drives the click handler's own UI feedback
+  // (shake on failure) since this doesn't return synchronously the way localBuy does.
+  let pendingItemId = null; // one purchase in flight at a time
+  function serverBuy(itemId, onResult) {
+    if (pendingItemId) return;
+    const item = itemById(itemId);
+    if (!item) return onResult(false);
+    pendingItemId = itemId;
+    Cloud.callFunction("purchase", { itemId })
+      .then((res) => {
+        pendingItemId = null;
+        // Granted as the SAME flat +1 local mutation the offline path already makes (never the server's full
+        // returned buffItems/projectiles maps as a snapshot) - consistent with how openBox/sellSkin apply their
+        // own grants, and avoids stomping any other still-local-only inventory drift for a DIFFERENT item.
+        if (item.category === "projectile") Economy.addProjectiles(item.id, 1);
+        else Economy.addBuffs(item.id, 1);
+        // Coins: the ACTUAL delta the server made, never an assumed flat price (the real bug caught live in
+        // openBox's own wiring, 2026-09-30 - the admin uid's cost can genuinely be 0 even though everyone else's
+        // isn't, and this is correct for anyone else's real price too either way).
+        const delta = res.coins - Economy.getCoins();
+        if (delta !== 0) Economy.addCoins(delta);
+        // The server's own returned stock/offers are authoritative for whichever source it actually bought from
+        // - applied directly into the cache rather than re-deriving the same clear/decrement math client-side.
+        const cache = Cloud.getShopStockCache();
+        if (cache) {
+          if (res.usedPersonalStock && cache.personal) {
+            cache.personal.stock = res.stock;
+            cache.personal.offers = res.offers;
+          } else {
+            cache.global.stock = res.stock;
+            cache.global.offers = res.offers;
+          }
+        }
+        if (typeof Cloud !== "undefined" && Cloud.notePurchase) Cloud.notePurchase();
+        onResult(true);
+      })
+      .catch((err) => {
+        pendingItemId = null;
+        console.warn("purchase (server) rejected:", err && err.message);
+        onResult(false);
+      });
+  }
+
+  // Dispatches to whichever path is live right now. The OFFLINE path returns its result synchronously (unchanged
+  // from before); the ONLINE path is async and reports back through `onResult` instead - see onClick below for
+  // how it tells the two apart.
+  function buy(itemId, onResult) {
+    if (isOnline()) {
+      serverBuy(itemId, onResult);
+      return null;
+    }
+    return localBuy(itemId);
+  }
+
   // ---------- UI ----------
   // The SHOP tab is a plain list of every projectile/buff (2026-09-27) - one row per catalog item, not one card per
   // rolled slot. Sorted by rarity ASCENDING (common at the top, legendary at the bottom - the owner's ask). Every
@@ -210,12 +299,13 @@ const Shop = (() => {
 
   // One row. `available` = the item currently has a matching slot in the roll (its first one, if the rarity roll
   // happened to put the same item in two slots at once - purely cosmetic, buying just resolves to whichever slot
-  // is found first).
+  // is found first). Reads currentStockOffers() (real server stock online, the local roll offline) instead of
+  // Economy.getShopState() directly, as of 2026-09-30.
   function rowHtml(item) {
-    const st = Economy.getShopState();
-    const slot = st.stock ? st.stock.indexOf(item.id) : -1;
+    const { stock, offers } = currentStockOffers();
+    const slot = stock.indexOf(item.id);
     const available = slot !== -1;
-    const offer = available ? (st.offers || [])[slot] || null : null;
+    const offer = available ? offers[slot] || null : null;
     const p = price(item); // fixed now (2026-09-27) - the same number whether or not it's currently in stock
     const buyable = available && Economy.getCoins() >= p && !isMaxed(item); // a maxed-out buff looks unbuyable, like a too-expensive one
     // Unavailable (not in the current roll): a plain red "NO STOCK" label instead of a button at all (2026-09-27,
@@ -230,7 +320,10 @@ const Shop = (() => {
     // unavailable stack explicitly reads "x0" rather than showing nothing, the owner's ask - it's still an
     // "amount", just zero), nothing at all for a buff (always exactly one per purchase, never had an amount).
     const amountText = item.amount ? (available && offer ? `x${offer.amount}` : "x0") : null;
-    const dot = available && (st.unseenIds || []).includes(item.id);
+    // "New to the roll" dots are an OFFLINE-only nicety (Economy.getShopState().unseenIds is a purely local
+    // concept - see checkDisplayed's own note) - the online path just never shows one, a deliberate
+    // simplification rather than building a server-tracked equivalent.
+    const dot = !isOnline() && available && (Economy.getShopState().unseenIds || []).includes(item.id);
     return Collection.shopRowHtml(item, { offer, action, extraClass: available ? "" : " unavailable", amountText, dot });
   }
 
@@ -243,8 +336,10 @@ const Shop = (() => {
   // A row whose item is "new to the roll" (see rerollAll's unseenIds note) loses its dot once it's been scrolled
   // into view - same idea as the SKINS menu's checkDisplayed, but clearing the dot by removing its DOM node
   // directly rather than a full re-render (a full render() would restart every OTHER row's CSS animation too -
-  // see tick()'s own note on why that's avoided now).
+  // see tick()'s own note on why that's avoided now). OFFLINE only (2026-09-30) - see rowHtml's own note; online
+  // rows never carry the dot in the first place, so there's nothing here to clear.
   function checkDisplayed() {
+    if (isOnline()) return;
     const st = Economy.getShopState();
     if (!root || !st.unseenIds || !st.unseenIds.length) return;
     const view = root.getBoundingClientRect();
@@ -263,10 +358,20 @@ const Shop = (() => {
     if (changed) Economy.saveShop();
   }
 
-  // Top-right of the header (see index.html #shop-timer): counts down to the next global reroll.
+  // Top-right of the header (see index.html #shop-timer): counts down to the next reroll. Online, that's a REAL
+  // server timestamp (the shared global schedule, or a personal reroll's own expiry) shown in actual real time -
+  // deliberately NOT run through realMs()/shopRate() the way the offline countdown is, since a shopSpeed skin
+  // effect is a purely local, cosmetic thing that has no bearing on when the Cloud Scheduler's own real reroll
+  // actually happens (applying it here would just make the displayed countdown lie about a fixed server fact).
   function updateTimerText() {
     const el = document.getElementById("shop-timer");
     if (!el) return;
+    if (isOnline()) {
+      const s = activeStock();
+      const at = s && typeof (s.expiresAt || s.nextRerollAt) === "number" ? s.expiresAt || s.nextRerollAt : null;
+      el.textContent = typeof at === "number" ? countdownText(at - Date.now()) : "";
+      return;
+    }
     const at = Economy.getShopState().nextRerollAt;
     el.textContent = typeof at === "number" ? countdownText(realMs(at - shopNow())) : "";
   }
@@ -314,14 +419,22 @@ const Shop = (() => {
   // stock unconditionally, and each category (projectile, consumable) independently rolls shop.rollsPerCategory
   // fresh picks from its own non-guaranteed items (2026-09-27: replaces the old "exactly 6 shared slots" model -
   // stock is now a variable-length, deduped list, not a fixed array of card slots). The next reroll is scheduled a
-  // fresh rerollMs() from this moment. Used by the Toy Tank event (main.js fireTank) too - "the entire shop should
-  // reroll the exact time the tank fires", and its own cadence just restarts from that moment.
+  // fresh rerollMs() from this moment.
+  //
+  // OFFLINE ONLY as of 2026-09-30 - a no-op while online. This used to also be what the Toy Tank event (main.js
+  // fireTank) called directly ("the entire shop should reroll the exact time the tank fires"); that call site is
+  // untouched, but now genuinely does nothing while online, because the REAL personal reroll already happened
+  // (functions/economy.js useBuff, the moment the buff itself was used - see Cloud.setPersonalShopStock, wired
+  // into buffs.js's own useBuff response handler) well before the tank's animation even finishes firing. Without
+  // this guard, an online call here would still mutate the (nobody's-looking-at-it) LOCAL stock and, if the shop
+  // happened to be open, wrongly re-render it over the real server stock the player is actually looking at.
   //
   // If this happens while the shop is closed, every freshly-stocked id (guaranteed ones included, in case they
   // weren't in stock before - e.g. right after this feature first ships) is marked "unseen" (a red dot, same idea
   // as a new projectile/buff's) until its row is scrolled into view (checkDisplayed). A reroll while the shop is
   // OPEN needs none of that - the player is looking straight at it happening.
   function rerollAll() {
+    if (isOnline()) return;
     const st = Economy.getShopState();
     const picked = new Set(eco.shop.guaranteedIds || []);
     const rolls = eco.shop.rollsPerCategory || 1;
@@ -363,15 +476,37 @@ const Shop = (() => {
     if (live && game && !alreadyAnnounced) game.sound.play("shop_restock", { volume: 0.9 });
   }
 
-  // Once a second (and when the app returns to the foreground): reroll the whole shop if the cadence is up, and
-  // while it's on screen keep the header's countdown live. No more per-row re-rendering just to tick a timer down
-  // (that used to fully rebuild the list's DOM every second, which restarted a legendary row's CSS shine/wave
-  // animation from frame 0 each time - the "flashing in a weird way" the owner reported, 2026-09-27. The list itself
-  // now only re-renders when something actually changes: opening the shop, switching PROJECTILES/BUFFS, buying, or
-  // an actual reroll.)
+  // Has the currently-active ONLINE stock's own expiry passed (the personal reroll's expiresAt, or the shared
+  // global stock's nextRerollAt)? Mirrors isDue()'s "nothing fetched yet counts as due" reasoning for the
+  // offline stock.
+  function isOnlineStockStale() {
+    const cache = typeof Cloud !== "undefined" ? Cloud.getShopStockCache() : null;
+    if (!cache) return true;
+    const s = activeStock();
+    const at = s && (s.expiresAt || s.nextRerollAt);
+    return typeof at !== "number" || Date.now() >= at;
+  }
+
+  // Once a second (and when the app returns to the foreground): while OFFLINE, reroll the whole shop if the
+  // cadence is up (unchanged, 2026-09-27 behaviour) and keep the header's countdown live; while ONLINE, re-fetch
+  // the real stock once its own expiry has passed (Cloud.refreshShopStock's own loading guard makes a stray
+  // extra call here harmless) and just keep the countdown ticking down in between. No more per-row re-rendering
+  // just to tick a timer down (that used to fully rebuild the list's DOM every second, which restarted a
+  // legendary row's CSS shine/wave animation from frame 0 each time - the "flashing in a weird way" the owner
+  // reported, 2026-09-27. The list itself now only re-renders when something actually changes: opening the shop,
+  // switching PROJECTILES/BUFFS, buying, or an actual reroll.)
   function tick() {
     if (!eco) return;
-    if (isDue(Economy.getShopState(), shopNow())) {
+    if (isOnline()) {
+      if (isOnlineStockStale()) {
+        Cloud.refreshShopStock(() => {
+          if (isShopOpen()) {
+            render();
+            updateTimerText();
+          }
+        });
+      }
+    } else if (isDue(Economy.getShopState(), shopNow())) {
       rerollAll();
       announceReroll(true);
     }
@@ -381,16 +516,22 @@ const Shop = (() => {
   function onClick(e) {
     const btn = e.target.closest(".shop-buy[data-id]");
     if (!btn) return;
-    const result = buy(btn.dataset.id);
-    if (result.ok) {
-      playUiClick();
-      if (typeof Cloud !== "undefined") Cloud.notePurchase();
-      render();
-    } else if (result.reason === "funds" || result.reason === "max") {
-      btn.classList.remove("shake");
-      void btn.offsetWidth; // restart the animation if they tap repeatedly
-      btn.classList.add("shake");
-    }
+    const itemId = btn.dataset.id;
+    // buy() returns the result synchronously OFFLINE (unchanged); ONLINE it returns null and reports back later
+    // through this same handling, reused as the callback - see buy()/serverBuy's own note.
+    const handle = (result) => {
+      if (result.ok) {
+        playUiClick();
+        if (typeof Cloud !== "undefined") Cloud.notePurchase();
+        render();
+      } else if (result.reason === "funds" || result.reason === "max" || result.reason === "rejected") {
+        btn.classList.remove("shake");
+        void btn.offsetWidth; // restart the animation if they tap repeatedly
+        btn.classList.add("shake");
+      }
+    };
+    const syncResult = buy(itemId, (ok) => handle(ok ? { ok: true } : { ok: false, reason: "rejected" }));
+    if (syncResult) handle(syncResult);
   }
 
   return {
@@ -411,8 +552,12 @@ const Shop = (() => {
       document.getElementById("shop-backdrop").addEventListener("click", () => document.getElementById("shop-btn").click());
       dotEl = document.getElementById("shop-dot");
       // generate the saved stock right away if it's missing/due, before the shop is ever opened - quiet, no sound,
-      // same reasoning tick() has for a cadence that rolled over while the app was closed.
+      // same reasoning tick() has for a cadence that rolled over while the app was closed. Offline path only now
+      // (rerollAll no-ops while online, see its own guard) - the real stock is fetched right below instead,
+      // unconditionally and safely even before sign-in resolves (refreshShopStock's global half is a public
+      // read; the personal half just gets skipped while signed out).
       if (isDue(Economy.getShopState(), shopNow())) rerollAll();
+      if (typeof Cloud !== "undefined") Cloud.refreshShopStock();
       setDot(Economy.getShopState().unseen);
       setInterval(tick, 1000);
       document.addEventListener("visibilitychange", () => {
@@ -423,7 +568,7 @@ const Shop = (() => {
     // was open last time, is not remembered across visits.
     onOpen() {
       if (!eco) return;
-      if (isDue(Economy.getShopState(), shopNow())) rerollAll(); // quiet - just get it fresh, not "while playing"
+      if (isDue(Economy.getShopState(), shopNow())) rerollAll(); // offline path only now - see rerollAll's own guard
       openCat = "projectile";
       updateCatButtons();
       // The player is looking at the shop now, so whatever the dot was about is seen.
@@ -433,6 +578,18 @@ const Shop = (() => {
       render();
       root.scrollTop = 0; // always opens at the top of the list (the owner's ask), never the last scroll position
       updateTimerText();
+      // A fresh read, only now (opening it) - not every time the list happens to redraw (same convention as the
+      // leaderboard, see collection.js open("leaderboard")). render()/updateTimerText() above already drew
+      // whatever was cached (possibly nothing, the very first time) so the screen isn't blank while this is in
+      // flight; this re-renders once the real answer lands.
+      if (isOnline()) {
+        Cloud.refreshShopStock(() => {
+          if (isShopOpen()) {
+            render();
+            updateTimerText();
+          }
+        });
+      }
     },
     rerollAll, // exposed for the Toy Tank event (main.js fireTank) - see rerollAll's own comment
   };

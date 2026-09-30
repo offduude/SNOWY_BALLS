@@ -4079,3 +4079,53 @@ This closes out ALL FIVE of the original gameplay-mutation paths (purchase/useBu
 - every one of them now calls its real Cloud Function while signed in, with the exact original local behavior
 preserved while signed out. Still ahead: the one-time production data migration (item 6), and the actual
 maintenance-window cutover (item 9) - nothing in this whole migration has been deployed anywhere real yet.
+
+## Global shop stock: a shared CATALOG, not a shared POOL (2026-09-30)
+
+A follow-up question right after `purchase` shipped: does buying a grenade from the global stock stop OTHER
+players from buying it too? Yes, as originally built - a real, if honestly-answered, design gap. The owner's
+call: **ridiculous, fix it** - all players should see the exact same roll, but one player's purchase must never
+reduce what anyone else can buy. Same "Grow a Garden" reference as Toy Tank's own personal reroll, but the
+opposite direction: there, EACH PLAYER gets their OWN private roll; here, EVERYONE shares ONE roll, but each
+player gets their own full quota against it.
+
+**Server (`functions/lib/saves.js`, `functions/economy.js`):** new `shopBought: {generatedAt, bought}` field on
+`saves/{uid}` - this player's OWN purchase count against the CURRENT global roll, keyed to the roll's own
+`generatedAt` so it resets automatically the instant a new roll replaces this one (no cleanup job needed - a
+ledger from an old cycle is just never read again). `purchase`'s GLOBAL branch (the PERSONAL/Toy-Tank branch is
+completely unchanged - it already lived exclusively on the buyer's own save) now computes this player's own
+limit (the real rolled `offer.amount` for a stack, or a flat 1 for a consumable - "once per roll", same as
+before, just scoped per player instead of server-wide) and their own remaining count, and **never writes
+`shopStock/current` at all any more** - nothing shared is ever mutated by a purchase, so the old "two players
+racing for the last unit" transaction logic is gone entirely, because there is no longer a "last unit" to race
+over.
+
+**Client (`src/cloud.js`, `src/shop.js`):** `refreshShopStock()` now also reads `shopBought` alongside
+`personalShopStock` (same combined read of the caller's own private save), and `cloud.global` itself gained a
+`generatedAt` so the client can tell whether its OWN cached `bought` ledger still applies to the CURRENT roll.
+New `myGlobalStockOffers()` derives, fresh on every render, the stock/offers THIS player actually sees for the
+shared catalog - same item SET as everyone, each item's remaining amount computed as (the real rolled amount)
+minus (however much of it this player has already bought this cycle) - the shared `cache.global` object itself
+is never mutated, only read. `serverBuy`'s response handling changed to match: a global purchase's response no
+longer carries `stock`/`offers` at all (nothing shared changed), just `remaining` - the client increments its
+own local `cache.bought` ledger by 1, the same way the server just incremented its own copy.
+
+**Verification:** rewrote the purchase test section to match (asserting the shared doc is `deepStrictEqual`
+UNCHANGED after a purchase, not decremented) and added two new checks that are the actual point of this
+change: a SECOND seeded account buying the exact same item, against the exact same roll, right after the
+first account used up its own full quota - and getting its own full quota anyway; and a fresh roll giving a
+player who'd already exhausted their old quota a brand new one for the same item. 53 emulator checks total.
+Then live, thoroughly, with two REAL accounts against a real `firebase emulators:start` session (sequential
+sign-ins, not simultaneous tabs - Firebase Auth persists one session per browser profile, not per tab, so this
+traces two genuinely separate real accounts through the real Cloud Function rather than two live tabs, which
+the automated suite's own concurrent-account check already covers anyway): signed in as a fresh test account,
+bought out its own full quota of grenade (x2 -> NO STOCK) through the actual UI; switched to the admin account
+and confirmed grenade showed a completely fresh x2 on the SAME roll, bought one, and confirmed via a direct
+Admin SDK read that `shopStock/current`'s own `grenade` offer still read its ORIGINAL seeded amount (2),
+untouched by three real purchases across two different real accounts.
+
+Version bumps: `src/cloud.js?v=32 -> 33`, `src/shop.js?v=43 -> 44` - caught the "forgot to bump" mistake from
+earlier this same session before it could repeat; bumped BEFORE live-testing this time, not after chasing a
+stale-cache ghost again.
+- `functions/lib/saves.js`, `functions/economy.js`, `functions/test/run.js`, `src/cloud.js`, `src/shop.js`,
+  `index.html`.

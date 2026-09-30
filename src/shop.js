@@ -163,7 +163,9 @@ const Shop = (() => {
   // The stock the player is actually looking at right now: their own PERSONAL reroll (a Toy Tank restock - see
   // functions/economy.js useBuff), if they have one still active, else the shared GLOBAL stock everyone else
   // sees too. `null` only means "haven't fetched anything from the server yet" (see cloud.js refreshShopStock) -
-  // callers treat that the same as "nothing in stock" rather than showing stale/wrong data.
+  // callers treat that the same as "nothing in stock" rather than showing stale/wrong data. Used only for the
+  // TIMER (expiresAt/nextRerollAt) - see myGlobalStockOffers below for the actual per-item offers, which the
+  // global case can no longer read straight off this object (see its own note).
   function activeStock() {
     const cache = typeof Cloud !== "undefined" ? Cloud.getShopStockCache() : null;
     if (!cache) return null;
@@ -171,12 +173,50 @@ const Shop = (() => {
     return cache.global;
   }
 
+  // The GLOBAL stock is a shared CATALOG now, not a shared POOL (2026-09-30, "Grow a Garden" style - see
+  // functions/economy.js purchase's own note): every player sees the same roll, but nobody's purchase reduces
+  // what anyone else can buy. So `cache.global.stock`/`.offers` themselves never change from a purchase any
+  // more - what a purchase changes is THIS player's own `cache.bought` ledger. This derives the stock/offers
+  // THIS player actually sees - same item SET everyone gets, but each item's remaining amount is (the real
+  // rolled amount) minus (how many of it THIS player has already bought this roll), computed fresh on every
+  // render rather than stored anywhere as its own mutated copy.
+  function myGlobalStockOffers(cache) {
+    const g = cache.global;
+    const cycleMatches = cache.bought && cache.bought.generatedAt === g.generatedAt;
+    const myBought = cycleMatches ? cache.bought.bought : {};
+    const stock = [];
+    const offers = [];
+    g.stock.forEach((id, i) => {
+      if (!id) {
+        stock.push(null);
+        offers.push(null);
+        return;
+      }
+      const already = myBought[id] || 0;
+      const base = g.offers[i]; // the real ROLLED template - {amount} for a stack, null for a consumable
+      if (base) {
+        const remaining = base.amount - already;
+        stock.push(remaining > 0 ? id : null);
+        offers.push(remaining > 0 ? { amount: remaining } : null);
+      } else {
+        // A consumable: no "amount" to run down, just a once-per-roll quota - gone for ME once I've bought it,
+        // regardless of whether anyone else has.
+        stock.push(already > 0 ? null : id);
+        offers.push(null);
+      }
+    });
+    return { stock, offers };
+  }
+
   // What rowHtml/buy actually read from - the real server stock while online, the local save's own rolled stock
   // while offline. Always returns real arrays (never undefined) so callers never need their own null-guards.
   function currentStockOffers() {
     if (isOnline()) {
-      const s = activeStock();
-      return { stock: (s && s.stock) || [], offers: (s && s.offers) || [] };
+      const cache = typeof Cloud !== "undefined" ? Cloud.getShopStockCache() : null;
+      if (!cache) return { stock: [], offers: [] };
+      if (cache.personal && cache.personal.expiresAt > Date.now()) return { stock: cache.personal.stock, offers: cache.personal.offers };
+      if (!cache.global) return { stock: [], offers: [] };
+      return myGlobalStockOffers(cache);
     }
     const st = Economy.getShopState();
     return { stock: st.stock || [], offers: st.offers || [] };
@@ -243,16 +283,20 @@ const Shop = (() => {
         // isn't, and this is correct for anyone else's real price too either way).
         const delta = res.coins - Economy.getCoins();
         if (delta !== 0) Economy.addCoins(delta);
-        // The server's own returned stock/offers are authoritative for whichever source it actually bought from
-        // - applied directly into the cache rather than re-deriving the same clear/decrement math client-side.
         const cache = Cloud.getShopStockCache();
         if (cache) {
           if (res.usedPersonalStock && cache.personal) {
+            // The server's own returned stock/offers are authoritative here - applied directly rather than
+            // re-deriving the same clear/decrement math client-side (this stock is exclusively this player's
+            // own copy, so there's nothing else to keep in sync with).
             cache.personal.stock = res.stock;
             cache.personal.offers = res.offers;
-          } else {
-            cache.global.stock = res.stock;
-            cache.global.offers = res.offers;
+          } else if (cache.global) {
+            // GLOBAL stock (2026-09-30): the shared catalog itself never changes from a purchase any more - see
+            // myGlobalStockOffers' own note - only THIS player's own `bought` ledger does, incremented the same
+            // way the server just incremented its own copy. Never touches cache.global at all.
+            if (!cache.bought || cache.bought.generatedAt !== cache.global.generatedAt) cache.bought = { generatedAt: cache.global.generatedAt, bought: {} };
+            cache.bought.bought[itemId] = (cache.bought.bought[itemId] || 0) + 1;
           }
         }
         if (typeof Cloud !== "undefined" && Cloud.notePurchase) Cloud.notePurchase();

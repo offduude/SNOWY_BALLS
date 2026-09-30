@@ -20,16 +20,21 @@ function bad(msg) {
 // purchase({ itemId, clientVersion }) - buys a shop item (a consumable buff, or one unit of a projectile stack),
 // validated against the REAL stock the caller is actually looking at - their own PERSONAL reroll
 // (save.personalShopStock, a Toy Tank private restock - see useBuff below), if they have one still active, else
-// the shared global stock doc (functions/shop.js, functions/lib/shopStock.js - the item 5 Cloud Scheduler
-// piece) - rather than trusting the client's word for what's currently on sale either way. Mirrors src/shop.js's
-// own buy() exactly: a projectile-category item always grants exactly ONE unit per call (never a client-chosen
-// amount - "clicking it once buys only a single projectile" per that file's own comment) at its fixed unitPrice,
-// decrementing the SHARED slot's remaining offer.amount (clearing the slot at 0); a consumable always empties its
-// slot on any single purchase, same as the client always has. Reading+writing both saves/{uid} AND shopStock/
-// current inside the SAME transaction is what makes two players racing for the last unit in a GLOBAL slot resolve
-// correctly - Firestore's optimistic-concurrency retry means only one of them can actually win it. A personal
-// stock never has this race at all (nobody else can ever read or write it), so a personal purchase only ever
-// touches saves/{uid} - the global doc isn't even written to in that case.
+// the shared GLOBAL stock doc (functions/shop.js, functions/lib/shopStock.js - the item 5 Cloud Scheduler
+// piece) - rather than trusting the client's word for what's currently on sale either way.
+//
+// The GLOBAL stock is a shared CATALOG, not a shared POOL (2026-09-30, the owner's explicit call, "Grow a
+// Garden" style): every player sees the exact same roll, but one player's purchase never reduces what anyone
+// ELSE can buy - each player has their own full quota against the same roll (save.shopBought, keyed to the
+// roll's own `generatedAt` so it resets the instant a new roll replaces this one, no cleanup needed). This
+// means `purchase` never writes shopStock/current at all any more for a global purchase - nothing shared is
+// ever mutated by buying something, so there's no longer a race between two players over "the last one" to
+// resolve either, because there is no "last one" - everyone's remaining amount is their own.
+//
+// A PERSONAL stock (Toy Tank) is different: it already lives entirely on the buyer's own saves/{uid}, so
+// nobody else can ever read or write it - decrementing it in place, exactly as before, can never affect anyone
+// else either. Both paths grant exactly ONE unit per call (never a client-chosen amount - "clicking it once
+// buys only a single projectile", src/shop.js's own long-standing rule) at the item's fixed unitPrice.
 exports.purchase = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const itemId = typeof data.itemId === "string" ? data.itemId : null;
@@ -45,11 +50,6 @@ exports.purchase = functions.https.onCall(async (data, context) => {
 
     await applyRateLimits(tx, [{ uid, key: "purchase", limit: 20, windowMs: 60000 }]);
 
-    const usingPersonal = !!(save.personalShopStock && save.personalShopStock.expiresAt > Date.now());
-    const activeStock = usingPersonal ? save.personalShopStock : globalStock;
-    const slot = activeStock.stock.indexOf(itemId);
-    if (slot === -1) throw new functions.https.HttpsError("failed-precondition", "Not currently in stock.");
-
     if (!isAdmin(uid)) {
       const buffMax = eco.eco.shop.buffMax;
       if (item.category === "consumable" && Number.isInteger(buffMax) && (save.buffItems[itemId] || 0) >= buffMax) {
@@ -57,32 +57,70 @@ exports.purchase = functions.https.onCall(async (data, context) => {
       }
     }
     const cost = eco.priceOf(item);
-    if (spendableCoins(save) < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
-    save.coins -= cost;
-
-    if (item.category === "consumable") {
-      save.buffItems[itemId] = (save.buffItems[itemId] || 0) + 1;
-      activeStock.stock[slot] = null;
-      activeStock.offers[slot] = null;
-    } else {
-      save.projectiles[itemId] = (save.projectiles[itemId] || 0) + 1;
-      const offer = activeStock.offers[slot];
-      const remaining = (offer && offer.amount > 0 ? offer.amount : 0) - 1;
-      if (remaining > 0) {
-        activeStock.offers[slot] = { amount: remaining };
-      } else {
-        activeStock.stock[slot] = null;
-        activeStock.offers[slot] = null;
-      }
-    }
+    const usingPersonal = !!(save.personalShopStock && save.personalShopStock.expiresAt > Date.now());
 
     if (usingPersonal) {
+      // Exclusively this player's own copy already (see useBuff below) - decrementing it can never touch
+      // anyone else, so this keeps the original "mutate the stock object directly" shape from before this
+      // rework.
+      const activeStock = save.personalShopStock;
+      const slot = activeStock.stock.indexOf(itemId);
+      if (slot === -1) throw new functions.https.HttpsError("failed-precondition", "Not currently in stock.");
+      if (spendableCoins(save) < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
+      save.coins -= cost;
+      if (item.category === "consumable") {
+        save.buffItems[itemId] = (save.buffItems[itemId] || 0) + 1;
+        activeStock.stock[slot] = null;
+        activeStock.offers[slot] = null;
+      } else {
+        save.projectiles[itemId] = (save.projectiles[itemId] || 0) + 1;
+        const offer = activeStock.offers[slot];
+        const remaining = (offer && offer.amount > 0 ? offer.amount : 0) - 1;
+        if (remaining > 0) activeStock.offers[slot] = { amount: remaining };
+        else {
+          activeStock.stock[slot] = null;
+          activeStock.offers[slot] = null;
+        }
+      }
       save.personalShopStock = { stock: activeStock.stock, offers: activeStock.offers, expiresAt: save.personalShopStock.expiresAt };
-    } else {
-      tx.set(shopStockRef(), { stock: activeStock.stock, offers: activeStock.offers, nextRerollAt: globalStock.nextRerollAt, generatedAt: globalStock.generatedAt });
+      writeSave(tx, uid, save);
+      return {
+        coins: save.coins,
+        buffItems: save.buffItems,
+        projectiles: save.projectiles,
+        stock: activeStock.stock,
+        offers: activeStock.offers,
+        usedPersonalStock: true,
+      };
     }
+
+    // GLOBAL stock: this player's own quota against the shared roll, never a shared number.
+    const slot = globalStock.stock.indexOf(itemId);
+    if (slot === -1) throw new functions.https.HttpsError("failed-precondition", "Not currently in stock.");
+    const cycle = globalStock.generatedAt;
+    const bought = save.shopBought.generatedAt === cycle ? { ...save.shopBought.bought } : {};
+    const already = bought[itemId] || 0;
+    // A consumable's own "quota" is always exactly 1 per roll (it never had an `amount` to begin with - the
+    // OLD shared model emptied its slot on any single purchase; the new per-player one just scopes that same
+    // "once per roll" rule to each player instead of to the whole server). A stack's quota is the real rolled
+    // amount everyone was shown.
+    const limit = item.amount ? (globalStock.offers[slot] && globalStock.offers[slot].amount) || 0 : 1;
+    if (already >= limit) throw new functions.https.HttpsError("failed-precondition", "You've already bought the most of this you can this reroll.");
+    if (spendableCoins(save) < cost) throw new functions.https.HttpsError("failed-precondition", "Not enough coins.");
+    save.coins -= cost;
+    if (item.category === "consumable") save.buffItems[itemId] = (save.buffItems[itemId] || 0) + 1;
+    else save.projectiles[itemId] = (save.projectiles[itemId] || 0) + 1;
+    bought[itemId] = already + 1;
+    save.shopBought = { generatedAt: cycle, bought };
+
     writeSave(tx, uid, save);
-    return { coins: save.coins, buffItems: save.buffItems, projectiles: save.projectiles, stock: activeStock.stock, offers: activeStock.offers, usedPersonalStock: usingPersonal };
+    return {
+      coins: save.coins,
+      buffItems: save.buffItems,
+      projectiles: save.projectiles,
+      remaining: limit - bought[itemId],
+      usedPersonalStock: false,
+    };
   });
 });
 

@@ -140,13 +140,16 @@ async function main() {
       assert.ok(/stock/i.test(e.message), `expected a "not in stock" message, got: ${e.message}`);
     }
   });
-  await check("purchase charges the real price and grants the item", async () => {
+  await check("purchase charges the real price and grants the item - and does NOT touch the shared stock doc at all (2026-09-30)", async () => {
+    const stockBefore = (await db.collection("shopStock").doc("current").get()).data();
     const before = (await db.collection("saves").doc(UID_A).get()).data().coins;
     const res = await call("purchase", { itemId: "water_bottle" }); // price 4
     assert.strictEqual(res.data.coins, before - 4);
     assert.strictEqual(res.data.buffItems.water_bottle, 1);
-    const stock = (await db.collection("shopStock").doc("current").get()).data();
-    assert.strictEqual(stock.stock[0], null, "a consumable's slot must clear on any single purchase");
+    const stockAfter = (await db.collection("shopStock").doc("current").get()).data();
+    assert.deepStrictEqual(stockAfter, stockBefore, "the GLOBAL stock doc must be completely untouched by a purchase - it's a shared CATALOG now, not a shared pool");
+    const saveA = (await db.collection("saves").doc(UID_A).get()).data();
+    assert.strictEqual(saveA.shopBought.bought.water_bottle, 1, "this player's OWN purchase count is what actually tracks it");
   });
   await check("purchase rejects an unaffordable item (still in stock, just too expensive)", async () => {
     await seedSave(UID_A, { coins: 1 }); // force it unaffordable
@@ -158,24 +161,38 @@ async function main() {
       assert.ok(/coins/i.test(e.message), `expected a "not enough coins" message, got: ${e.message}`);
     }
   });
-  await seedSave(UID_A, { coins: 50000 }); // reset for the rest of the tests below
-  await check("purchase of a projectile stack grants exactly one unit and decrements the SHARED remaining amount", async () => {
+  await seedSave(UID_A, { coins: 50000, shopBought: { generatedAt: null, bought: {} } }); // reset for the rest of the tests below
+  await check("purchase of a projectile stack grants exactly one unit and tracks THIS PLAYER's own remaining quota - the shared stock doc is never touched", async () => {
     const before = (await db.collection("saves").doc(UID_A).get()).data().coins;
-    const res = await call("purchase", { itemId: "grenade" }); // unitPrice 1875, 2 left in the seeded stock
+    const res = await call("purchase", { itemId: "grenade" }); // unitPrice 1875, 2 rolled in the seeded stock
     assert.strictEqual(res.data.coins, before - 1875);
     assert.strictEqual(res.data.projectiles.grenade, 1); // exactly one, never the item's amount range
-    let stock = (await db.collection("shopStock").doc("current").get()).data();
-    assert.strictEqual(stock.offers[2].amount, 1, "one left after the first purchase");
-    assert.strictEqual(stock.stock[2], "grenade", "slot stays filled while stock remains");
-    await call("purchase", { itemId: "grenade" }); // the last one
-    stock = (await db.collection("shopStock").doc("current").get()).data();
-    assert.strictEqual(stock.stock[2], null, "slot clears once the shared stack hits zero");
+    assert.strictEqual(res.data.remaining, 1, "one left of MY OWN quota after the first purchase");
+    const stock = (await db.collection("shopStock").doc("current").get()).data();
+    assert.strictEqual(stock.offers[2].amount, 2, "the shared doc's own rolled amount must be completely unaffected");
+    await call("purchase", { itemId: "grenade" }); // the second (and, for THIS player, last) one
     try {
-      await call("purchase", { itemId: "grenade" }); // nothing left
+      await call("purchase", { itemId: "grenade" }); // this player's own quota (2) is now used up
       throw new Error("did not throw");
     } catch (e) {
       assert.strictEqual(e.code, "functions/failed-precondition");
     }
+  });
+  await check("a DIFFERENT player's purchases are completely independent - the whole point of this rework", async () => {
+    // UID_A just bought out their own full quota of grenade (2/2) in the check above. UID_B, seeing the exact
+    // same shared roll, must still be able to buy their own full 2 - proving nothing UID_A did affected them.
+    await seedSave(UID_B, { coins: 50000, shopBought: { generatedAt: null, bought: {} } });
+    await asUid(UID_B);
+    const res1 = await call("purchase", { itemId: "grenade" });
+    assert.strictEqual(res1.data.remaining, 1, "UID_B's own quota starts fresh regardless of what UID_A already bought");
+    const res2 = await call("purchase", { itemId: "grenade" });
+    assert.strictEqual(res2.data.remaining, 0);
+    await asUid(UID_A); // back to the account the rest of this file's sections expect to be signed in as
+  });
+  await check("purchase against a NEW roll gives a fresh quota, even for the same item", async () => {
+    await seedStock(["grenade"], [{ amount: 3 }]); // a brand-new roll (new generatedAt) - UID_A's old quota must NOT carry over
+    const res = await call("purchase", { itemId: "grenade" });
+    assert.strictEqual(res.data.remaining, 2, "a new roll resets this player's quota, even though they'd already used up their old one");
   });
 
   await check("useBuff starts a timed buff", async () => {

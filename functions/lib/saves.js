@@ -22,7 +22,7 @@ function leaderboardRef(uid) {
 }
 
 // Every server-owned top-level field on saves/{uid} - see defaults() below.
-const SERVER_OWNED_FIELDS = ["coins", "lifetimeCoins", "skinCounts", "buffItems", "projectiles", "buffs", "equipped", "reserved", "outgoingTradeId", "personalShopStock"];
+const SERVER_OWNED_FIELDS = ["coins", "lifetimeCoins", "skinCounts", "buffItems", "projectiles", "buffs", "equipped", "reserved", "outgoingTradeId", "personalShopStock", "shopBought"];
 
 // Writes the server-owned half of a save, found the hard way (2026-09-29, emulator smoke test) to need
 // `{ mergeFields: SERVER_OWNED_FIELDS }`, NOT a plain `{ merge: true }`: Firestore's `merge: true` recursively
@@ -59,6 +59,12 @@ function defaults() {
     reserved: { coins: 0, skins: [] }, // trade escrow - see functions/trading.js
     outgoingTradeId: null,
     personalShopStock: null, // a Toy Tank private reroll (2026-09-30 - see functions/economy.js useBuff's own note): { stock, offers, expiresAt } | null
+    // This player's OWN purchase count against the shared GLOBAL stock roll (2026-09-30 - see functions/
+    // economy.js purchase's own note: "Grow a Garden" style, the owner's call - everyone sees the same roll,
+    // but one player's purchase never reduces what anyone else can buy). Keyed to `generatedAt` so it resets
+    // automatically the moment a new roll replaces this one - a ledger from an old cycle is just never read
+    // again, no explicit cleanup needed.
+    shopBought: { generatedAt: null, bought: {} },
   };
 }
 
@@ -93,6 +99,11 @@ function normalize(raw) {
     pss && Array.isArray(pss.stock) && Array.isArray(pss.offers) && typeof pss.expiresAt === "number"
       ? { stock: pss.stock.map((id) => (typeof id === "string" ? id : null)), offers: pss.offers.map((o) => (o && Number.isInteger(o.amount) ? { amount: o.amount } : null)), expiresAt: pss.expiresAt }
       : null;
+  const sb = p.shopBought;
+  const shopBought =
+    sb && typeof sb.generatedAt === "number" && sb.bought && typeof sb.bought === "object"
+      ? { generatedAt: sb.generatedAt, bought: cleanCounts(sb.bought) }
+      : { generatedAt: null, bought: {} };
   return {
     coins: Number.isInteger(p.coins) && p.coins >= 0 ? p.coins : 0,
     lifetimeCoins: Number.isInteger(p.lifetimeCoins) && p.lifetimeCoins >= 0 ? p.lifetimeCoins : 0,
@@ -107,6 +118,7 @@ function normalize(raw) {
     },
     outgoingTradeId: typeof p.outgoingTradeId === "string" ? p.outgoingTradeId : null,
     personalShopStock,
+    shopBought,
   };
 }
 

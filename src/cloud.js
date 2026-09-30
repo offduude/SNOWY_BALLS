@@ -649,11 +649,15 @@ const Cloud = (() => {
   // go once rerolling is genuinely global - the owner's own read: "if we plan on making global shop rerolls
   // then it definitely cant be rerolled locally"). Read-on-open, same convention as the leaderboard/trades
   // above. Two reads, not one: the shared global doc (shopStock/current, public) AND - only if signed in - the
-  // caller's OWN saves/{uid}.personalShopStock (private, a Toy Tank restock - see functions/economy.js useBuff),
-  // combined into one cache so a page reload doesn't lose track of an active personal reroll (the ONLY other
-  // place the client would otherwise ever learn about one is a single useBuff response, which a reload loses).
-  // An already-expired personal stock is treated as absent right here, not left for every caller to re-check. ----
-  let shopStockCache = null; // { global: {stock, offers, nextRerollAt}, personal: {stock, offers, expiresAt} | null } | null = never fetched
+  // caller's OWN save (private): its `personalShopStock` (a Toy Tank restock - see functions/economy.js
+  // useBuff) AND its `shopBought` (this player's OWN purchase count against the CURRENT global roll - "Grow a
+  // Garden" style, the owner's call: everyone sees the same roll, but one player's purchase never reduces what
+  // anyone else can buy, so nothing about `global` itself ever changes from a purchase any more - see shop.js's
+  // own note on how `bought` combines with `global` to derive what THIS player still has left). Combined into
+  // one cache so a page reload doesn't lose track of either (the only other place the client would otherwise
+  // ever learn about them is a single useBuff/purchase response, which a reload loses). An already-expired
+  // personal stock is treated as absent right here, not left for every caller to re-check. ----
+  let shopStockCache = null; // { global: {stock, offers, nextRerollAt, generatedAt}, personal: {...}|null, bought: {generatedAt, bought}|null } | null = never fetched
   let shopStockLoading = false;
 
   function getShopStockCache() {
@@ -672,13 +676,20 @@ const Cloud = (() => {
           stock: Array.isArray(g.stock) ? g.stock : [],
           offers: Array.isArray(g.offers) ? g.offers : [],
           nextRerollAt: typeof g.nextRerollAt === "number" ? g.nextRerollAt : null,
+          generatedAt: typeof g.generatedAt === "number" ? g.generatedAt : null,
         };
+        const saveData = saveSnap && saveSnap.exists ? saveSnap.data() : null;
         let personal = null;
-        const p = saveSnap && saveSnap.exists ? saveSnap.data().personalShopStock : null;
+        const p = saveData && saveData.personalShopStock;
         if (p && Array.isArray(p.stock) && typeof p.expiresAt === "number" && p.expiresAt > Date.now()) {
           personal = { stock: p.stock, offers: Array.isArray(p.offers) ? p.offers : [], expiresAt: p.expiresAt };
         }
-        shopStockCache = { global, personal };
+        let bought = null;
+        const b = saveData && saveData.shopBought;
+        if (b && typeof b.generatedAt === "number" && b.bought && typeof b.bought === "object") {
+          bought = { generatedAt: b.generatedAt, bought: b.bought };
+        }
+        shopStockCache = { global, personal, bought };
         shopStockLoading = false;
         if (onUpdated) onUpdated();
       })

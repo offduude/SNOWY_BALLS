@@ -188,7 +188,11 @@ const Cloud = (() => {
       app = firebase.initializeApp(FIREBASE_CONFIG);
       auth = firebase.auth();
       db = firebase.firestore();
-      functions = firebase.functions();
+      // "europe-central2" (2026-10-02) must match every Cloud Function's own .region() call (functions/economy.js,
+      // functions/trading.js, functions/shop.js) - the SDK defaults to us-central1 otherwise and would never find
+      // any of them, real project or emulator alike (confirmed live: the emulator enforces this match too, not
+      // just the real deployed project).
+      functions = firebase.functions("europe-central2");
       initAppCheck();
       if (USE_EMULATOR) {
         auth.useEmulator("http://127.0.0.1:9099", { disableWarnings: true });

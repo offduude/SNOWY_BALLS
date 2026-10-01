@@ -15,3 +15,7 @@ emulator-data/
 # never be committed.
 scripts/serviceAccountKey.json
 scripts/backups/
+
+# A build artifact copied in by firebase.json's functions.predeploy hook right before every real deploy - the
+# repo-root economy.json is the one real source of truth, this is never hand-edited or committed.
+functions/economy.json

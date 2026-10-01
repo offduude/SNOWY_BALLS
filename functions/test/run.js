@@ -27,7 +27,7 @@ const db = admin.firestore();
 const clientApp = initializeApp({ projectId: PROJECT_ID, apiKey: "emulator-fake-key" }, "test-client");
 const clientAuth = getAuth(clientApp);
 connectAuthEmulator(clientAuth, `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099"}`, { disableWarnings: true });
-const clientFunctions = getFunctions(clientApp);
+const clientFunctions = getFunctions(clientApp, "europe-central2"); // must match every exports.* function's own .region() (2026-10-02) - the client SDK defaults to us-central1 otherwise and would never find any of them
 connectFunctionsEmulator(clientFunctions, "127.0.0.1", 5001); // matches firebase.json's emulators.functions.port
 const clientDb = getFirestore(clientApp);
 connectFirestoreEmulator(clientDb, "127.0.0.1", 8080); // matches firebase.json's emulators.firestore.port - used only to verify the shopStock read RULE (public, signed out included), everything else goes through Admin SDK `db` or the callable Functions

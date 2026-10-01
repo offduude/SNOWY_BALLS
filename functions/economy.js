@@ -8,6 +8,10 @@
 // `runWith({ maxInstances: PLAYER_MAX_INSTANCES })` (2026-10-01) on every export here - see lib/scaling.js's own
 // note: applyRateLimits caps one uid's own call rate, this caps the WHOLE function's concurrency regardless of
 // how many different uids are calling it at once, the actual backstop against a many-botted-accounts attack.
+//
+// `.region("europe-central2")` (2026-10-02) on every export - the real project's Firestore lives in
+// europe-central2 (Warsaw); the Firebase CLI's default region (us-central1) would otherwise put every single
+// Firestore read/write in this file a transatlantic round trip away from its own data, on every call.
 const functions = require("firebase-functions");
 const { db } = require("./lib/admin");
 const { requireAuth, isAdmin, ADMIN_COINS } = require("./lib/auth");
@@ -42,7 +46,7 @@ function bad(msg) {
 // nobody else can ever read or write it - decrementing it in place, exactly as before, can never affect anyone
 // else either. Both paths grant exactly ONE unit per call (never a client-chosen amount - "clicking it once
 // buys only a single projectile", src/shop.js's own long-standing rule) at the item's fixed unitPrice.
-exports.purchase = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.purchase = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const itemId = typeof data.itemId === "string" ? data.itemId : null;
@@ -149,7 +153,7 @@ exports.purchase = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).htt
 // get none.
 const EVENT_TRIGGER_BUFF_IDS = new Set(Object.values(eco.EVENT_DEFS).map((d) => d.buffId));
 
-exports.useBuff = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.useBuff = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const buffId = typeof data.buffId === "string" ? data.buffId : null;
@@ -236,7 +240,7 @@ function drawBox(kind) {
   return atRarity[Math.floor(Math.random() * atRarity.length)];
 }
 
-exports.openBox = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.openBox = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const kind = typeof data.kind === "string" ? data.kind : null;
@@ -280,7 +284,7 @@ exports.openBox = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).http
 // escrowed in an outgoing trade offer can't also be sold out from under it. Selling out whatever's currently
 // EQUIPPED re-equips the kind's own default (free, permanent) item, same "never left equipped at 0 owned"
 // guarantee collection.js's client-side applySoldLocally makes for the signed-out/local path.
-exports.sellSkin = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.sellSkin = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const kind = typeof data.kind === "string" ? data.kind : null;
@@ -359,7 +363,7 @@ exports.sellSkin = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).htt
 // Known, accepted gap (unlike `hit`, which only ever inflates a bounded reward): a modified client claiming
 // `saved: true` on every throw gets unlimited free use of a consumable projectile it may not even have an
 // active save-chance buff for - an unbounded exploit, not a bounded one. Deliberately left open per the above.
-exports.claimThrow = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.claimThrow = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const projectileId = typeof data.projectileId === "string" ? data.projectileId : null;

@@ -1,14 +1,23 @@
 // Loads the SAME economy.json the client reads from, so prices/odds/rarities can never drift between the two -
 // there is exactly one source of truth for game numbers, same as before this migration.
 //
-// NOTE for the real deploy (not the emulator): `firebase deploy --only functions` only uploads what's inside
-// `functions/` (per firebase.json's functions.source) - a `require("../economy.json")` reaching outside that
-// directory works fine locally (same filesystem, what the emulator uses) but will NOT be included in an actual
-// deployment bundle. Before ever running a real `firebase deploy`, either copy economy.json into functions/ (and
-// update this require) or point `functions.source` at the project root - flagged here rather than silently
-// deploying a Functions build with no economy data. Not a concern yet: nothing in this migration has been
-// deployed for real, only run against the Local Emulator Suite.
-const eco = require("../../economy.json");
+// FIX (2026-10-02, the first real `firebase deploy` hit exactly the gap this file used to flag as a future
+// risk): `firebase deploy --only functions` only uploads what's inside `functions/` (per firebase.json's
+// functions.source) - the old `require("../../economy.json")` reached outside that directory, which works fine
+// locally/in the emulator (same filesystem) but isn't in the real deploy bundle at all, so every function
+// failed to even load ("Cannot find module '../../economy.json'"). Fixed via firebase.json's own `predeploy`
+// hook, which copies the real repo-root economy.json into functions/economy.json right before every real
+// deploy - still exactly one source of truth (the root file), just automatically synced into the deploy bundle
+// instead of manually duplicated. functions/economy.json itself is gitignored - a build artifact, never
+// hand-edited, and never present for local dev (the emulator never runs predeploy hooks) - so this tries that
+// copy FIRST (what a real deployed function actually has) and falls back to the real repo-root file (what local
+// dev/the emulator actually has) rather than picking one and breaking the other.
+let eco;
+try {
+  eco = require("../economy.json");
+} catch (e) {
+  eco = require("../../economy.json");
+}
 
 const rarityIndex = new Map((eco.rarities || []).map((r) => [r.id, r]));
 const boxOdds = eco.boxOdds || {};

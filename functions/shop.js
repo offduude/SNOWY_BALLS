@@ -34,8 +34,9 @@ const rerollMinutes = Math.max(1, Math.round(rerollMs() / 60000));
 // rerollIfDue() below directly, in-process, which is exactly what this handler's body does anyway.
 // `maxInstances: ADMIN_MAX_INSTANCES` on both exports below (2026-10-01, see lib/scaling.js's own note) - never
 // more than one legitimate concurrent reroll anyway, scheduled or admin-triggered; the cap is cheap insurance,
-// not something either path would ever actually hit under normal use.
-exports.rerollShop = functions.runWith({ maxInstances: ADMIN_MAX_INSTANCES }).pubsub.schedule(`every ${rerollMinutes} minutes`).onRun(async () => {
+// not something either path would ever actually hit under normal use. `.region("europe-central2")` likewise
+// (2026-10-02) - see functions/economy.js's own note on why (the real project's Firestore lives there).
+exports.rerollShop = functions.region("europe-central2").runWith({ maxInstances: ADMIN_MAX_INSTANCES }).pubsub.schedule(`every ${rerollMinutes} minutes`).onRun(async () => {
   await rerollIfDue(false);
 });
 
@@ -45,7 +46,7 @@ exports.rerollShop = functions.runWith({ maxInstances: ADMIN_MAX_INSTANCES }).pu
 // exercise the same way every other Function in this project is tested, not just the direct in-process call.
 // Still reachable (and rejected) by ANY signed-in caller before the isAdmin check runs, same as every other
 // callable - maxInstances caps that invocation layer regardless of who's calling.
-exports.forceRerollShop = functions.runWith({ maxInstances: ADMIN_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.forceRerollShop = functions.region("europe-central2").runWith({ maxInstances: ADMIN_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   if (!isAdmin(uid)) throw new functions.https.HttpsError("permission-denied", "Admin only.");

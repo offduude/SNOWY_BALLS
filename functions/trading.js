@@ -9,7 +9,8 @@
 // purchase/useBuff/openBox/sellSkin (functions/economy.js) - nothing to bypass in the trade math itself.
 //
 // `runWith({ maxInstances: PLAYER_MAX_INSTANCES })` (2026-10-01) on every export here - see lib/scaling.js and
-// functions/economy.js's own matching note.
+// functions/economy.js's own matching note. `.region("europe-central2")` (2026-10-02) likewise - see
+// functions/economy.js's own note on why (the real project's Firestore lives there, not us-central1).
 const functions = require("firebase-functions");
 const { db, FieldValue } = require("./lib/admin");
 const { requireAuth } = require("./lib/auth");
@@ -63,7 +64,7 @@ function sideIsEmpty(side) {
 // calls) purely to give applyRateLimits a tx to work with - reads still happen in the same order as before,
 // just inside db.runTransaction, with the rate-limit check (itself a read-then-write) last, after both real
 // reads, same "all reads before any writes" discipline every other callable here already follows.
-exports.getTargetInventory = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.getTargetInventory = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const toUid = typeof data.toUid === "string" ? data.toUid : null;
@@ -81,7 +82,7 @@ exports.getTargetInventory = functions.runWith({ maxInstances: PLAYER_MAX_INSTAN
   });
 });
 
-exports.proposeTrade = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.proposeTrade = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const fromUid = requireAuth(context);
   await requireMinVersion(data);
   const toUid = typeof data.toUid === "string" ? data.toUid : null;
@@ -131,7 +132,7 @@ exports.proposeTrade = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES })
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-exports.acceptTrade = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.acceptTrade = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const accepterUid = requireAuth(context);
   await requireMinVersion(data);
   const tradeId = typeof data.tradeId === "string" ? data.tradeId : null;
@@ -235,7 +236,7 @@ exports.acceptTrade = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-exports.declineTrade = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.declineTrade = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const tradeId = typeof data.tradeId === "string" ? data.tradeId : null;
@@ -266,7 +267,7 @@ exports.declineTrade = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES })
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-exports.cancelTrade = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
+exports.cancelTrade = functions.region("europe-central2").runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const tradeId = typeof data.tradeId === "string" ? data.tradeId : null;

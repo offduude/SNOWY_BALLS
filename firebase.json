@@ -1,10 +1,11 @@
 {
-  "_readme": "Emulator-only config (see docs/NOTES.md, snowy-balls-blaze-migration memory). `firebase deploy` is never run from here - firestore.rules is still hand-pasted into the console, and Cloud Functions get their own manual deploy step once the owner is ready to publish for real. `firebase emulators:start` never touches the real project no matter what project id this file names.",
+  "_readme": "firestore.rules is still hand-pasted into the console by hand (see docs/DEPLOY_CHECKLIST.md), never deployed from here. `firebase emulators:start` never touches the real project no matter what project id this file names. Cloud Functions ARE deployed from here now (`firebase deploy --only functions`, docs/DEPLOY_CHECKLIST.md step 4) - the predeploy hook below copies economy.json into functions/ first, since `firebase deploy` only uploads functions.source's own directory and functions/lib/economyData.js reads economy.json by a relative path that only resolves locally/in the emulator otherwise (see that file's own note).",
   "firestore": {
     "rules": "firestore.rules"
   },
   "functions": {
-    "source": "functions"
+    "source": "functions",
+    "predeploy": ["node -e \"require('fs').copyFileSync('economy.json', 'functions/economy.json')\""]
   },
   "emulators": {
     "auth": { "port": 9099 },

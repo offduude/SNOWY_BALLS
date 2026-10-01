@@ -5,7 +5,7 @@
   },
   "functions": {
     "source": "functions",
-    "predeploy": ["node -e \"require('fs').copyFileSync('economy.json', 'functions/economy.json')\""]
+    "predeploy": ["node scripts/copyEconomyForDeploy.js"]
   },
   "emulators": {
     "auth": { "port": 9099 },

@@ -10,3 +10,8 @@ firestore-debug.log
 ui-debug.log
 .firebase/
 emulator-data/
+
+# Production migration (scripts/migrateSaves.js) - a service account key and real player data backups must
+# never be committed.
+scripts/serviceAccountKey.json
+scripts/backups/

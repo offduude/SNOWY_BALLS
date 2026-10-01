@@ -65,7 +65,7 @@
       width: 90%;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 12px;
+      font-size: calc(var(--u) * 1.2);
       line-height: 1.8;
       text-align: center;
       white-space: pre-line;
@@ -143,7 +143,7 @@
       text-align: center;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 12px;
+      font-size: calc(var(--u) * 1.2);
       line-height: 1.8;
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
         0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000;
@@ -155,8 +155,12 @@
 
     #game-container.boxes-open #boxes-hint { opacity: 1; }
 
+    /* A further step down on top of --u's own scaling, specifically for a coarse-pointer (touch) device or a
+       narrow window - legibility at touch sizes, not the same concern --u's letterboxing-driven scaling solves -
+       kept proportional (0.9u, matching 9px's old ratio to 12px) rather than a fixed px so it doesn't reintroduce
+       the same won't-scale bug at an extreme viewport. */
     @media (pointer: coarse), (max-width: 700px) {
-      #boxes-hint { font-size: 9px; }
+      #boxes-hint { font-size: calc(var(--u) * 0.9); }
     }
 
     /* The odds grid (boxes.js openInspect): a dimmed backdrop over the boxes screen with just each possible
@@ -722,6 +726,22 @@
     #game-container.shop-open #shop-panel,
     #game-container.shop-open #shop-cats {
       opacity: 1;
+    }
+
+    /* pointer-events, split out from the opacity rule above (2026-10-01, a real bug the owner caught): #shop-cats
+       is a flex container taller/wider than the two buttons it holds (justify-content: center leaves empty space
+       above/below/between PROJECTILES and BUFFS) - giving the CONTAINER itself pointer-events:auto meant a tap in
+       that empty space was silently swallowed by #shop-cats before it could ever reach #shop-backdrop underneath,
+       so tapping "outside the shop" didn't close it in exactly that dead zone. #shop-cats itself stays
+       pointer-events:none (inherited from its own base rule above) at all times now; only the buttons opt back in
+       - a tap anywhere else in the column's own box now passes straight through to the backdrop, same as tapping
+       anywhere else outside the panel already does. */
+    #game-container.shop-open #shop-backdrop,
+    #game-container.shop-open #shop-panel {
+      pointer-events: auto;
+    }
+
+    #game-container.shop-open #shop-cats .shop-cat-btn {
       pointer-events: auto;
     }
 
@@ -755,14 +775,21 @@
 
     .shop-cat-btn {
       width: 100%;
-      height: 40px; /* taller, bigger text (2026-09-27, the owner's follow-up: the slimmer/shorter version looked "weird") */
+      /* height/font-size used to be fixed pixels (40px / 9px) - fine at the size they were tuned at, but they
+         stayed that size while #shop-cats' own width (a % of the scaled game area) shrank at a smaller viewport,
+         so the text no longer fit and visibly overflowed the button (2026-10-01, the owner's report). Switched to
+         the same --u scaling unit every other size in this file uses, so the text now shrinks along with the
+         button instead of escaping it. calc(var(--u) * 4)/0.9 render the same as the old 40px/9px at this file's
+         own reference size (--u is tuned so 100 * var(--u) spans the game's own width) - only the SMALL-viewport
+         behavior actually changes. */
+      height: calc(var(--u) * 4);
       padding: 0 calc(var(--u) * 0.3);
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 9px;
+      font-size: calc(var(--u) * 0.9);
       line-height: 1.2;
       white-space: normal; /* "PROJECTILES" can wrap to 2 lines in the now-narrower column rather than overflow */
       cursor: pointer;
@@ -944,24 +971,24 @@
     #shop-btn,
     #boxes-btn {
       position: absolute;
-      right: 10px;
-      bottom: 10px;
-      width: 84px;
-      height: 32px;
+      right: calc(var(--u) * 1);
+      bottom: calc(var(--u) * 1);
+      width: calc(var(--u) * 8.4);
+      height: calc(var(--u) * 3.2);
       padding: 0;
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 10px;
+      font-size: calc(var(--u) * 1);
       cursor: pointer;
       z-index: 4;
       -webkit-tap-highlight-color: transparent;
     }
 
     #boxes-btn {
-      bottom: 48px; /* 10px margin + 32px SHOP button + 6px gap */
+      bottom: calc(var(--u) * 4.8); /* 1u margin + 3.2u SHOP button + 0.6u gap - was a fixed-px running sum (10+32+6), now the same sum in --u */
     }
 
     #shop-btn:active,
@@ -982,12 +1009,12 @@
     /* PROJECTILES / CHARACTERS buttons: middle of the left edge, same look as the SHOP button. */
     #side-buttons {
       position: absolute;
-      left: 10px;
+      left: calc(var(--u) * 1);
       top: 50%;
       transform: translateY(-50%);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: calc(var(--u) * 0.8);
       z-index: 5; /* above the list panel, so both stay usable when a list is open */
       transition: opacity 0.25s ease;
     }
@@ -1002,15 +1029,15 @@
     }
 
     .side-btn {
-      width: 108px;
-      height: 32px;
+      width: calc(var(--u) * 10.8);
+      height: calc(var(--u) * 3.2);
       padding: 0;
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 8px;
+      font-size: calc(var(--u) * 0.8);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
@@ -1459,13 +1486,15 @@
       text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
     }
 
-    /* BUFFS button: under the projectile counter, same right-edge stack (LEADERBOARD 10-38, the counter 44-66, this 72-100). */
+    /* BUFFS button: under the projectile counter, same right-edge stack (LEADERBOARD 1u-3.8u, the counter
+       4.4u-6.6u, this 7.2u-10u - was a fixed-px running sum (10-38/44-66/72-100), now the same sum in --u; see
+       #ammo-box/.hud-stat's own note for the middle link in this chain). */
     #buffs-btn {
       position: absolute;
-      top: 72px;
-      right: 10px;
-      width: 96px; /* as wide as the projectile counter above it (the mute button that shared this row is gone) */
-      height: 28px;
+      top: calc(var(--u) * 7.2);
+      right: calc(var(--u) * 1);
+      width: calc(var(--u) * 9.6); /* as wide as the projectile counter above it (the mute button that shared this row is gone) */
+      height: calc(var(--u) * 2.8);
       z-index: 5;
       transition: opacity 0.25s ease;
     }
@@ -1473,11 +1502,11 @@
     /* LEADERBOARD button: top of the right-edge stack, above the projectile counter and BUFFS. */
     #leaderboard-btn {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 96px;
-      height: 28px;
-      font-size: 7px; /* "LEADERBOARD" is a touch too wide for the stack's usual 8px */
+      top: calc(var(--u) * 1);
+      right: calc(var(--u) * 1);
+      width: calc(var(--u) * 9.6);
+      height: calc(var(--u) * 2.8);
+      font-size: calc(var(--u) * 0.7); /* "LEADERBOARD" is a touch too wide for the stack's usual 0.8u */
       z-index: 5;
       transition: opacity 0.25s ease;
     }
@@ -1524,9 +1553,9 @@
        counter. Under the shop board (z 3), so they disappear with the rest of the game view in the shop. */
     .hud-stat {
       position: absolute;
-      right: 10px;
-      width: 96px;
-      height: 22px;
+      right: calc(var(--u) * 1);
+      width: calc(var(--u) * 9.6);
+      height: calc(var(--u) * 2.2);
       box-sizing: border-box;
       display: flex;
       align-items: center;
@@ -1536,13 +1565,13 @@
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 8px;
+      font-size: calc(var(--u) * 0.8);
       white-space: nowrap;
       pointer-events: auto; /* a tap on the counter does nothing - it must not start a throw (see the touch-blocking list below) */
       z-index: 2;
     }
 
-    #ammo-box { top: 44px; transition: opacity 0.2s ease; } /* 10px margin + 28px buttons + 6px gap */
+    #ammo-box { top: calc(var(--u) * 4.4); transition: opacity 0.2s ease; } /* 1u margin + 2.8u buttons + 0.6u gap - see #leaderboard-btn/#buffs-btn's own note on this same chain */
 
     #game-container.boxes-open #ammo-box {
       pointer-events: none;
@@ -1582,9 +1611,9 @@
 
     /* The equipped projectile's picture and how many are left ("[picture] x12"), where the STREAK counter was. */
     #ammo-box img {
-      width: 14px;
-      height: 14px;
-      margin-right: 4px;
+      width: calc(var(--u) * 1.4);
+      height: calc(var(--u) * 1.4);
+      margin-right: calc(var(--u) * 0.4);
       image-rendering: pixelated;
     }
 
@@ -1631,8 +1660,8 @@
        Pops in with an overshoot, then keeps pulsing until the shop is opened. */
     .notif-dot {
       position: absolute;
-      width: 16px;
-      height: 16px;
+      width: calc(var(--u) * 1.6);
+      height: calc(var(--u) * 1.6);
       box-sizing: border-box;
       background: #ff3b30;
       border: 2px solid #ffffff;
@@ -1644,14 +1673,14 @@
     }
 
     #shop-dot {
-      right: 86px; /* dot centered on the LEFT edge: button 10px margin + 84px wide, minus half the dot */
-      bottom: 32px; /* vertically centered on the button's top edge (10px margin + 32px tall) */
+      right: calc(var(--u) * 8.6); /* dot centered on the LEFT edge: button 1u margin + 8.4u wide, minus half the dot */
+      bottom: calc(var(--u) * 3.2); /* vertically centered on the button's top edge (1u margin + 3.2u tall) */
     }
 
     /* Same idea, one button up (BOXES sits above SHOP - see #boxes-btn). */
     #boxes-dot {
-      right: 86px;
-      bottom: 80px; /* boxes-btn's own top edge: 48px margin + 32px tall */
+      right: calc(var(--u) * 8.6);
+      bottom: calc(var(--u) * 8); /* boxes-btn's own top edge: 4.8u margin + 3.2u tall */
     }
 
     #game-container.boxes-open #shop-dot {
@@ -1660,39 +1689,51 @@
 
     /* Same dot on the top-right corner of the PROJECTILES button (inside #side-buttons, whose box is the button). */
     #projectiles-dot {
-      right: -8px;
-      top: -8px;
+      right: calc(var(--u) * -0.8);
+      top: calc(var(--u) * -0.8);
     }
 
-    /* The same dot on the top-right corner of the SKINS button (the second button: 32px tall buttons, 8px gap -> it starts 40px down). */
+    /* The same dot on the top-right corner of the SKINS button (the second button: 3.2u tall buttons, 0.8u gap -> it starts 4u down). */
     #skins-dot {
-      right: -8px;
-      top: 32px;
+      right: calc(var(--u) * -0.8);
+      top: calc(var(--u) * 3.2);
     }
 
-    /* Same dot on the top-right corner of the OPTIONS button (the third: 80px down, 2 x (32 + 8)) - a reminder to sign in,
+    /* Same dot on the top-right corner of the OPTIONS button (the third: 7.2u down, 2 x (3.2 + 0.8)) - a reminder to sign in,
        not a "something new" notice: it stays on for as long as the player is signed out, see saves.js accountSectionHtml
        and collection.js's updateOptionsDot (2026-09-23). */
     #options-dot {
-      right: -8px;
-      top: 72px;
+      right: calc(var(--u) * -0.8);
+      top: calc(var(--u) * 7.2);
     }
 
-    /* Same dot on the top-left corner of the BUFFS button (button: 10px from the right edge, 96px wide, 72px from the
+    /* Same dot on the top-left corner of the BUFFS button (button: 1u from the right edge, 9.6u wide, 7.2u from the
        top - it swapped places with LEADERBOARD, this dot has to follow it there). */
     #buffs-dot {
-      right: 98px; /* 10 + 96 - half the dot */
-      top: 64px; /* 72 - half the dot */
+      right: calc(var(--u) * 9.8); /* 1 + 9.6 - half the dot */
+      top: calc(var(--u) * 6.4); /* 7.2 - half the dot */
     }
 
     #game-container.boxes-open #buffs-dot {
       display: none;
     }
 
+    /* Same dot on the top-left corner of the LEADERBOARD button itself (2026-10-01, the owner's ask) - a pending
+       incoming trade offer, visible from the main HUD without having to open LEADERBOARD -> INBOX first. Button:
+       1u from the right edge, 9.6u wide, 1u from the top - same left-edge-of-button math as #buffs-dot. */
+    #leaderboard-dot {
+      right: calc(var(--u) * 9.8); /* 1 + 9.6 - half the dot */
+      top: calc(var(--u) * 0.2); /* 1 - half the dot */
+    }
+
+    #game-container.boxes-open #leaderboard-dot {
+      display: none;
+    }
+
     /* On a card in the PROJECTILES / BUFFS lists: centred on the card's top-left corner. */
     .pick-new {
-      left: -8px;
-      top: -8px;
+      left: calc(var(--u) * -0.8);
+      top: calc(var(--u) * -0.8);
     }
 
     /* On the SIGN IN button itself (saves.js accountSectionHtml, 2026-09-23 - moved here from the account card's
@@ -1700,8 +1741,8 @@
        positioning parent for a card's action button (see .pick-regen hanging under EQUIP) and hugs the button
        tightly when signed out, so this lines up on the button itself rather than the wider card. */
     .signin-dot {
-      right: -8px;
-      top: -8px;
+      right: calc(var(--u) * -0.8);
+      top: calc(var(--u) * -0.8);
     }
 
     .notif-dot.show {
@@ -1728,21 +1769,21 @@
        corkboard (BOXES open) it moves to the top centre (see below). */
     #coin-counter {
       position: absolute;
-      right: 10px;
-      bottom: 86px; /* 10px margin + 32px SHOP button + 6px gap + 32px BOXES button + 6px gap */
-      width: 84px;
-      height: 22px;
+      right: calc(var(--u) * 1);
+      bottom: calc(var(--u) * 8.6); /* 1u margin + 3.2u SHOP button + 0.6u gap + 3.2u BOXES button + 0.6u gap */
+      width: calc(var(--u) * 8.4);
+      height: calc(var(--u) * 2.2);
       box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: calc(var(--u) * 0.6);
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: 9px;
+      font-size: calc(var(--u) * 0.9);
       pointer-events: auto; /* same: tapping the coin counter must not start a throw */
       z-index: 4;
     }
@@ -1753,7 +1794,7 @@
       right: auto;
       bottom: auto;
       left: 50%;
-      top: calc(var(--u) * 2.8 - 11px); /* the frame band is ~5.6u tall: the 22px counter sits in its middle */
+      top: calc(var(--u) * 2.8 - var(--u) * 1.1); /* the frame band is ~5.6u tall: the 2.2u-tall counter sits in its middle (half its own height) */
       transform: translateX(-50%);
     }
 
@@ -1774,7 +1815,7 @@
       background: #000;
       color: #fff;
       font-family: "Press Start 2P", monospace;
-      font-size: 12px; /* the same size as #message's "TAP to AIM" - the loading text is styled to match it */
+      font-size: calc(var(--u) * 1.2); /* the same size as #message's "TAP to AIM" - the loading text is styled to match it */
       line-height: 1.8;
       text-align: center;
     }
@@ -1961,6 +2002,18 @@
     }
 
     .save-icon-btn:active { background: #74491f; }
+    /* A real, inert disabled state - not .ghost (which is still "clearly pressable", just a quieter colour for a
+       legitimate secondary action like CANCEL). Used by the TRADE button on a private-inventory player's account
+       card (2026-10-01, the owner's ask: visibly present but greyed out and non-functional, rather than hidden
+       outright) - the native `disabled` attribute means it never fires a click at all, not just a CSS look. */
+    .save-icon-btn:disabled {
+      background: #9c8b74;
+      border-color: #6b5a44;
+      color: #cfc3ad;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .save-icon-btn:disabled:active { background: #9c8b74; }
     /* PRIVATE INVENTORY's own ON state (saves.js tradingSectionHtml, 2026-09-29) - a toggle, not a one-shot
        action, so it needs a distinct "currently active" look, same idea as .pick-equip.on. */
     .save-icon-btn.on { background: #b9a88f; border-color: #8a7a62; color: #3b2412; }
@@ -1969,14 +2022,6 @@
     /* CHANGE NAME + CHANGE DESCRIPTION side by side instead of stacked, splitting the row evenly. */
     .account-btn-row { flex: none; display: flex; gap: calc(var(--u) * 1); }
     .account-btn-row .save-icon-btn { flex: 1; min-width: 0; }
-
-    /* Small explanatory line under the PRIVATE INVENTORY toggle - muted, not an error (unlike .account-error). */
-    .trading-note {
-      flex: none;
-      color: #e6cfa3;
-      font-size: calc(var(--u) * 0.95);
-      line-height: 1.5;
-    }
 
     /* A leaderboard card: place | name ... coins. Ranks 2-3 get the same epic tint the buff cards use, rank 1 the same
        travelling rainbow + pulsing shine a legendary buff card gets (.rarity-wave / .buff-card-shine, shared keyframes) -
@@ -2229,6 +2274,16 @@
       letter-spacing: 0.05em;
     }
 
+    /* The target's own real coin balance, shown under "YOU WANT" (2026-10-01, the owner's ask) - so a request
+       amount can be judged against what they actually have, before it's even typed. Empty/hidden on "YOU GIVE"
+       (your own balance is already visible in the HUD's own coin counter) and while it hasn't synced yet. */
+    .trade-col-balance {
+      flex: none;
+      text-align: center;
+      font-size: calc(var(--u) * 0.85);
+      color: #8a6a44;
+    }
+
     .trade-coins-row {
       flex: none;
       display: flex;
@@ -2461,8 +2516,8 @@
 
     #coin-counter .coin {
       flex: none;
-      width: 9px;
-      height: 9px;
+      width: calc(var(--u) * 0.9);
+      height: calc(var(--u) * 0.9);
       background: #f1c40f;
       border: 2px solid #b8860b;
       border-radius: 50%;
@@ -2510,6 +2565,7 @@
           </div>
           <div class="trade-col">
             <div class="trade-col-head">YOU WANT</div>
+            <div id="trade-want-balance" class="trade-col-balance"></div>
             <div class="trade-coins-row"><i class="coin"></i><input type="number" min="0" step="1" inputmode="numeric" class="trade-coins-input" data-side="want" /></div>
             <div class="trade-skins-grid" data-side="want"></div>
           </div>
@@ -2544,6 +2600,7 @@
     <span id="buffs-dot" class="notif-dot"></span>
     <div id="ammo-box" class="hud-stat"><img id="ammo-icon" alt="" draggable="false" /><span id="ammo-text">x0</span></div>
     <button id="leaderboard-btn" class="side-btn" type="button">LEADERBOARD</button>
+    <span id="leaderboard-dot" class="notif-dot"></span>
     <div id="side-buttons">
       <button id="projectiles-btn" class="side-btn" type="button">PROJECTILES</button>
       <span id="projectiles-dot" class="notif-dot"></span>
@@ -2567,7 +2624,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
-  <script src="src/version.js?v=332"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check-compat.js"></script>
+  <script src="src/version.js?v=333"></script>
   <script src="src/economy.js?v=50"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,
@@ -2595,15 +2653,15 @@
       }, 100);
     })();
   </script>
-  <script src="src/cloud.js?v=34"></script>
+  <script src="src/cloud.js?v=40"></script>
   <script src="src/rarity.js?v=3"></script>
   <script src="src/buffs.js?v=35"></script>
   <script src="src/shop.js?v=44"></script>
-  <script src="src/boxes.js?v=10"></script>
+  <script src="src/boxes.js?v=11"></script>
   <script src="src/volume.js?v=2"></script>
-  <script src="src/saves.js?v=31"></script>
+  <script src="src/saves.js?v=40"></script>
   <script src="src/collection.js?v=89"></script>
-  <script src="src/main.js?v=199"></script>
+  <script src="src/main.js?v=200"></script>
   <script>
     // Phaser also listens on window for touches/clicks that start OUTSIDE the canvas, so taps on
     // the shop, the SHOP/BACK button and the mute button used to be fed to the game as throws.

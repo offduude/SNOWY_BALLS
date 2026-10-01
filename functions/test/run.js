@@ -64,9 +64,44 @@ async function seedStock(stock, offers) {
   await db.collection("shopStock").doc("current").set({ stock, offers, nextRerollAt: now + 300000, generatedAt: now });
 }
 
+// Every test identity's real email claim (2026-10-01, the invite-only allowlist - see functions/lib/auth.js
+// ALLOWED_EMAILS and firestore.rules isAllowedEmail). A custom token carries no email by default - without this,
+// EVERY test in this file would start failing requireAuth the instant the allowlist shipped, not just the ones
+// about it specifically. Which real allowed email a given test uid gets doesn't matter beyond membership - the
+// allowlist checks the email claim alone, never a uid<->email correspondence (that pairing is something only a
+// real Google sign-in itself enforces) - picked distinct ones below purely so a test reads like 5 different
+// people, not because the code cares. `test-trader-not-invited` is the one deliberately or intentionally OMITTED
+// here, so its real email (below) stays off the list - that's the whole point of the negative test that uses it.
+const TEST_EMAILS = {
+  "test-trader-a": "offduude@gmail.com",
+  "test-trader-b": "domimarzec111@gmail.com",
+  "test-trader-c": "kubamolo592@gmail.com",
+  [ADMIN_UID]: "snowyballs759@gmail.com",
+  "test-trader-not-invited": "a-real-stranger@gmail.com",
+};
+
+// `createCustomToken`'s own `additionalClaims` CANNOT set `email` (confirmed live - Firebase reserves certain
+// claim names, email included, and silently drops them from a custom token; the resulting ID token had no email
+// claim at all) - the real, working way to get a uid an email claim in the emulator is to give that uid an
+// actual Auth user record with one FIRST (`createUser`), then mint a plain custom token for it - the ID token
+// that comes back then carries the real user record's email, confirmed live via getIdTokenResult(). Idempotent
+// (ignores "already exists" - this file signs in as the same handful of uids many times over the run).
+const ensuredAuthUsers = new Set();
+async function ensureAuthUser(uid, email) {
+  if (ensuredAuthUsers.has(uid)) return;
+  ensuredAuthUsers.add(uid);
+  try {
+    await admin.auth().createUser({ uid, email, emailVerified: true });
+  } catch (e) {
+    if (e.code !== "auth/uid-already-exists") throw e;
+  }
+}
+
 async function asUid(uid) {
   await signOut(clientAuth).catch(() => {});
   if (uid === null) return; // stay signed out
+  const email = TEST_EMAILS[uid] || "offduude@gmail.com"; // any allowed email works for an uid not listed above
+  await ensureAuthUser(uid, email);
   const token = await admin.auth().createCustomToken(uid);
   await signInWithCustomToken(clientAuth, token);
 }
@@ -349,8 +384,8 @@ async function main() {
   await check("sellSkin credits the fixed sellPrice", async () => {
     await seedSave(UID_A, { skinCounts: { character: { pryk: 1 }, scenery: {}, weather: {} } });
     const before = (await db.collection("saves").doc(UID_A).get()).data().coins;
-    const res = await call("sellSkin", { kind: "character", id: "pryk", n: 1 }); // sellPrice 37496
-    assert.strictEqual(res.data.coins, before + 37496);
+    const res = await call("sellSkin", { kind: "character", id: "pryk", n: 1 }); // sellPrice 13332 (2026-10-01 retune - was 37496)
+    assert.strictEqual(res.data.coins, before + 13332);
   });
   await check("sellSkin selling out the EQUIPPED skin re-equips the kind's default (2026-09-30)", async () => {
     await seedSave(UID_A, { skinCounts: { character: { pryk: 1 }, scenery: {}, weather: {} }, equipped: { character: "pryk", scenery: "frosty", weather: "snow", projectile: "snowball" } });
@@ -391,10 +426,14 @@ async function main() {
     const after = (await db.collection("shopStock").doc("current").get()).data();
     assert.strictEqual(after.generatedAt, before.generatedAt, "an undue reroll must not touch the stored doc");
   });
-  await check("shopStock/current is readable by a signed-OUT client (public read, per firestore.rules)", async () => {
+  await check("shopStock/current now REFUSES a signed-OUT client (2026-10-01, the invite-only allowlist - was public)", async () => {
     await asUid(null); // still signed out from the auth-gate section's own asUid(null) - explicit here for clarity
-    const snap = await getDoc(doc(clientDb, "shopStock", "current"));
-    assert.ok(snap.exists(), "a signed-out client should be able to read the public shop stock doc");
+    try {
+      await getDoc(doc(clientDb, "shopStock", "current"));
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied");
+    }
   });
   await check("forceRerollShop refuses a non-admin caller", async () => {
     await asUid(UID_A);
@@ -460,6 +499,37 @@ async function main() {
     assert.strictEqual(lbA.coins, 50000 - 1000 + 50);
   });
 
+  // REGRESSION (2026-10-01): a real bug caught by live-testing, not by this suite - acceptTrade's integrity-check
+  // branch used to `throw` from INSIDE the db.runTransaction callback right after queueing the decline's own
+  // writes, which Firestore transaction semantics silently discard entirely (throwing aborts the whole
+  // transaction). The trade stayed "pending" forever and the sender's escrow stayed reserved forever, even
+  // though the caller was told it had been "auto-declined". Fixed by returning a sentinel and throwing OUTSIDE
+  // the transaction, after the decline's own commit has already succeeded - this test asserts the decline
+  // actually PERSISTS, not just that the call rejects (a check on the thrown error alone would have passed even
+  // on the broken version).
+  await check("acceptTrade's integrity-check auto-decline actually persists (not just rejects the call)", async () => {
+    await asUid(UID_A);
+    const res = await call("proposeTrade", { toUid: UID_B, offer: { coins: 500, skins: [] }, request: { coins: 0, skins: [] } });
+    const desyncedTradeId = res.data.tradeId;
+    // Desync the escrow directly (Admin SDK bypasses rules) - mimics whatever real-world drift this safety net
+    // exists for, without needing to actually reproduce one.
+    await db.collection("saves").doc(UID_A).update({ outgoingTradeId: null, reserved: { coins: 0, skins: [] } });
+    await asUid(UID_B);
+    try {
+      await call("acceptTrade", { tradeId: desyncedTradeId });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "functions/failed-precondition");
+      assert.ok(/auto-declined/.test(e.message), `expected the auto-decline message, got: ${e.message}`);
+    }
+    const trade = (await db.collection("trades").doc(desyncedTradeId).get()).data();
+    assert.strictEqual(trade.status, "declined", "the decline must actually persist, not just reject the call");
+    assert.strictEqual(trade.reason, "integrity");
+    const saveA = (await db.collection("saves").doc(UID_A).get()).data();
+    assert.strictEqual(saveA.outgoingTradeId, null);
+    assert.strictEqual(saveA.reserved.coins, 0);
+  });
+
   console.log("\n-- Trading: cancel / decline --");
   await seedSave(UID_A, { coins: 50000, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
   await resetRateLimit(UID_A); // this section makes several proposeTrade calls that aren't testing the rate limit itself
@@ -506,6 +576,130 @@ async function main() {
     } finally {
       await db.collection("leaderboard").doc(UID_B).set({ privateInventory: false }, { merge: true });
     }
+  });
+
+  console.log("\n-- getTargetInventory: skinCounts moved off the public leaderboard doc (2026-10-01) --");
+  // The owner's own question: "can we even make it that a modified client cannot read the private inventory?"
+  // skinCounts used to live on leaderboard/{uid} (public read) - now it's inventoryMirror/{uid} (Admin SDK only),
+  // disclosed to a client exclusively through this Function, which checks privacy server-side first.
+  await db.collection("inventoryMirror").doc(UID_B).set({ skinCounts: { character: { pryk: 2 }, scenery: {}, weather: {} } });
+  await check("getTargetInventory returns the real skinCounts for a non-private target", async () => {
+    await asUid(UID_A);
+    const res = await call("getTargetInventory", { toUid: UID_B });
+    assert.strictEqual(res.data.skinCounts.character.pryk, 2);
+  });
+  await check("getTargetInventory refuses to disclose skinCounts for a private target, real data notwithstanding", async () => {
+    await db.collection("leaderboard").doc(UID_B).set({ privateInventory: true }, { merge: true });
+    try {
+      const res = await call("getTargetInventory", { toUid: UID_B });
+      assert.strictEqual(res.data.skinCounts, null);
+    } finally {
+      await db.collection("leaderboard").doc(UID_B).set({ privateInventory: false }, { merge: true });
+    }
+  });
+  await check("a client can never read inventoryMirror/{uid} directly, not even their own", async () => {
+    try {
+      await getDoc(doc(clientDb, "inventoryMirror", UID_A));
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied");
+    }
+  });
+  await check("a client can never write inventoryMirror/{uid} directly", async () => {
+    try {
+      await setDoc(doc(clientDb, "inventoryMirror", UID_A), { skinCounts: { character: { pryk: 999 }, scenery: {}, weather: {} } });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied");
+    }
+  });
+  await check("leaderboard/{uid} refuses a client write that still includes skinCounts (the old, now-removed shape)", async () => {
+    try {
+      await setDoc(
+        doc(clientDb, "leaderboard", UID_A),
+        { name: "Trader A", coins: 50000, character: "andek", description: "", updatedAt: serverTimestamp(), skinCounts: {} },
+        { merge: true }
+      );
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied");
+    }
+  });
+
+  console.log("\n-- Trading: a pending offer auto-declines the instant it becomes uncoverable (2026-10-01) --");
+  // The SENDER's own offer can never actually go uncoverable (hard escrow - spendableCoins/spendableSkinCount
+  // already protect it everywhere real coins/skins are spent, proven throughout this file already). This section
+  // is specifically about the RECIPIENT's side - nothing reserves anything there until they actually accept, so
+  // their own spending elsewhere has to be watched for instead. See lib/tradeGuard.js.
+  await seedStock(["daniels_coin"], [null]); // a real consumable, price 6750 (economy.json) - the known spend this section uses throughout
+  await check("purchase auto-declines a pending incoming offer this player can no longer cover", async () => {
+    await resetRateLimit(UID_B);
+    await seedSave(UID_A, { coins: 7000, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
+    await seedSave(UID_B, { coins: 0, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
+    await asUid(UID_B);
+    const proposed = await call("proposeTrade", { toUid: UID_A, offer: { coins: 0, skins: [] }, request: { coins: 300, skins: [] } });
+    await asUid(UID_A);
+    await call("purchase", { itemId: "daniels_coin" }); // costs 6750, leaving A with 250 - below the 300 just requested
+    const trade = (await db.collection("trades").doc(proposed.data.tradeId).get()).data();
+    assert.strictEqual(trade.status, "declined");
+    assert.strictEqual(trade.reason, "insufficient");
+    const saveB = (await db.collection("saves").doc(UID_B).get()).data();
+    assert.strictEqual(saveB.outgoingTradeId, null, "the sender's own escrow must be released too, not just the trade doc marked declined");
+  });
+  await check("...but a request that's STILL coverable after the same purchase is left alone", async () => {
+    await resetRateLimit(UID_B);
+    await seedStock(["daniels_coin"], [null]); // a FRESH roll (new generatedAt) - the check above already spent UID_A's one-per-roll quota of this item against the old one
+    await seedSave(UID_A, { coins: 7000, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
+    await seedSave(UID_B, { coins: 0, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
+    await asUid(UID_B);
+    const proposed = await call("proposeTrade", { toUid: UID_A, offer: { coins: 0, skins: [] }, request: { coins: 100, skins: [] } });
+    await asUid(UID_A);
+    await call("purchase", { itemId: "daniels_coin" }); // leaves A with 250, still >= the 100 requested
+    const trade = (await db.collection("trades").doc(proposed.data.tradeId).get()).data();
+    assert.strictEqual(trade.status, "pending", "a still-coverable request must not be touched");
+    await asUid(UID_B);
+    await call("cancelTrade", { tradeId: proposed.data.tradeId }); // clean up - don't leave this pending for a later section
+  });
+  await check("acceptTrade triggers the same guard for a DIFFERENT pending incoming offer, not just the one being accepted", async () => {
+    const UID_C = "test-trader-c";
+    await resetRateLimit(UID_B);
+    await resetRateLimit(UID_C);
+    await seedSave(UID_A, { coins: 300, reserved: { coins: 0, skins: [] }, outgoingTradeId: null, skinCounts: { character: {}, scenery: {}, weather: {} } });
+    await seedSave(UID_B, { coins: 0, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
+    await seedSave(UID_C, { coins: 0, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
+    await asUid(UID_B);
+    const fromB = await call("proposeTrade", { toUid: UID_A, offer: { coins: 0, skins: [] }, request: { coins: 250, skins: [] } });
+    await asUid(UID_C);
+    const fromC = await call("proposeTrade", { toUid: UID_A, offer: { coins: 0, skins: [] }, request: { coins: 100, skins: [] } });
+    // A can cover EITHER request right now (300 spendable >= 250, and >= 100) but not both at once (250+100=350).
+    await asUid(UID_A);
+    await call("acceptTrade", { tradeId: fromB.data.tradeId }); // pays 250, leaving 50 spendable - below C's own 100 request
+    const tradeB = (await db.collection("trades").doc(fromB.data.tradeId).get()).data();
+    assert.strictEqual(tradeB.status, "accepted", "the trade actually being accepted must be unaffected by its own side-effect");
+    const tradeC = (await db.collection("trades").doc(fromC.data.tradeId).get()).data();
+    assert.strictEqual(tradeC.status, "declined");
+    assert.strictEqual(tradeC.reason, "insufficient");
+    const saveC = (await db.collection("saves").doc(UID_C).get()).data();
+    assert.strictEqual(saveC.outgoingTradeId, null);
+  });
+  // REGRESSION (2026-10-02, a real gap found reviewing this rollout): sellSkin is the one function that actually
+  // REMOVES skins - unlike purchase/openBox (coins only) it can make a SKIN-based incoming request uncoverable,
+  // but it never called the trade guard at all until now. Also the only test in this whole section that exercises
+  // declineUncoverableIncomingTrades' `coversSkins` branch - every check above only ever spent coins.
+  await check("sellSkin auto-declines a pending incoming offer REQUESTING the exact skin just sold", async () => {
+    await resetRateLimit(UID_A);
+    await resetRateLimit(UID_B);
+    await seedSave(UID_A, { coins: 50000, reserved: { coins: 0, skins: [] }, outgoingTradeId: null, skinCounts: { character: { pryk: 1 }, scenery: {}, weather: {} } });
+    await seedSave(UID_B, { coins: 0, reserved: { coins: 0, skins: [] }, outgoingTradeId: null });
+    await asUid(UID_B);
+    const proposed = await call("proposeTrade", { toUid: UID_A, offer: { coins: 0, skins: [] }, request: { coins: 0, skins: [{ kind: "character", id: "pryk", qty: 1 }] } });
+    await asUid(UID_A);
+    await call("sellSkin", { kind: "character", id: "pryk", n: 1 }); // sells A's only pryk - B's own request can no longer be covered
+    const trade = (await db.collection("trades").doc(proposed.data.tradeId).get()).data();
+    assert.strictEqual(trade.status, "declined");
+    assert.strictEqual(trade.reason, "insufficient");
+    const saveB = (await db.collection("saves").doc(UID_B).get()).data();
+    assert.strictEqual(saveB.outgoingTradeId, null, "the sender's own escrow must be released too, not just the trade doc marked declined");
   });
 
   console.log("\n-- Admin account: an effectively bottomless coin balance (2026-09-30), but normal trading --");
@@ -576,11 +770,15 @@ async function main() {
     const res = await call("claimThrow", { projectileId: "snowball", hit: false, clientVersion: "v0.0.1" });
     assert.ok(res.data);
   });
-  await check("config/minVersion is readable by a signed-OUT client (public read, per firestore.rules)", async () => {
+  await check("config/minVersion now REFUSES a signed-OUT client (2026-10-01, the invite-only allowlist - was public)", async () => {
     await db.collection("config").doc("minVersion").set({ build: 1 });
     await asUid(null);
-    const snap = await getDoc(doc(clientDb, "config", "minVersion"));
-    assert.ok(snap.exists());
+    try {
+      await getDoc(doc(clientDb, "config", "minVersion"));
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied");
+    }
   });
   await check("config/minVersion can never be written by a client, even signed in", async () => {
     await asUid(UID_A);
@@ -699,6 +897,51 @@ async function main() {
     assert.deepStrictEqual(await tradesFor(UID_C), [], "a bystander must see neither query return anything");
     await asUid(UID_A);
     await call("cancelTrade", { tradeId: proposed.data.tradeId }); // clean up - leaves no pending trade behind for a later run
+  });
+
+  console.log("\n-- Invite-only allowlist: signed in is no longer enough on its own (2026-10-01) --");
+  // test-trader-not-invited is deliberately NOT in TEST_EMAILS' allowed set above - a REAL, successful sign-in
+  // (the Auth emulator has no concept of "invited" either - Firebase Auth itself never did), just with an email
+  // that was never added to ALLOWED_EMAILS/isAllowedEmail.
+  await check("requireAuth refuses a signed-in account whose email isn't on the allowlist", async () => {
+    await asUid("test-trader-not-invited");
+    try {
+      await call("claimThrow", { projectileId: "snowball", hit: false });
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "functions/permission-denied");
+    }
+  });
+  await check("firestore.rules refuses the same account reading the leaderboard directly, not just Functions", async () => {
+    await asUid("test-trader-not-invited");
+    try {
+      await getDocs(query(collection(clientDb, "leaderboard"), orderBy("coins", "desc"), limit(1)));
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied");
+    }
+  });
+  await check("firestore.rules refuses the same account reading shopStock/current directly", async () => {
+    await asUid("test-trader-not-invited");
+    try {
+      await getDoc(doc(clientDb, "shopStock", "current"));
+      throw new Error("did not throw");
+    } catch (e) {
+      assert.strictEqual(e.code, "permission-denied");
+    }
+  });
+  await check("an allowed account's own reads of leaderboard/shopStock still work (the gate isn't just 'deny everything')", async () => {
+    await resetRateLimit(UID_A);
+    await asUid(UID_A);
+    const lb = await getDocs(query(collection(clientDb, "leaderboard"), orderBy("coins", "desc"), limit(1)));
+    assert.ok(lb.docs.length > 0, "an allowed account must still see the leaderboard");
+    const stock = await getDoc(doc(clientDb, "shopStock", "current"));
+    assert.ok(stock.exists, "an allowed account must still see the shop stock");
+  });
+  await check("the admin account passes requireAuth via isAdmin(uid) alone, independent of its own email claim", async () => {
+    await asUid(ADMIN_UID); // TEST_EMAILS maps this to the real admin email too, but isAdmin(uid) is the OTHER, independent path - see that function's own note
+    const res = await call("getTargetInventory", { toUid: UID_A }); // a cheap, side-effect-free read - just needs to get PAST requireAuth
+    assert.ok("skinCounts" in res.data);
   });
 
   console.log(`\n${passed} passed, ${failed} failed.`);

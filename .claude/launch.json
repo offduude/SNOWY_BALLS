@@ -4,8 +4,8 @@
     {
       "name": "snowy-balls",
       "runtimeExecutable": "py",
-      "runtimeArgs": ["-m", "http.server", "8124"],
-      "port": 8124
+      "runtimeArgs": ["-m", "http.server", "5501"],
+      "port": 5501
     }
   ]
 }

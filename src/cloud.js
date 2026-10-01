@@ -29,6 +29,36 @@ const FIREBASE_CONFIG = {
   appId: "1:555349371621:web:25810d924ee66ea305820c",
 };
 
+// App Check (2026-10-01 - the owner's own question: can many botted accounts overload the project's Firebase
+// limits? App Check is Firebase's own answer to the related-but-different half of that: it proves a call
+// actually came from this real app running in a real browser, not a script hitting the Functions HTTP endpoint
+// directly with a stolen/forged uid - something `requireAuth` alone cannot tell apart, since a valid Firebase
+// Auth token is trivial for ANY script to obtain (sign in with any Google account, same as the real game does).
+//
+// EMPTY BY DESIGN right now - unlike FIREBASE_CONFIG above, this genuinely cannot be filled in here: a reCAPTCHA
+// v3 SITE KEY only exists once the owner registers the real production domain at
+// https://www.google.com/recaptcha/admin (a Google account action, same category as publishing firestore.rules -
+// Claude cannot do this part). Leaving this "" makes initAppCheck() below a complete no-op - zero behavior
+// change for the emulator or any existing testing - until that's done. The remaining steps, once a site key
+// exists: (1) paste it in here, (2) in the Firebase console, App Check -> Apps -> register this web app with that
+// same reCAPTCHA v3 provider, (3) only THEN add `enforceAppCheck: true` to every callable's `functions.runWith(...)`
+// options (functions/economy.js, functions/trading.js, functions/shop.js) - flipping that on before steps 1-2 are
+// live would reject every real call, nothing exempted, including the owner's own.
+const APP_CHECK_SITE_KEY = "";
+
+// No-op if APP_CHECK_SITE_KEY is still empty, or this is the local emulator (App Check's real attestation has
+// nothing to verify against a dev server on 127.0.0.1 anyway - testing it meaningfully needs the console-side
+// registration above first). Called once from init(), right after the other services - see that function's own
+// call site.
+function initAppCheck() {
+  if (!APP_CHECK_SITE_KEY || USE_EMULATOR || typeof firebase.appCheck !== "function") return;
+  try {
+    firebase.appCheck().activate(APP_CHECK_SITE_KEY, true); // true = auto-refresh the token, same as every other Firebase SDK default
+  } catch (e) {
+    /* a bad site key, or App Check not yet enabled for this project in the console - the game must not depend on this */
+  }
+}
+
 // WRITE TIMING: a sync pushes the leaderboard card AND the full save together (one batched write - two documents, one round
 // trip) only if something actually changed since the last successful write, and never while Economy.isGod() (see
 // window.godMode in main.js - and note signIn()/godMode() each refuse to run while the other's state is active, so a god
@@ -48,6 +78,11 @@ const SAVES_COLLECTION = "saves";
 // write path.
 const ADMIN_UID = "zrHVHG8QVXfZfMhUn0PJHf9TEKO2";
 const SESSION_KEY = "snowyBallsSession"; // this device's own remembered { uid, token } - separate from Economy's save data (see resetLocalSave/claimSession)
+// This device's own outgoing trade, if its offer has been locally pre-deducted but not yet reconciled (2026-10-01
+// - see setWatchedOutgoingTrade/reconcileWatchedOutgoingTrade). Survives a reload so a trade that resolves while
+// this device is closed still gets reconciled - a one-time get() on load, rather than waiting on a live listener
+// that only fires for a transition it was actually around to see.
+const WATCHED_TRADE_KEY = "snowyBallsWatchedOutgoingTrade";
 // How recently saves/{uid} must have been touched to count as "someone is actively playing on it right now" (see
 // signIn()). Set explicitly to "just over a minute" (not tied to SYNC_INTERVAL_MS by a multiplier) - the game already
 // syncs at least every SYNC_INTERVAL_MS while genuinely in use, so a save older than this really has gone quiet.
@@ -154,6 +189,7 @@ const Cloud = (() => {
       auth = firebase.auth();
       db = firebase.firestore();
       functions = firebase.functions();
+      initAppCheck();
       if (USE_EMULATOR) {
         auth.useEmulator("http://127.0.0.1:9099", { disableWarnings: true });
         db.useEmulator("127.0.0.1", 8080);
@@ -192,6 +228,8 @@ const Cloud = (() => {
       // save even belongs to the account being signed into before ever uploading it, closing the original
       // duplication concern from a different angle that does not depend on this listener at all.
       notifyAuth();
+      if (user) startTradesListener();
+      else stopTradesListener();
       // Skip while a god save is active (2026-09-29, needed once godMode() started requiring sign-in - see main.js):
       // without this, this restore-on-load path would immediately re-download the real cloud save over the god save
       // on the very next reload, the same overwrite the isGod() guards on signIn()/syncNow() already exist to prevent.
@@ -285,6 +323,33 @@ const Cloud = (() => {
       localStorage.setItem(SESSION_KEY, JSON.stringify(mySession));
     } catch (e) {
       /* storage unavailable - this device just can't reliably detect being displaced; sync itself still works */
+    }
+  }
+
+  // ---- watched outgoing trade: this device's own record of an offer it pre-deducted locally (2026-10-01) ----
+  function loadWatchedOutgoingTrade() {
+    try {
+      const raw = localStorage.getItem(WATCHED_TRADE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed.id === "string" && parsed.offer && parsed.request ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setWatchedOutgoingTrade(id, offer, request) {
+    try {
+      localStorage.setItem(WATCHED_TRADE_KEY, JSON.stringify({ id, offer, request }));
+    } catch (e) {
+      /* storage unavailable - the live listener still covers this trade's resolution as long as the tab stays open */
+    }
+  }
+
+  function clearWatchedOutgoingTrade() {
+    try {
+      localStorage.removeItem(WATCHED_TRADE_KEY);
+    } catch (e) {
+      /* storage unavailable - nothing was persisted in the first place */
     }
   }
 
@@ -508,6 +573,21 @@ const Cloud = (() => {
     dirty = true;
   }
 
+  // FIX (2026-10-01, a real bug the owner reported live-testing: private inventory "works but doesn't update
+  // instantly, letting players still send trade offers and seeing their inventory"): flipping OPTIONS' private-
+  // inventory toggle used to just go through Economy.onSave's generic `dirty = true` (same as markDirty above) -
+  // fine for a cosmetic field like the account description, but privateInventory is a real enforcement gate:
+  // proposeTrade (functions/trading.js) rejects an offer by reading the TARGET's leaderboard/{uid}.privateInventory
+  // fresh, every time, with no cache of its own - so the gap here was never just a stale TRADE button on someone
+  // else's screen, it was the SERVER itself still holding the old value, genuinely allowing a trade against this
+  // account, for however long the next ~30s heartbeat took to catch up. Immediate, same treatment as
+  // notePurchase/noteThrow below - this account's own privacy flag must reach the server before anyone else's
+  // client can act on the stale version a moment longer than necessary.
+  function notePrivacyChange() {
+    dirty = true;
+    heartbeat();
+  }
+
   // A shop purchase must reach the cloud before the player can refresh their way out of it - it's real coins spent
   // and a real item gained, exactly the kind of thing the restored-session read-on-load flow (see
   // onAuthStateChanged) would otherwise hand back the pre-purchase version of on a reload that beat the normal
@@ -574,18 +654,20 @@ const Cloud = (() => {
     // functions/lib/saves.js's own header note): without it, this being a FULL document overwrite would silently
     // wipe any server-owned field a Cloud Function has written into the same doc (skinCounts, buffItems, a
     // trade's escrow, the leaderboard's own mirrored skinCounts/privateInventory) back down to nothing, the next
-    // time this runs. Still correct to push `coins` from here for now - nothing calls the economy Cloud Functions
-    // from gameplay yet, so Economy.getCoins() genuinely is the only source of truth today. That stops being true
-    // once shop/boxes/buffs/throws are wired to call purchase/openBox/useBuff/claimThrow instead of mutating
-    // Economy locally (the plan's "Client UI wave") - at that point this must stop writing `coins` (and,
-    // eventually, `character`/skin-related fields) entirely, since a Cloud Function already mirrors the
-    // authoritative value here on every action that changes it (see acceptTrade/openBox/sellSkin) and this
-    // client-side push would otherwise race it and sometimes win with a stale number.
-    // Never for the admin/testing account (2026-09-30, the owner's ask - see ADMIN_UID's own note above): it
-    // still needs saves/{uid} synced (below, unconditionally) for its own continuity across devices/reloads,
-    // just never a public leaderboard card.
+    // time this runs.
+    //
+    // FIX (2026-10-01, the owner's report: the leaderboard stopped updating from plain throws at all): `coins`
+    // dropped from this write entirely - this is exactly the moment this comment's own earlier draft said would
+    // come ("once shop/boxes/buffs/throws are wired to call purchase/openBox/useBuff/claimThrow instead of
+    // mutating Economy locally... this must stop writing coins, since a Cloud Function already mirrors the
+    // authoritative value on every action that changes it, and this client-side push would otherwise race it").
+    // That wiring finished (items 20-26 of the blaze-migration), but this line never got updated to match - every
+    // coin-changing Function now mirrors its own new total itself (claimThrow/purchase gained their own mirror
+    // calls the same day as this fix, openBox/sellSkin's existing mirrors gained `coins` alongside the
+    // skinCounts they already had). `name`/`character`/`description`/`privateInventory` stay here - nothing
+    // server-side manages any of those, this client push is still their only source.
     if (user.uid !== ADMIN_UID) {
-      batch.set(db.collection("leaderboard").doc(user.uid), { name, coins, character, description, privateInventory, updatedAt: now }, { merge: true });
+      batch.set(db.collection("leaderboard").doc(user.uid), { name, character, description, privateInventory, updatedAt: now }, { merge: true });
     }
     if (saveJson !== null) batch.set(db.collection(SAVES_COLLECTION).doc(user.uid), { data: saveJson, updatedAt: now, session: mySession.token }, { merge: true });
     return batch
@@ -611,11 +693,12 @@ const Cloud = (() => {
   // actually OPENS the leaderboard. `onUpdated` fires once, only when a fresh read lands (not for an already-in-flight
   // one this call reuses).
   //
-  // skinCounts/privateInventory (2026-09-30): now actually read back into the cache, not just allow-listed in
-  // firestore.rules - this is what the trade-compose "YOU WANT" picker reads a target's real skins from
-  // (saves.js targetSkinsCatalog), and what gates the TRADE button/picker off entirely for a private player. Most
-  // rows won't have `skinCounts` yet (only openBox/sellSkin/acceptTrade write it, via a Cloud Function, and
-  // nothing is deployed to the real project yet) - `null` here means exactly that: "not synced", not "owns nothing".
+  // privateInventory (2026-09-30): read back into the cache - this is what gates the TRADE button off entirely
+  // for a private player (saves.js openInspect). `skinCounts` USED to be read back here too (for the trade-
+  // compose "YOU WANT" picker) - moved OFF this public document entirely (2026-10-01, see inventoryMirrorRef's
+  // own note, functions/lib/saves.js): a target's real inventory is now only ever learned through
+  // Cloud.callFunction("getTargetInventory", ...), which checks privacy server-side before answering, so a
+  // modified client reading this doc directly can no longer see it regardless of the flag.
   function refreshLeaderboard(onUpdated) {
     if (!ready || leaderboardLoading) return;
     leaderboardLoading = true;
@@ -641,7 +724,6 @@ const Cloud = (() => {
             character: d.data().character || null,
             description: d.data().description || "",
             privateInventory: d.data().privateInventory === true,
-            skinCounts: d.data().skinCounts || null,
           }));
         leaderboardLoading = false;
         if (onUpdated) onUpdated();
@@ -651,37 +733,165 @@ const Cloud = (() => {
       });
   }
 
-  // ---- trades (2026-09-30): the INBOX's own read-on-open cache, same convention as the leaderboard above - a
-  // one-shot get(), never a live listener. Two separate equality queries (fromUid==me, toUid==me), merged and
-  // sorted client-side rather than one compound query, since a trade's own two participant fields can never both
-  // match the same uid at once (no dedup needed) and this avoids requiring any composite Firestore index. Only
-  // ever "pending" trades - the INBOX shows what still needs a decision, not history (see the plan's Part 2: "your
-  // one outgoing offer (with CANCEL) and every pending incoming offer (ACCEPT/DECLINE)"). ----
+  // ---- trades: a LIVE cache (2026-10-01, was a one-shot read-on-open poll piggybacked on the 30s heartbeat -
+  // the owner's own ask: an incoming trade offer, and the notification for it, should land instantly, not up to
+  // 30s late). Two separate `onSnapshot` listeners (fromUid==me, toUid==me - never one compound query, since a
+  // trade's own two participant fields can never both match the same uid at once, so there's nothing to dedup,
+  // and this avoids requiring any composite Firestore index), merged client-side into one cache on every push
+  // from either. Only ever "pending" trades - the INBOX shows what still needs a decision, not history. ----
   let tradesRows = null; // cache: [{id, fromUid, toUid, offer, request, createdAt}] | null = never fetched (or signed out)
-  let tradesLoading = false;
+  let tradesFromDocs = [];
+  let tradesToDocs = [];
+  let tradesUnsubFrom = null;
+  let tradesUnsubTo = null;
+  const tradesListeners = [];
 
   function getTradesCache() {
     return tradesRows;
   }
 
-  function refreshTrades(onUpdated) {
-    if (!ready || !user || tradesLoading) return;
-    tradesLoading = true;
-    const col = db.collection("trades");
-    Promise.all([col.where("fromUid", "==", user.uid).where("status", "==", "pending").get(), col.where("toUid", "==", user.uid).where("status", "==", "pending").get()])
-      .then(([fromSnap, toSnap]) => {
-        const rows = [...fromSnap.docs, ...toSnap.docs].map((d) => {
-          const t = d.data();
-          return { id: d.id, fromUid: t.fromUid, toUid: t.toUid, offer: t.offer, request: t.request, createdAt: t.createdAt && t.createdAt.toMillis ? t.createdAt.toMillis() : 0 };
-        });
-        rows.sort((a, b) => b.createdAt - a.createdAt);
-        tradesRows = rows;
-        tradesLoading = false;
-        if (onUpdated) onUpdated();
+  // Fires on every live push, not just a manual refresh - this is what lets the LEADERBOARD button's own red dot
+  // (saves.js updateLeaderboardDot) and the INBOX's own dot/list stay current without anyone having to ask again.
+  // Replays immediately if a cache already exists by the time a late subscriber registers, same discipline
+  // onAuthChange/onOutdated already use.
+  function onTradesChange(fn) {
+    tradesListeners.push(fn);
+    if (tradesRows !== null) fn(tradesRows);
+  }
+  function notifyTradesChange() {
+    tradesListeners.forEach((fn) => fn(tradesRows));
+  }
+
+  function mergeTradesDocs() {
+    const rows = [...tradesFromDocs, ...tradesToDocs].map((d) => {
+      const t = d.data();
+      return { id: d.id, fromUid: t.fromUid, toUid: t.toUid, offer: t.offer, request: t.request, createdAt: t.createdAt && t.createdAt.toMillis ? t.createdAt.toMillis() : 0 };
+    });
+    rows.sort((a, b) => b.createdAt - a.createdAt);
+    tradesRows = rows;
+  }
+
+  // ---- an outgoing trade's own resolution (2026-10-01): the signal sendTradeOffer's local pre-deduction waits
+  // on to know whether to keep it (accepted) or give it back (declined/cancelled) - see saves.js
+  // onOutgoingTradeResolved. Two different triggers both funnel through reportOutgoingTradeResolved, which is
+  // de-duplicated per trade id (a Set, not just "first caller wins" by accident) so a cancel the player initiated
+  // themselves and a same-moment "removed" push from the listener below can never both apply the reaction. ----
+  const resolvedTradeIds = new Set();
+  const outgoingResolvedListeners = [];
+
+  function onOutgoingTradeResolved(fn) {
+    outgoingResolvedListeners.push(fn);
+  }
+
+  function reportOutgoingTradeResolved(info) {
+    if (resolvedTradeIds.has(info.id)) return;
+    resolvedTradeIds.add(info.id);
+    outgoingResolvedListeners.forEach((fn) => fn(info));
+    const watched = loadWatchedOutgoingTrade();
+    if (watched && watched.id === info.id) clearWatchedOutgoingTrade();
+  }
+
+  // A one-time check against whatever trade this device was still watching the last time it closed - covers a
+  // trade that resolved while this device was offline entirely, which the live listener below structurally can't
+  // (its own "removed" detection only ever sees a transition it was actually attached to witness; a trade that
+  // already left "pending" before the listener (re)attaches was never in its result set to begin with).
+  function reconcileWatchedOutgoingTrade() {
+    const watched = loadWatchedOutgoingTrade();
+    if (!watched) return;
+    db.collection("trades")
+      .doc(watched.id)
+      .get()
+      .then((doc) => {
+        if (!doc.exists) return;
+        const t = doc.data();
+        if (t.status === "pending") return; // still pending - the live listener about to start covers its eventual resolution
+        reportOutgoingTradeResolved({ id: watched.id, status: t.status, offer: t.offer, request: t.request });
       })
       .catch(() => {
-        tradesLoading = false; // offline, signed out, or not published to this project yet - whatever was cached is all there is
+        /* offline, or a transient read failure - tried again the next time startTradesListener() runs */
       });
+  }
+
+  function startTradesListener() {
+    if (!ready || !user || tradesUnsubFrom) return; // not ready, signed out, or already listening
+    reconcileWatchedOutgoingTrade();
+    const col = db.collection("trades");
+    tradesUnsubFrom = col
+      .where("fromUid", "==", user.uid)
+      .where("status", "==", "pending")
+      .onSnapshot(
+        (snap) => {
+          // A doc leaving this query's result set always means its status just changed to something other than
+          // "pending" - but the snapshot the SDK delivers for a "removed" change is this listener's own LAST
+          // KNOWN content for that doc (the most recent state that still matched `status == "pending"`), NOT the
+          // new post-update content - confirmed live-testing a real bug (2026-10-01, the owner's report: a
+          // sender's coin counter never updated after their own request-only trade was accepted): the delivered
+          // `status` here was still "pending" even though the trade had genuinely just been accepted server-side,
+          // which sent every resolved trade down the WRONG branch of onOutgoingTradeResolved (refunding the
+          // offer, as if declined/cancelled, instead of crediting the request). A fresh read of the doc by id is
+          // what actually gets the true resulting status.
+          snap.docChanges().forEach((change) => {
+            if (change.type === "removed") {
+              const id = change.doc.id;
+              change.doc.ref
+                .get()
+                .then((doc) => {
+                  if (!doc.exists) return; // genuinely deleted, not just resolved - nothing to report
+                  const t = doc.data();
+                  reportOutgoingTradeResolved({ id, status: t.status, offer: t.offer, request: t.request });
+                })
+                .catch(() => {
+                  /* offline, or a transient read failure - this trade's resolution is lost for this device until
+                     the next reconcileWatchedOutgoingTrade() (a fresh sign-in or page load) picks it back up */
+                });
+            }
+          });
+          tradesFromDocs = snap.docs;
+          mergeTradesDocs();
+          notifyTradesChange();
+        },
+        () => {
+          /* offline, or a transient read failure - the listener auto-retries on reconnect, whatever was cached stays */
+        }
+      );
+    tradesUnsubTo = col
+      .where("toUid", "==", user.uid)
+      .where("status", "==", "pending")
+      .onSnapshot(
+        (snap) => {
+          tradesToDocs = snap.docs;
+          mergeTradesDocs();
+          notifyTradesChange();
+        },
+        () => {}
+      );
+  }
+
+  function stopTradesListener() {
+    if (tradesUnsubFrom) tradesUnsubFrom();
+    if (tradesUnsubTo) tradesUnsubTo();
+    tradesUnsubFrom = null;
+    tradesUnsubTo = null;
+    tradesFromDocs = [];
+    tradesToDocs = [];
+    tradesRows = null;
+  }
+
+  // Kept for every existing call site (collection.js open("leaderboard"), heartbeat()'s own piggyback) - now just
+  // ensures the live listener is running and resolves `onUpdated` against whatever's already cached (or the next
+  // snapshot, if nothing has landed yet), rather than firing a read of its own.
+  function refreshTrades(onUpdated) {
+    startTradesListener();
+    if (!onUpdated) return;
+    if (tradesRows !== null) {
+      onUpdated();
+      return;
+    }
+    const once = () => {
+      tradesListeners.splice(tradesListeners.indexOf(once), 1);
+      onUpdated();
+    };
+    tradesListeners.push(once);
   }
 
   // ---- shop stock (2026-09-30, the "purchase" wiring): the REAL, server-generated stock src/shop.js reads
@@ -789,12 +999,17 @@ const Cloud = (() => {
     notePurchase,
     noteThrow,
     noteBuffUse,
+    notePrivacyChange,
     getAuthError,
     setConfirmOverwrite,
     getLeaderboardCache,
     refreshLeaderboard,
     getTradesCache,
     refreshTrades,
+    onTradesChange,
+    setWatchedOutgoingTrade,
+    onOutgoingTradeResolved,
+    reportOutgoingTradeResolved,
     getShopStockCache,
     refreshShopStock,
     setPersonalShopStock,

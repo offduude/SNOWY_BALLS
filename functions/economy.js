@@ -4,13 +4,19 @@
 // write inside a single db.runTransaction so a rate-limit check and its own mutation can never be split apart by
 // a retry or a concurrent call, then returns the caller's updated totals - the client applies ONLY this returned
 // value, never an optimistic local guess (same discipline the plan's trading Functions use).
+//
+// `runWith({ maxInstances: PLAYER_MAX_INSTANCES })` (2026-10-01) on every export here - see lib/scaling.js's own
+// note: applyRateLimits caps one uid's own call rate, this caps the WHOLE function's concurrency regardless of
+// how many different uids are calling it at once, the actual backstop against a many-botted-accounts attack.
 const functions = require("firebase-functions");
 const { db } = require("./lib/admin");
 const { requireAuth, isAdmin, ADMIN_COINS } = require("./lib/auth");
 const { applyRateLimits } = require("./lib/rateLimit");
-const { normalize, spendableCoins, spendableSkinCount, savesRef, writeSave, writeLeaderboardMirror } = require("./lib/saves");
+const { normalize, spendableCoins, spendableSkinCount, savesRef, writeSave, writeLeaderboardMirror, writeInventoryMirror } = require("./lib/saves");
 const { shopStockRef, normalize: normalizeStock, generateStock, rerollMs } = require("./lib/shopStock");
 const { requireMinVersion } = require("./lib/version");
+const { readIncomingTradeGuard, declineUncoverableIncomingTrades } = require("./lib/tradeGuard");
+const { PLAYER_MAX_INSTANCES } = require("./lib/scaling");
 const eco = require("./lib/economyData");
 
 function bad(msg) {
@@ -36,7 +42,7 @@ function bad(msg) {
 // nobody else can ever read or write it - decrementing it in place, exactly as before, can never affect anyone
 // else either. Both paths grant exactly ONE unit per call (never a client-chosen amount - "clicking it once
 // buys only a single projectile", src/shop.js's own long-standing rule) at the item's fixed unitPrice.
-exports.purchase = functions.https.onCall(async (data, context) => {
+exports.purchase = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const itemId = typeof data.itemId === "string" ? data.itemId : null;
@@ -49,6 +55,7 @@ exports.purchase = functions.https.onCall(async (data, context) => {
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
     if (isAdmin(uid)) save.coins = ADMIN_COINS; // forced on every read, not a skip-the-check branch - see lib/auth.js's own note
+    const tradeGuard = await readIncomingTradeGuard(tx, uid, null); // read now - see lib/tradeGuard.js's own note on why this can't wait until after the spend below
 
     await applyRateLimits(tx, [{ uid, key: "purchase", limit: 20, windowMs: 60000 }]);
 
@@ -85,6 +92,8 @@ exports.purchase = functions.https.onCall(async (data, context) => {
         }
       }
       save.personalShopStock = { stock: activeStock.stock, offers: activeStock.offers, expiresAt: save.personalShopStock.expiresAt };
+      declineUncoverableIncomingTrades(tx, tradeGuard, save);
+      writeLeaderboardMirror(tx, uid, { coins: save.coins }); // FIX (2026-10-01) - purchase never mirrored coins to the leaderboard at all; see claimThrow's own note on this same gap
       writeSave(tx, uid, save);
       return {
         coins: save.coins,
@@ -115,6 +124,8 @@ exports.purchase = functions.https.onCall(async (data, context) => {
     bought[itemId] = already + 1;
     save.shopBought = { generatedAt: cycle, bought };
 
+    declineUncoverableIncomingTrades(tx, tradeGuard, save);
+    writeLeaderboardMirror(tx, uid, { coins: save.coins }); // FIX (2026-10-01) - purchase never mirrored coins to the leaderboard at all; see claimThrow's own note on this same gap
     writeSave(tx, uid, save);
     return {
       coins: save.coins,
@@ -138,7 +149,7 @@ exports.purchase = functions.https.onCall(async (data, context) => {
 // get none.
 const EVENT_TRIGGER_BUFF_IDS = new Set(Object.values(eco.EVENT_DEFS).map((d) => d.buffId));
 
-exports.useBuff = functions.https.onCall(async (data, context) => {
+exports.useBuff = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const buffId = typeof data.buffId === "string" ? data.buffId : null;
@@ -196,22 +207,26 @@ exports.useBuff = functions.https.onCall(async (data, context) => {
 
 // ---------------------------------------------------------------------------------------------------------------
 // openBox({ kind, clientVersion }) - the exact same weighted draw as boxes.js's own draw(kind) (rarity roll
-// against economy.json boxOdds, then uniform among that rarity's items in the kind's pool), just run server-side
-// so the odds and the RNG are no longer something devtools can edit (closes the gap economy.json's own
-// _boxOddsSecurityNote flags). Returns the drawn item so the client can play its reel animation against the REAL
-// result instead of deciding one itself.
+// against economy.json boxOdds[kind], then uniform among that rarity's items in the kind's pool), just run
+// server-side so the odds and the RNG are no longer something devtools can edit. Returns the drawn item so the
+// client can play its reel animation against the REAL result instead of deciding one itself.
+//
+// `boxOdds` is PER KIND (2026-10-01, the owner's character-box-only retune, 40/30/9/1 - scenery/weather stayed
+// at the original 80/15/4/1) - every lookup below is `eco.boxOdds[kind][r.id]`, not the old flat
+// `eco.boxOdds[r.id]`, so each kind's draw only ever uses its OWN odds table.
 function drawBox(kind) {
   const pool = eco.boxPool(kind);
   if (!pool.length) return null;
-  const rarities = [...eco.rarityIndex.values()].filter((r) => (eco.boxOdds[r.id] || 0) > 0);
+  const kindOdds = eco.boxOdds[kind] || {};
+  const rarities = [...eco.rarityIndex.values()].filter((r) => (kindOdds[r.id] || 0) > 0);
   if (!rarities.length) return pool[Math.floor(Math.random() * pool.length)];
   const rid = (it) => (rarities.some((r) => r.id === it.rarity) ? it.rarity : rarities[0].id);
   const present = rarities.filter((r) => pool.some((it) => rid(it) === r.id));
-  const total = present.reduce((sum, r) => sum + (eco.boxOdds[r.id] || 0), 0);
+  const total = present.reduce((sum, r) => sum + (kindOdds[r.id] || 0), 0);
   let roll = Math.random() * total;
   let chosen = present[present.length - 1];
   for (const r of present) {
-    roll -= eco.boxOdds[r.id] || 0;
+    roll -= kindOdds[r.id] || 0;
     if (roll < 0) {
       chosen = r;
       break;
@@ -221,7 +236,7 @@ function drawBox(kind) {
   return atRarity[Math.floor(Math.random() * atRarity.length)];
 }
 
-exports.openBox = functions.https.onCall(async (data, context) => {
+exports.openBox = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const kind = typeof data.kind === "string" ? data.kind : null;
@@ -232,6 +247,7 @@ exports.openBox = functions.https.onCall(async (data, context) => {
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
     if (isAdmin(uid)) save.coins = ADMIN_COINS; // forced on every read, not a skip-the-check branch - see lib/auth.js's own note
+    const tradeGuard = await readIncomingTradeGuard(tx, uid, null); // read now - see lib/tradeGuard.js's own note on why this can't wait until after the spend below
 
     await applyRateLimits(tx, [{ uid, key: "openBox", limit: 20, windowMs: 60000 }]);
 
@@ -241,12 +257,19 @@ exports.openBox = functions.https.onCall(async (data, context) => {
     if (!item) throw new functions.https.HttpsError("internal", "This box's pool is empty.");
     save.skinCounts[kind][item.id] = (save.skinCounts[kind][item.id] || 0) + 1;
 
+    declineUncoverableIncomingTrades(tx, tradeGuard, save);
     writeSave(tx, uid, save);
     // Mirrored onto the PUBLIC leaderboard doc too (Admin SDK write, bypasses firestore.rules) - the read source
     // the trade-compose "YOU WANT" picker uses to browse a target's real skins (saves/{uid} itself is private) -
-    // see src/saves.js targetSkinsCatalog. Never actually reaches admin's OWN leaderboard doc in practice, since
-    // cloud.js's own syncNow() never creates one for that uid in the first place - see that file's own note.
-    writeLeaderboardMirror(tx, uid, { skinCounts: save.skinCounts });
+    // see functions/trading.js getTargetInventory. Never actually reaches admin's OWN mirrors in practice, since
+    // cloud.js's own syncNow() never creates a leaderboard doc for that uid in the first place - see that file's
+    // own note.
+    // `coins` added 2026-10-01 - this used to mirror skinCounts only, leaving the leaderboard's own coin total
+    // for an openBox purchase entirely dependent on the client's own (now-racy) syncNow() push; see claimThrow's
+    // own note on this same gap.
+    // skinCounts split OUT to its own non-public mirror (2026-10-01) - see inventoryMirrorRef's own note.
+    writeLeaderboardMirror(tx, uid, { coins: save.coins });
+    writeInventoryMirror(tx, uid, save.skinCounts);
     return { coins: save.coins, kind, itemId: item.id, rarity: item.rarity, skinCounts: save.skinCounts };
   });
 });
@@ -257,7 +280,7 @@ exports.openBox = functions.https.onCall(async (data, context) => {
 // escrowed in an outgoing trade offer can't also be sold out from under it. Selling out whatever's currently
 // EQUIPPED re-equips the kind's own default (free, permanent) item, same "never left equipped at 0 owned"
 // guarantee collection.js's client-side applySoldLocally makes for the signed-out/local path.
-exports.sellSkin = functions.https.onCall(async (data, context) => {
+exports.sellSkin = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const kind = typeof data.kind === "string" ? data.kind : null;
@@ -269,6 +292,11 @@ exports.sellSkin = functions.https.onCall(async (data, context) => {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(savesRef(uid));
     const save = normalize(snap.exists ? snap.data() : null);
+    // FIX (2026-10-02, a real gap found reviewing the trade-guard rollout): sellSkin is the one function that
+    // actually REMOVES skins - a pending incoming trade requesting the exact skin just sold would silently sit
+    // uncoverable forever instead of auto-declining, unlike purchase/openBox/acceptTrade (all already wired).
+    // Read now - see lib/tradeGuard.js's own note on why this can't wait until after the spend below.
+    const tradeGuard = await readIncomingTradeGuard(tx, uid, null);
 
     await applyRateLimits(tx, [{ uid, key: "sellSkin", limit: 20, windowMs: 60000 }]);
 
@@ -283,8 +311,12 @@ exports.sellSkin = functions.https.onCall(async (data, context) => {
       if (def) save.equipped[kind] = def.id;
     }
 
+    declineUncoverableIncomingTrades(tx, tradeGuard, save);
     writeSave(tx, uid, save);
-    writeLeaderboardMirror(tx, uid, { skinCounts: save.skinCounts });
+    // `coins` added 2026-10-01 - see openBox's own note on this same gap. skinCounts split OUT to its own
+    // non-public mirror the same day - see inventoryMirrorRef's own note (functions/lib/saves.js).
+    writeLeaderboardMirror(tx, uid, { coins: save.coins });
+    writeInventoryMirror(tx, uid, save.skinCounts);
     return { coins: save.coins, skinCounts: save.skinCounts, equipped: save.equipped };
   });
 });
@@ -327,7 +359,7 @@ exports.sellSkin = functions.https.onCall(async (data, context) => {
 // Known, accepted gap (unlike `hit`, which only ever inflates a bounded reward): a modified client claiming
 // `saved: true` on every throw gets unlimited free use of a consumable projectile it may not even have an
 // active save-chance buff for - an unbounded exploit, not a bounded one. Deliberately left open per the above.
-exports.claimThrow = functions.https.onCall(async (data, context) => {
+exports.claimThrow = functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireMinVersion(data);
   const projectileId = typeof data.projectileId === "string" ? data.projectileId : null;
@@ -384,6 +416,13 @@ exports.claimThrow = functions.https.onCall(async (data, context) => {
     save.coins += reward;
     save.lifetimeCoins += reward;
 
+    // FIX (2026-10-01, the owner's report: two simultaneous sessions saw the leaderboard stop updating from
+    // throws at all): claimThrow never mirrored its own new coin total to the leaderboard - only
+    // openBox/sellSkin (skinCounts only, not even coins) and acceptTrade (the sole function that mirrored coins
+    // at all) did. The leaderboard's `coins` field was relying entirely on the client's own OLD syncNow() push
+    // to ever move at all for a plain throw - see that function's own note on why that's now a genuine race, not
+    // just a redundant write, now that every coin-changing path is server-authoritative.
+    writeLeaderboardMirror(tx, uid, { coins: save.coins });
     writeSave(tx, uid, save);
     return { coins: save.coins, projectiles: save.projectiles, reward, saved };
   });

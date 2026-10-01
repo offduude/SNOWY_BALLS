@@ -7,7 +7,29 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // The leaderboard is public to READ (anyone can see the standings, signed in or not) but a player may only ever write
+    // Invite-only allowlist (2026-10-01 - the owner's own ask, after asking whether many botted accounts could
+    // overload the project's Firebase limits, then deciding to gate on sign-in + an allowlist rather than rely on
+    // Firebase App Check alone, which needs a reCAPTCHA site key the owner doesn't have yet - see
+    // functions/lib/auth.js's own matching note and docs/NOTES.md). ANY Google account can still complete a real
+    // sign-in (Firebase Auth itself has no concept of "invited"), so this is the actual gate: every rule below
+    // that used to be `if true` (public, no sign-in needed at all) or just `request.auth.uid == uid` now also
+    // requires the account's own email - straight off the real Google ID token, not anything a client can forge -
+    // to be on this list. The game was never meant to support a never-signed-in local play mode, so nothing here
+    // stays public. Mirrored by hand in functions/lib/auth.js's ALLOWED_EMAILS (rules can't require() that file) -
+    // keep the two lists in sync manually, same as ADMIN_UID already is across multiple files in this project.
+    function isAllowedEmail() {
+      return request.auth != null && request.auth.token.email != null && request.auth.token.email.lower() in [
+        'joatre2741@gmail.com',
+        't4backupemail2@gmail.com',
+        'domimarzec111@gmail.com',
+        'kubamolo592@gmail.com',
+        'offduude@gmail.com',
+        'snowyballs759@gmail.com'
+      ];
+    }
+
+    // The leaderboard - readable only by an allowed account (2026-10-01, was public to everyone - see
+    // isAllowedEmail's own note above) - but a player may only ever write
     // THEIR OWN document (uid = their Google account id from Firebase Auth), and only with the shape src/cloud.js writes:
     // { name, coins, character, description, updatedAt }. This is a light sanity check (right size/shape of each field,
     // nobody else's doc, the server's own clock for the timestamp so it can't be backdated or left off) - not a full
@@ -17,36 +39,54 @@ service cloud.firestore {
     // sanitizeAccountDescription) before it ever gets here - the 400-byte cap below is deliberately looser than that
     // client cap (a short string can still be a few hundred UTF-8 bytes once accented/non-Latin characters are involved),
     // it only exists to block a client that skipped the cleaning entirely.
-    // `privateInventory` and `skinCounts` (added 2026-09-29 for the trading feature - see the approved plan and the
-    // snowy-balls-blaze-migration memory) are OPTIONAL here on purpose, not required: rules+Functions publish
-    // BEFORE the client build that actually sends them (the migration's own standing sequencing rule), so if they
+    // `privateInventory` (added 2026-09-29 for the trading feature - see the approved plan and the
+    // snowy-balls-blaze-migration memory) is OPTIONAL here on purpose, not required: rules+Functions publish
+    // BEFORE the client build that actually sends them (the migration's own standing sequencing rule), so if it
     // were required every write from the OLD, still-live client would start failing the moment these rules go up -
-    // exactly the kind of break the snowy-balls-smooth-version-transitions memory exists to prevent. `privateInventory`
-    // IS now sent by the client itself (cloud.js syncNow(), 2026-09-30 - a plain preference, not server-owned).
-    // `skinCounts` is only ever written by a Cloud Function (Admin SDK, which bypasses these rules entirely)
-    // mirroring a player's saves/{uid} totals here - a client never legitimately sends it itself; it's
-    // allow-listed here only so a client's own unrelated write (name/coins/character/description) to a doc that
-    // already has these fields isn't rejected for containing them. PUBLIC read on this whole doc is what lets the
-    // trade-compose "YOU WANT" picker browse a target's real skins (saves.js targetSkinsCatalog) - the ONLY place
-    // another player's inventory is ever shown client-side (2026-09-30: the leaderboard inspect popup's own
-    // standalone preview was removed).
+    // exactly the kind of break the snowy-balls-smooth-version-transitions memory exists to prevent. It IS now sent
+    // by the client itself (cloud.js syncNow(), 2026-09-30 - a plain preference, not server-owned).
+    // `skinCounts` USED to live here too, mirrored by a Cloud Function - moved OUT entirely to its own
+    // inventoryMirror/{uid} collection below (2026-10-01, the owner's own question: "can we even make it that a
+    // modified client cannot read the private inventory?"). Firestore rules have no notion of "public except this
+    // one field" - skinCounts riding on the same PUBLIC-READ document as the leaderboard listing meant a private
+    // player's real inventory was always readable by anyone willing to read this doc directly, no matter how
+    // convincingly the client's own TRADE button hid it. See inventoryMirrorRef's own note (functions/lib/
+    // saves.js) and functions/trading.js getTargetInventory for the real, server-enforced replacement.
     match /leaderboard/{uid} {
-      allow read: if true;
+      allow read: if isAllowedEmail();
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.data.keys().hasOnly(['name', 'coins', 'character', 'description', 'updatedAt', 'privateInventory', 'skinCounts'])
+                   && isAllowedEmail()
+                   && request.resource.data.keys().hasOnly(['name', 'coins', 'character', 'description', 'updatedAt', 'privateInventory'])
                    && request.resource.data.name is string
                    && request.resource.data.name.size() > 0
                    && request.resource.data.name.size() <= 60
-                   && request.resource.data.coins is number
-                   && request.resource.data.coins >= 0
-                   && request.resource.data.coins < 100000000000 // 100 billion - no real save gets anywhere near this; it only exists to block a garbage value
+                   // `coins` (made OPTIONAL here 2026-10-01, a real bug found live-testing the private-inventory
+                   // fix): the client stopped sending this field entirely weeks ago (syncNow() - only a Cloud
+                   // Function mirrors it now), so a genuinely brand-new account's first-ever client write (name/
+                   // description/privateInventory - e.g. the owner's own repro, toggling OPTIONS before ever
+                   // throwing a snowball) hits a doc with no `coins` field at all yet, and `request.resource.data
+                   // .coins is number` on a key that plain doesn't exist throws an evaluation error instead of
+                   // just failing - silently blocking that player's very first sync of anything, forever, until
+                   // some OTHER action finally gets a Cloud Function to create the doc first. Same optional
+                   // pattern `character`/`privateInventory`/`skinCounts` already use below; still validated
+                   // whenever it IS present (whether carried forward from an existing Cloud Function write, or
+                   // this write's own merge of one).
+                   && (!('coins' in request.resource.data) || (request.resource.data.coins is number && request.resource.data.coins >= 0 && request.resource.data.coins < 100000000000)) // 100 billion - no real save gets anywhere near this; it only exists to block a garbage value
                    && (request.resource.data.character == null || (request.resource.data.character is string && request.resource.data.character.size() <= 60))
                    && request.resource.data.description is string
                    && request.resource.data.description.size() <= 400
                    && request.resource.data.updatedAt == request.time // the server's clock, not a value the client can pick
-                   && (!('privateInventory' in request.resource.data) || request.resource.data.privateInventory is bool)
-                   && (!('skinCounts' in request.resource.data) || request.resource.data.skinCounts is map);
+                   && (!('privateInventory' in request.resource.data) || request.resource.data.privateInventory is bool);
+    }
+
+    // A player's real skin counts (2026-10-01) - split OUT of leaderboard/{uid} specifically so it is NEVER
+    // public-read, unlike that document. `allow read, write: if false` - Admin SDK only, same as trades/
+    // rateLimits below; the ONLY way any client ever learns a skinCounts value (their own or someone else's) is
+    // functions/trading.js getTargetInventory, which checks the TARGET's own privateInventory flag (on
+    // leaderboard/{uid}) before ever returning anything. See inventoryMirrorRef's own note, functions/lib/saves.js.
+    match /inventoryMirror/{uid} {
+      allow read, write: if false;
     }
 
     // The actual cloud save - PRIVATE, unlike the leaderboard: only the owning account can read or write it (nobody else's
@@ -79,31 +119,44 @@ service cloud.firestore {
     // malicious one attempting to grant itself coins cannot satisfy without already knowing, and merely echoing
     // back, the CURRENT real value - it can never actually change it through this path.
     match /saves/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && request.auth.uid == uid && isAllowedEmail();
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.data.keys().hasOnly(['data', 'updatedAt', 'session', 'coins', 'lifetimeCoins', 'skinCounts', 'buffItems', 'projectiles', 'buffs', 'equipped', 'reserved', 'outgoingTradeId'])
+                   && isAllowedEmail()
+                   && request.resource.data.keys().hasOnly(['data', 'updatedAt', 'session', 'coins', 'lifetimeCoins', 'skinCounts', 'buffItems', 'projectiles', 'buffs', 'equipped', 'reserved', 'outgoingTradeId', 'personalShopStock', 'shopBought'])
                    && request.resource.data.data is string
                    && request.resource.data.data.size() < 200000
                    && request.resource.data.session is string
                    && request.resource.data.session.size() > 0
                    && request.resource.data.session.size() <= 100
                    && request.resource.data.updatedAt == request.time
-                   // A per-field `resource.data.X == request.resource.data.X` comparison (tried first) threw a
-                   // genuine evaluation error rather than just failing, for reasons that weren't worth chasing
-                   // further once this - Firestore's OWN documented idiom for "which fields did this write
-                   // actually change" - turned out simpler and more robust anyway: on an UPDATE,
-                   // `.diff(resource.data).affectedKeys()` is the set of keys whose VALUE changed (a field
-                   // present and identical on both sides never appears in it at all, regardless of type - no
-                   // null/map-equality edge cases to get wrong by hand) - requiring that set to be a subset of
-                   // the client-owned fields means a write may add/change `data`/`updatedAt`/`session` freely
-                   // but can never actually CHANGE any server-owned field, only (harmlessly) carry its existing
-                   // value forward via merge. On a CREATE there is no `resource.data` to diff against at all
-                   // (`resource == null` is Firestore's documented way to detect this) - a brand-new doc must
-                   // simply not contain any server-owned field yet, checked directly instead.
+                   // FIX (2026-10-01, a real bug live-tested against the emulator - see docs/NOTES.md): the
+                   // `.diff(resource.data).affectedKeys().hasOnly([...])` idiom this used to use does NOT keep its
+                   // own documented promise that "a field present and identical on both sides never appears in it
+                   // at all" - `personalShopStock`/`shopBought` (nested-map server-owned fields, unlike the
+                   // flatter ones that happened to be exercised when this was first written) showed up in
+                   // `affectedKeys()` even completely UNCHANGED, rejecting every real player's sync the moment a
+                   // Cloud Function ever wrote either field - which is every player, from their very first shop
+                   // purchase. Confirmed live: `.get(key, null)` equality per field does NOT have this problem.
+                   // On a CREATE there is no `resource.data` to compare against at all (`resource == null` is
+                   // Firestore's documented way to detect this) - a brand-new doc must simply not contain any
+                   // server-owned field yet, checked directly instead. On an UPDATE, each server-owned field (see
+                   // functions/lib/saves.js SERVER_OWNED_FIELDS - keep this list in sync with that one) must carry
+                   // forward UNCHANGED; `.get(key, null)` compares safely whether or not the key exists on either
+                   // side, so a field genuinely absent from both, or present and equal on both, always passes.
                    && (resource == null
                         ? request.resource.data.keys().hasOnly(['data', 'updatedAt', 'session'])
-                        : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['data', 'updatedAt', 'session']));
+                        : request.resource.data.get('coins', null) == resource.data.get('coins', null)
+                          && request.resource.data.get('lifetimeCoins', null) == resource.data.get('lifetimeCoins', null)
+                          && request.resource.data.get('skinCounts', null) == resource.data.get('skinCounts', null)
+                          && request.resource.data.get('buffItems', null) == resource.data.get('buffItems', null)
+                          && request.resource.data.get('projectiles', null) == resource.data.get('projectiles', null)
+                          && request.resource.data.get('buffs', null) == resource.data.get('buffs', null)
+                          && request.resource.data.get('equipped', null) == resource.data.get('equipped', null)
+                          && request.resource.data.get('reserved', null) == resource.data.get('reserved', null)
+                          && request.resource.data.get('outgoingTradeId', null) == resource.data.get('outgoingTradeId', null)
+                          && request.resource.data.get('personalShopStock', null) == resource.data.get('personalShopStock', null)
+                          && request.resource.data.get('shopBought', null) == resource.data.get('shopBought', null));
     }
 
     // Trade offers (2026-09-29, see the approved plan's Part 3 and functions/trading.js): a client can READ a
@@ -115,6 +168,7 @@ service cloud.firestore {
     // fails every read with an error indistinguishable from "not published yet").
     match /trades/{tradeId} {
       allow read: if request.auth != null
+                  && isAllowedEmail()
                   && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
       allow write: if false;
     }
@@ -125,26 +179,28 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // The global shop stock (2026-09-29, plan item 5 - see functions/shop.js/functions/lib/shopStock.js): public
-    // to READ, signed in or not, same reasoning as the leaderboard - every client needs to see what's currently
-    // on sale to render the SHOP tab at all, and there's nothing private in a rolled stock list. NEVER writable by
-    // a client, under any circumstance - only the Cloud Scheduler-triggered rerollShop / the admin-only
+    // The global shop stock (2026-09-29, plan item 5 - see functions/shop.js/functions/lib/shopStock.js): readable
+    // only by an allowed account (2026-10-01, was public - see isAllowedEmail's own note above; this game was
+    // never meant to support a never-signed-in local play mode, so there's no reason to keep this public). NEVER
+    // writable by a client, under any circumstance - only the Cloud Scheduler-triggered rerollShop / the admin-only
     // forceRerollShop (both Admin SDK, bypass these rules entirely) ever touch this doc. This is the actual fix
     // for the multi-tab reroll exploit: one server-generated roll every client reads, instead of each tab
     // computing its own.
     match /shopStock/{docId} {
-      allow read: if true;
+      allow read: if isAllowedEmail();
       allow write: if false;
     }
 
-    // Version-gate config (2026-09-30 - see functions/lib/version.js). Public read, same reasoning as shopStock:
-    // every client needs to read config/minVersion itself for the proactive "am I already stale" check
-    // (src/cloud.js checkClientVersion), not just find out reactively when a Function rejects a call. NEVER
-    // writable by a client - only ever hand-set via the Firestore console (matching this project's existing
+    // Version-gate config (2026-09-30 - see functions/lib/version.js). Readable only by an allowed account
+    // (2026-10-01, was public - same reasoning as shopStock above): every client needs to read config/minVersion
+    // itself for the proactive "am I already stale" check (src/cloud.js checkClientVersion), not just find out
+    // reactively when a Function rejects a call - but a non-allowed account was never going to get past
+    // requireAuth anyway, so there's nothing lost by gating the proactive check the same way as everything else.
+    // NEVER writable by a client - only ever hand-set via the Firestore console (matching this project's existing
     // discipline of hand-pasting rules rather than automating deploys), read by every callable Function via the
     // Admin SDK, which bypasses these rules entirely.
     match /config/{docId} {
-      allow read: if true;
+      allow read: if isAllowedEmail();
       allow write: if false;
     }
 

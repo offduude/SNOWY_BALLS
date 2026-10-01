@@ -21,6 +21,23 @@ function leaderboardRef(uid) {
   return db.collection("leaderboard").doc(uid);
 }
 
+// A player's real skin counts, split OUT of leaderboard/{uid} into their own non-public collection (2026-10-01 -
+// the owner's own question: "can we even make it that a modified client cannot read the private inventory?").
+// Before this, skinCounts lived on leaderboard/{uid} itself, which firestore.rules makes `allow read: if true` -
+// the public leaderboard LISTING genuinely needs that (anyone must be able to see everyone's name/coins/rank),
+// but Firestore security rules have no notion of "public except this one field," so skinCounts riding along on
+// the same document meant ANY client (a modified one, or just a raw Firestore SDK call with no app at all) could
+// always read a private player's real inventory directly, no matter how convincingly the TRADE button was
+// greyed out and disabled client-side - that was always a UI nicety, never an actual data boundary. This
+// collection is `allow read, write: if false` (Admin SDK only, same as trades/rateLimits) - the ONLY way any
+// client ever learns a skinCounts value, their own or someone else's, is functions/trading.js getTargetInventory,
+// which checks the target's OWN privateInventory flag server-side before ever returning anything - a modified
+// client can still CALL it, but the server simply never answers for a private target, which is the only real way
+// to enforce this (you cannot stop a client from asking, only from ever being told).
+function inventoryMirrorRef(uid) {
+  return db.collection("inventoryMirror").doc(uid);
+}
+
 // Every server-owned top-level field on saves/{uid} - see defaults() below.
 const SERVER_OWNED_FIELDS = ["coins", "lifetimeCoins", "skinCounts", "buffItems", "projectiles", "buffs", "equipped", "reserved", "outgoingTradeId", "personalShopStock", "shopBought"];
 
@@ -37,10 +54,16 @@ function writeSave(tx, uid, save) {
   tx.set(savesRef(uid), save, { mergeFields: SERVER_OWNED_FIELDS });
 }
 
-// Same reasoning as writeSave above, for the public leaderboard mirror - `fields` is e.g. `{ coins }` or
-// `{ skinCounts }` or both; each key gets replaced wholesale rather than deep-merged.
+// Same reasoning as writeSave above, for the public leaderboard mirror - `fields` is e.g. `{ coins }` (skinCounts
+// no longer goes through here - see inventoryMirrorRef's own note above and writeInventoryMirror below).
 function writeLeaderboardMirror(tx, uid, fields) {
   tx.set(leaderboardRef(uid), fields, { mergeFields: Object.keys(fields) });
+}
+
+// Same wholesale-replace reasoning as writeSave/writeLeaderboardMirror above (a sold-down-to-zero skin must
+// actually disappear, not survive a deep merge) - the non-public counterpart to writeLeaderboardMirror.
+function writeInventoryMirror(tx, uid, skinCounts) {
+  tx.set(inventoryMirrorRef(uid), { skinCounts }, { mergeFields: ["skinCounts"] });
 }
 
 // `defaults()` gives every field a sane value the same way economy.js's own `clean()` does for the client save -
@@ -136,4 +159,16 @@ function spendableSkinCount(save, kind, id) {
   return Math.max(0, total - reservedSkinQty(save, kind, id));
 }
 
-module.exports = { defaults, normalize, spendableCoins, spendableSkinCount, reservedSkinQty, savesRef, leaderboardRef, writeSave, writeLeaderboardMirror };
+module.exports = {
+  defaults,
+  normalize,
+  spendableCoins,
+  spendableSkinCount,
+  reservedSkinQty,
+  savesRef,
+  leaderboardRef,
+  inventoryMirrorRef,
+  writeSave,
+  writeLeaderboardMirror,
+  writeInventoryMirror,
+};

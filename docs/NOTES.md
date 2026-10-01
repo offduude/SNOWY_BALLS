@@ -4239,3 +4239,654 @@ the doc and confirmed normal play resumed with zero leftover state. `index.html`
 `v=33 -> 34` / `v=30 -> 31`.
 - `functions/lib/version.js` (new), `functions/economy.js`, `functions/trading.js`, `functions/shop.js`,
   `firestore.rules`, `src/cloud.js`, `src/saves.js`, `index.html`, `functions/test/run.js`.
+
+## Trading: four real bugs found and fixed live-testing, plus instant notifications (2026-10-01)
+
+The owner reported trading "feels slow" and that accepting a trade had **zero** effect on their own coin
+counter. Live-testing this turned up four separate, real bugs - not one.
+
+**Bug 1 - accepting a trade never touched the accepter's own Economy.** `src/saves.js runTradeAction`'s
+`.then(() => ...)` discarded `acceptTrade`'s response entirely; nothing ever called `Economy.addCoins`/
+`addSkin`/`removeSkin`. Fixed by applying the trade's own already-known `offer`/`request` shape (already sitting
+in the trades cache - the ACCEPT button couldn't have rendered without it) - same "the outcome was already
+known, just apply it" discipline `collection.js applySoldLocally` uses for sellSkin, rather than trusting the
+response's raw totals as a blind set.
+
+**Bug 2 - INBOX notifications were a 30s poll, not instant.** `cloud.js`'s trades cache was a one-shot
+read-on-open piggybacked on the heartbeat. Reworked into two live `onSnapshot` listeners (`fromUid==me`,
+`toUid==me`, both `status==pending`), started on sign-in/stopped on sign-out, merged into the same cache shape
+every existing caller already expects (`refreshTrades(onUpdated)` kept as a thin compatibility wrapper). New
+`Cloud.onTradesChange(fn)` callback list. Verified live: a trade offer seeded directly in Firestore (mimicking
+another player) showed up as a real UI change within ~1s, zero reload, zero manual action.
+
+**New: a red dot on the LEADERBOARD button itself** (top-left corner, matching `#buffs-dot`'s own positioning
+math), not just the INBOX button inside that screen - the owner's ask, so a pending offer is visible from the
+main HUD without opening LEADERBOARD first. `updateLeaderboardDot()` (saves.js), driven by `refresh()`
+unconditionally (unlike the INBOX dot, which only updates while that screen is open) and by `Cloud.onTradesChange`.
+
+**Bug 3 - acceptTrade's own integrity-check safety net didn't actually work**, found live-testing Bug 1's fix
+with a deliberately-desynced test trade. The code queued the decline's writes (`tx.update(... status:
+"declined" ...)`, clearing the sender's escrow) then immediately `throw`-ed an `HttpsError` from INSIDE the
+SAME `db.runTransaction` callback - but throwing from inside a transaction callback **aborts the whole
+transaction**, discarding every write queued in it. The trade stayed "pending" forever and the sender's escrow
+stayed reserved forever, even though the caller was told it had been auto-declined. Fixed in
+`functions/trading.js acceptTrade`: the integrity branch now `return`s a `{integrityFailed: true}` sentinel
+(letting that transaction commit normally), and the OUTER function checks it and throws the user-facing error
+*after* the commit has already succeeded. New regression test (`functions/test/run.js`) asserts the decline
+actually *persists* in Firestore, not just that the call rejects - the previous, broken version would have
+passed a test that only checked the thrown error.
+
+**Bug 4 - the sender's own coin counter never moved ("ghost coins").** The server escrows the offer the instant
+`proposeTrade` succeeds, but nothing client-side ever reflected that locally for the SENDER - their own counter
+sat at the pre-trade number for the whole time the offer was pending, with nothing explaining why, then jumped
+to whatever the next full sync happened to pull. The owner's own fix, implemented as asked: `sendTradeOffer`
+now deducts the offer locally the INSTANT it's sent (mirroring the server's own escrow, not guessing), and the
+deduction is reversed the instant the trade resolves to anything other than accepted.
+
+Reconciling "anything other than accepted" needed three different triggers, all funneled through one
+de-duplicated signal (`cloud.js reportOutgoingTradeResolved`/`onOutgoingTradeResolved`, a `Set` of already-
+reacted-to trade ids so two triggers firing for the same resolution can never double-apply):
+- **The sender cancels it themselves** - `runTradeAction("cancelTrade", ...)` already knows the outcome, reports
+  it directly.
+- **The other player accepts or declines it while this tab is open** - the existing `fromUid==me` live listener's
+  `snap.docChanges()` "removed" entries fire for exactly this (a doc leaving the `status==pending` query always
+  means its status just changed) - and critically, the snapshot delivered for a "removed" change is the doc's
+  own NEW post-update content, not stale pre-update data, so no extra read is needed to learn the outcome.
+- **It resolves while this device is closed entirely** - the live listener structurally can't catch this (a
+  trade already resolved before the listener (re)attaches was never in its result set to begin with, so there's
+  no "removed" transition to observe). New `WATCHED_TRADE_KEY` localStorage record (set the moment an offer is
+  sent, matching the `saveMySession`-style persistence already used for session tokens) lets
+  `reconcileWatchedOutgoingTrade()` do a one-time direct `get()` on reload/sign-in against specifically the trade
+  that was still pending last time this device closed.
+
+An ACCEPTED outcome only needs to apply the `request` side (whatever the sender receives back, if anything) -
+the `offer` side was already deducted at send time, correctly, nothing more to do there.
+
+Verified live end-to-end: seeded a real incoming trade for a test account, watched the LEADERBOARD dot appear
+within ~1s with no action taken; accepted it and confirmed the coin counter jumped immediately (4 -> 254) and
+the won skin was granted (a new SKINS dot appeared); re-ran the broken (unescrowed) version of the same trade
+and confirmed the integrity-decline now genuinely persists in Firestore (`status: "declined", reason:
+"integrity"`) instead of leaving the trade and the sender's escrow stuck forever. 62 emulator checks total (one
+new regression test), all passing, zero regressions in the full suite.
+
+## Shop: background-tap-to-close dead zone, and category button text overflow (2026-10-01)
+
+The owner found a real bug by hand that automated/live testing had missed: tapping the SHOP's dimmed background
+correctly closes it almost everywhere - except in the empty space around and between the PROJECTILES/BUFFS
+category buttons (`#shop-cats`), where nothing happens at all. Root cause: `#shop-cats` is a flex container
+(`height: 55%`, `justify-content: center`) considerably taller than the two buttons it actually holds, and the
+WHOLE container got `pointer-events: auto` the instant the shop opened - so a tap anywhere in that box's empty
+space (well over 100px of dead space above/below/between the buttons at the sizes tested) was silently absorbed
+by `#shop-cats` itself before it could ever reach `#shop-backdrop` underneath, and `#shop-cats` has no click
+handler of its own to do anything with it.
+
+Fixed in `index.html`: split the shared `opacity`/`pointer-events` rule apart - `#shop-cats` itself now stays
+`pointer-events: none` permanently (inherited from its own base rule, never overridden), and only
+`.shop-cat-btn` (the two actual buttons) gets `pointer-events: auto` when the shop is open. A standard CSS
+pattern (container doesn't intercept, specific children opt back in) - a tap anywhere else in the column's own
+box now passes straight through to the backdrop, same as tapping anywhere else outside the panel already did.
+
+**Same report, a second real bug**: `.shop-cat-btn`'s `height`/`font-size` were fixed pixels (40px/9px) instead
+of this file's own `--u` scaling unit every other sized element uses - fine at the size they were tuned at, but
+staying fixed while `#shop-cats`' own width (a % of the scaled game area) shrinks at a smaller viewport, so
+"PROJECTILES"/"BUFFS" visibly overflowed their own buttons, exactly as the owner's screenshot showed. Switched
+to `calc(var(--u) * 4)` / `calc(var(--u) * 0.9)` (chosen to render identically to the old fixed values at this
+file's own reference size - only the small-viewport behavior actually changes).
+
+Verified live: confirmed via `elementFromPoint` that the dead zone (directly between the two buttons, and well
+above/below them) now resolves to `#shop-backdrop`, not `#shop-cats`, both at a normal desktop size and at a
+small (480x270) emulated viewport; confirmed a real click there closes the shop; confirmed the two category
+buttons themselves are still correctly hit-testable and still switch category on click; confirmed at the small
+viewport the button text now renders fully contained with no overflow.
+- `src/saves.js`, `src/cloud.js`, `functions/trading.js`, `functions/test/run.js`, `index.html`.
+
+## Every button/HUD element converted to --u scaling, not just .shop-cat-btn (2026-10-01)
+
+The owner's follow-up to the shop fix above: "on a big display theyre small and in the corners and on smaller
+displays like a vertically held mobile phone they occupy half the screen" - the same root cause as
+`.shop-cat-btn`'s bug (fixed px instead of this file's own `--u` responsive unit), just everywhere else too. A
+full audit of every clickable/sized element in `index.html`'s `<style>` block (an Explore agent, cross-checked
+against the body markup) found the shop/boxes/modal/collection-list/leaderboard/trade-compose/options systems
+were ALL already correctly `--u`-scaled - the bug was isolated to the main HUD chrome: the bottom-right
+SHOP/BOXES stack, the left-edge PROJECTILES/SKINS/OPTIONS column, the right-edge LEADERBOARD/ammo-counter/BUFFS
+stack, the coin counter, every notification dot's position, and a few stray bits of in-game text (`#message`,
+`#boxes-hint`, `#loading-screen`).
+
+Converted every one of those (`#shop-btn`/`#boxes-btn`, `#side-buttons`/`.side-btn`, `#buffs-btn`/
+`#leaderboard-btn`, `.hud-stat`/`#ammo-box`/`#ammo-box img`, `#coin-counter`/`#coin-counter .coin`, `.notif-dot`
+plus all 9 of its per-button position overrides, `.pick-new`, `.signin-dot`, `#message`, `#boxes-hint` + its own
+coarse-pointer media query, `#loading-screen`) from fixed px to `calc(var(--u) * N)`, each `N` chosen so it
+renders PIXEL-IDENTICAL to the old fixed value at this file's own reference/design size (confirmed live - a
+screenshot at the reference size is unchanged from before this pass) - only the behavior at a genuinely
+different aspect ratio actually changes.
+
+Several of these were chained: the right-edge stack (LEADERBOARD -> ammo counter -> BUFFS) and the bottom-right
+stack (SHOP -> BOXES -> coin counter) are each a running sum of the PREVIOUS element's own position + height +
+a fixed gap (their own code comments did this arithmetic in raw px) - converting one in isolation would have
+broken the chain's math, so each stack was converted together, re-deriving the same running sum in `--u` units.
+Every notification dot's own position is a THIRD layer on top of that (each one's offset is computed from the
+button/counter it sits on), so those had to move in the same pass too, not left stale pointing at pre-conversion
+geometry.
+
+Verified live at three sizes against the same unmodified build: the reference desktop size (screenshot
+pixel-identical to before this pass - confirms the conversion factor is correct, not just "smaller"); a wide
+2000x900 window (buttons now scale proportionally with the game's own letterboxed 16:9 play area instead of
+staying a fixed small size within it); and a 375x812 portrait mobile size (the exact complaint - buttons
+previously stayed at their fixed-px size while the surrounding `--u`-scaled UI shrank around them, making them
+look oversized/crowded in the tiny letterboxed strip a portrait phone gives the game; now they shrink
+proportionally with everything else). Also re-confirmed the shop's background-tap-to-close dead-zone fix and
+the SHOP open/close flow still work correctly at the portrait size, since several of the converted elements sit
+right next to it.
+
+Note: the game's own 16:9 aspect-ratio lock (why a very wide or very tall viewport letterboxes at all) is a
+separate, pre-existing, deliberate design choice (`--u`'s own formula) - not touched by this pass. This fix is
+specifically "every element now scales consistently WITH `--u`", not a redesign of the letterboxing/aspect
+strategy itself.
+- `index.html` only.
+
+## The projectile counter's own text ("x50") still didn't scale - a THIRD source of the same bug class (2026-10-01)
+
+The owner's own follow-up catch, right after the whole-UI `--u` pass above: the ammo/projectile HUD counter's
+digit text still didn't shrink/grow with everything else. Root cause this time wasn't CSS at all - `#ammo-text`
+has no font-size rule of its own (correctly inherits `.hud-stat`'s, already fixed) - `src/main.js
+updateAmmoHud()` sets it directly via `text.style.fontSize = ...px`, an inline style that overrides the
+stylesheet entirely, computed from a flat `min(8, floor(60/(digits+1)))` formula with no `--u` in it at all.
+
+First attempt - reading `--u`'s own resolved value via `getComputedStyle(gameContainer).getPropertyValue("--u")`
+- turned out unreliable: a custom property whose OWN value is a `calc()`/`min()` expression can come back as
+that literal unparsed expression STRING rather than a resolved px number (confirmed live - `parseFloat` on it
+returned `NaN` every time in this browser), silently making the fix a no-op the whole time it looked correct.
+Fixed by recomputing `--u` directly in JS instead, mirroring index.html's own formula (`min(innerWidth,
+innerHeight * 16/9) / 100` - `dvh` has no direct JS equivalent, `innerHeight` is the right analogue for a
+cosmetic font-size, doesn't need mobile-chrome pixel-exactness the way real layout would) - both the cap and the
+budget scale by the same ratio they always had to `--u` at the reference size (8/10 = 0.8u, 60/10 = 6u).
+
+Verified live: confirmed via `window.innerWidth/innerHeight` at a 375x812 mobile size the computed font-size is
+genuinely smaller (3px) than at this session's own pane size (~6.8px) - correctly dynamic now, not the flat 8px
+it silently stayed at with the first (broken) attempt. `index.html`'s `main.js` bumped `v=199 -> 200`.
+- `src/main.js`, `index.html`.
+
+## Trading: the target's real balance shown + enforced, a greyed-out TRADE button for private players, and a
+## new guard that auto-declines a pending offer the instant it becomes uncoverable (2026-10-01)
+
+Four asks in one pass. (1) The trade-compose "YOU WANT" column now shows the target's real coin balance
+("They have N coins") right under the header, read from the same leaderboard-cache row the skin picker already
+uses. (2) The WANT coins input is capped to that real balance both via the input's own `max` attribute and in
+`onTradeComposeInput` itself (typing past it clamps back down) - the server's own `acceptTrade` check was always
+the real enforcement, this just stops a doomed request from being typed in the first place. (3) A
+private-inventory player's account card now shows a real, native `disabled` TRADE button (genuinely inert, not
+just styled to look that way - a real `<button disabled>`) instead of omitting the button outright, per the
+owner's ask - a new `.save-icon-btn:disabled` style (dimmed, `cursor: not-allowed`), distinct from `.ghost`
+(still "clearly pressable", the wrong look for something that does nothing).
+
+(4) The real one: "cancel trades immediately when either player doesn't have as many coins as specified." The
+SENDER's own offer can never actually go uncoverable - hard escrow already makes that structurally impossible,
+proven throughout this whole migration (every coin/skin-spending Function already checks `spendableCoins`/
+`spendableSkinCount`, which already exclude whatever's reserved). The RECIPIENT's side has no such protection -
+nothing reserves anything there until they actually accept, so their own spending elsewhere can leave a pending
+incoming offer silently impossible to ever accept. New `functions/lib/tradeGuard.js`: a two-phase helper
+(Firestore transactions require all reads before any writes, so "which of this player's pending incoming trades
+just became uncoverable" has to be read eagerly, before the spend that might invalidate them, then decided once
+the real post-spend balance is known) wired into `purchase`, `openBox`, and `acceptTrade` itself (since the
+accepter's own coins can move too, potentially invalidating a DIFFERENT pending incoming offer of theirs).
+Declines with `reason: "insufficient"`, releasing the sender's own escrow in the same pass - the owner's own
+confirmed assumption that skins already worked this way (via `sellSkin`'s existing `spendableSkinCount` check)
+was correct, verified by reading the code, no fix needed there.
+
+One known, accepted edge case, documented in the code rather than silently left: if the accepter has ANOTHER
+pending incoming offer from the exact same sender as the trade they're accepting, and that sender happens to
+also be the one whose escrow needs releasing by the guard, both writes target the same save doc within one
+transaction and whichever queues last wins the overlapping fields - the trade doc itself always still gets
+marked declined correctly (a separate document), only that one sender's escrow fields could end up stale. Needs
+two independent senders mid-trade with the exact same two players at the exact same moment - not pursued further
+at this game's actual scale.
+
+4 new emulator checks (65 total) - a purchase auto-declining an uncoverable incoming offer; a still-coverable
+one left alone; acceptTrade's own spend triggering the same guard for a DIFFERENT pending trade, with the
+trade actually being accepted unaffected. Verified live: the balance note and the input cap both render/behave
+correctly through the real compose screen.
+- `functions/lib/tradeGuard.js` (new), `functions/economy.js`, `functions/trading.js`, `src/saves.js`,
+  `index.html`, `functions/test/run.js`.
+
+## The leaderboard's own coin total was only ever moved by acceptTrade - everything else relied on a now-broken client push (2026-10-01)
+
+The owner's report: with two simultaneous sessions (a normal tab and an incognito tab, two different accounts),
+the leaderboard stopped updating from throws entirely for both - but a trade between them updated it correctly.
+Investigating found this isn't actually a two-tabs bug at all: **`claimThrow` and `purchase` never mirrored
+their own new coin total to the leaderboard server-side, period** - confirmed by grep, zero `writeLeaderboardMirror`
+calls in either. `openBox`/`sellSkin` mirrored `skinCounts` but never `coins` either. `acceptTrade` was the
+ONLY function that ever mirrored `coins` - exactly why a trade updated the leaderboard correctly while plain
+throws never did, with or without a second tab open.
+
+The only thing that ever moved `leaderboard/{uid}.coins` for every other path was the client's own OLD
+`syncNow()` push - and `syncNow()`'s own code already had a comment, written back when the Cloud Functions
+migration started, explicitly flagging this: "this must stop writing coins... once shop/boxes/buffs/throws are
+wired to call purchase/openBox/useBuff/claimThrow instead of mutating Economy locally... since a Cloud Function
+already mirrors the authoritative value... and this client-side push would otherwise race it." That wiring
+finished days ago (items 20-26 of the blaze-migration) but this line was never actually updated to match -
+the race the comment warned about was real, and with nothing server-side covering the gap for throws/purchases
+at all, "racy" in practice meant "never updates unless something else happens to also trigger a write."
+
+Fixed by finishing exactly what that comment described: `claimThrow`, `purchase` (both branches), `openBox`,
+and `sellSkin` all mirror `coins` now (openBox/sellSkin's existing skinCounts-only mirrors extended, rather than
+duplicated); `syncNow()` dropped `coins` from its own leaderboard write entirely - `name`/`character`/
+`description`/`privateInventory` stay, since nothing server-side manages any of those.
+
+Verified live, cleanly (a fresh account, real coins credited via an actual `claimThrow` call rather than a
+client-only shortcut, to avoid confusing the test with a locally-fabricated balance the server never agreed to):
+one `claimThrow` call correctly produced a `leaderboard/{uid}.coins` update, confirmed by reading the doc
+directly from Firestore with no client involved at all. Also used this same clean session to re-verify the
+separate "ghost coins" sender-side fix from earlier today still works correctly end to end: offering 200 of a
+real, server-credited 1000 coins dropped the sender's own HUD counter to 800 immediately, matching
+`Economy.getCoins()` exactly - the owner's own earlier incognito report of it not updating was most likely a
+stale cached copy of `saves.js` in that specific tab, from before the fix shipped.
+
+Two unrelated things surfaced and resolved along the way, not real bugs: the "sign-in failed: the save on this
+account could not be read" message the owner saw came from one of my own scratch test scripts seeding an
+incomplete save shape, not a real product bug (the message's own behavior - leaving the local save untouched
+rather than risk an unparseable overwrite - is working exactly as designed); and the "fake placeholder accounts
+don't show up on the leaderboard" observation was because that same scratch script only ever wrote to
+`saves/{uid}`, never `leaderboard/{uid}` (a separate collection), so there was never anything for the leaderboard
+screen to find for those accounts.
+
+65 emulator checks still passing (no server-side test covered this gap before - the leaderboard write path isn't
+exercised by the existing suite's own assertions, which mostly check `saves/{uid}` directly). `index.html`'s
+`cloud.js` bumped `v=37` (no further bump needed - this was a same-session continuation of the earlier trading
+fixes' already-bumped version).
+- `functions/economy.js`, `src/cloud.js`.
+
+## Two more real bugs behind the owner's leaderboard report (2026-10-01)
+
+The owner reported, from a real two-tab repro (a normal tab and an incognito tab, two fresh accounts, one
+trading coins to the other): the recipient's own coin counter never updated after the trade, the leaderboard
+briefly showed stale/incomplete numbers until closed and reopened, and - separately - every name on the
+leaderboard showed as "undefined" with no description and no picture. Live-reproduced both root causes against
+the emulator (two real signed-in sessions, a real `proposeTrade`/`acceptTrade` pair) rather than guessing from
+code alone - neither was the bug it first looked like.
+
+**Bug 1 - every player's name/character/description has been permanently stuck since their first server-owned
+save field, not racing a slow sync:** `firestore.rules`' `saves/{uid}` write rule (the fix two sections up this
+file) switched from a per-field comparison to `request.resource.data.diff(resource.data).affectedKeys()`,
+on the documented promise that "a field present and identical on both sides never appears in it at all." Live
+testing proved that's false for `personalShopStock`/`shopBought` specifically (nested-map server fields added to
+`functions/lib/saves.js` SERVER_OWNED_FIELDS after this rule was first written, and never added to this rule's
+own allow-lists) - they show up in `affectedKeys()` as "changed" even completely untouched, which fails the
+`.hasOnly(['data','updatedAt','session'])` check and makes the ENTIRE batched client sync (`syncNow()`, both the
+`saves/{uid}` write AND the `leaderboard/{uid}` write, one atomic batch) get silently `PERMISSION_DENIED`'d, every
+single time, forever, the instant a Cloud Function first writes either field - which in practice is every real
+player, starting from their first shop visit. The leaderboard doc still gets `coins`/`skinCounts` from the Cloud
+Function mirrors (a completely separate write path, Admin SDK, bypasses rules entirely) - just never `name`/
+`character`/`description`, since only the client's own now-permanently-failing write ever sends those.
+
+Fixed by replacing the `.diff()` idiom with direct `.get(key, null)` equality checks, one per entry in
+SERVER_OWNED_FIELDS (`resource.data.get('coins', null) == request.resource.data.get('coins', null)`, etc.) -
+confirmed live, field by field, that this does NOT have the same false-positive problem, for every field
+including the two that broke `.diff()`. Also added `personalShopStock`/`shopBought` to the `keys().hasOnly([...])`
+allow-list on the same rule (separately necessary either way, and part of the same drift - the allow-list was
+never updated when those two fields were added to SERVER_OWNED_FIELDS). Keep `firestore.rules`' two field lists
+here in sync with `functions/lib/saves.js` SERVER_OWNED_FIELDS by hand going forward - nothing enforces this
+automatically.
+
+**Bug 2 - a trade's SENDER never sees their own request-side coins land, even with the tab open the whole
+time:** `cloud.js`'s live trades listener detects a resolved outgoing trade via a Firestore `docChanges()`
+"removed" event (the trade leaving the `status == "pending"` query once it's accepted/declined/cancelled) - the
+code's own comment claimed the SDK delivers that change's doc content as "the doc's own NEW content... not stale
+pre-update data." Live-tested: false. The snapshot handed to a "removed" change is this listener's last-known
+content from BEFORE the transition - for an accepted trade that's still `status: "pending"`. Every resolution
+was landing in `onOutgoingTradeResolved`'s wrong branch (treated as declined/cancelled, refunding the ALREADY-
+spent offer) instead of the right one (crediting the request) - for a request-only trade (no coins offered,
+exactly the owner's repro) the refund branch has nothing to refund, so nothing visibly happens at all and the
+sender's counter just sits there, permanently behind the leaderboard's real total.
+
+Fixed by re-fetching the trade doc by id (`change.doc.ref.get()`) the moment a "removed" change is seen, instead
+of trusting the change event's own bundled data, and reporting the resolution from that fresh read. Verified
+live end to end: a fresh account proposes a request-only trade, a second account accepts it via a direct
+Function call while the first tab stays open and signed in the whole time, and the sender's own `Economy.getCoins()`
+updates within ~1s with no reload, no reopening anything, matching the server's real total exactly.
+
+The leaderboard screen's own "showed stale numbers until closed and reopened" half of the report isn't a bug on
+top of these two - `refreshLeaderboard()` is deliberately read-on-open, not a live listener (see its own header
+comment), so a leaderboard left open across a trade or a throw keeps showing whatever it last fetched until
+reopened, by design ("a stale leaderboard rank is harmless"). Once bug 1 stopped eating every sync, and bug 2
+stopped leaving the sender's own counter wrong, reopening the leaderboard now reliably shows the true, current
+numbers - which is what "closing and opening fixed it" already told us, before either root cause was found.
+
+All 65 emulator checks still pass after both fixes. `firestore.rules` needs the owner's own manual re-publish
+step (same as every rules change - see the file's own header note) before this reaches the real project.
+`index.html`'s `cloud.js` bumped `v=37 -> 38`.
+- `firestore.rules`, `src/cloud.js`.
+
+## Private inventory didn't actually block a trade instantly - a real enforcement gap, not just UI lag (2026-10-01)
+
+The owner's report: "i think it works but doesnt update instantly, letting players still send trade offers and
+seeing their inventory." Checked `functions/trading.js` `proposeTrade` first - it already reads the TARGET's
+`leaderboard/{uid}.privateInventory` FRESH, inside the transaction, no cache involved, so the server-side gate
+itself was never the problem. The actual gap: flipping OPTIONS' toggle (`saves.js` `toggle-private`) only ever
+called `Economy.setPrivateInventory(...)`, which just sets Cloud's generic `dirty` flag the same as a cosmetic
+field (the account description) - no immediate sync, just "the next ~30s heartbeat picks it up eventually." That
+meant the SERVER itself, not just some other player's stale leaderboard cache, still held the old (non-private)
+value for however long that cadence took - a real window where a trade against a just-gone-private account
+would genuinely succeed, not merely look wrong on someone's screen.
+
+Fixed with the same treatment `notePurchase`/`noteThrow` already get for a real coins/items change: a new
+`Cloud.notePrivacyChange()` (`src/cloud.js`) sets `dirty = true` and calls `heartbeat()` immediately, wired into
+the toggle handler (`src/saves.js`). Live-tested the full path end to end against the emulator: toggled private
+on for a fresh account, confirmed `leaderboard/{uid}.privateInventory` landed `true` within about a second (no
+30s wait), then had a second account attempt `proposeTrade` against it and confirmed the server actually refused
+it ("This player isn't accepting trades.") - not just a greyed-out button client-side.
+
+Surfaced a second, independent bug doing this: a genuinely brand-new account's very FIRST sync of anything
+(toggling the setting before ever throwing a snowball) threw `PERMISSION_DENIED` with a raw evaluation error
+("Property coins is undefined on object"). `firestore.rules`' `leaderboard/{uid}` write rule still required
+`request.resource.data.coins is number` unconditionally - a leftover from before `coins` was moved to a
+Cloud-Function-only mirror (see the fix two sections up this file); the client hasn't sent `coins` in weeks, so a
+doc nobody but the client has ever written to simply doesn't have that field yet, and asking a nonexistent key
+`is number` throws instead of just failing. Fixed by making `coins` optional in that rule, same pattern already
+used there for `character`/`privateInventory`/`skinCounts` - still validated (range-checked) whenever it IS
+present, whether from an existing Cloud Function mirror or carried forward by this same write.
+
+All 65 emulator checks still pass. `firestore.rules` needs the usual manual re-publish. `index.html` bumped
+`cloud.js` `v=38 -> 39` and `saves.js` `v=34 -> 35`.
+- `firestore.rules`, `src/cloud.js`, `src/saves.js`.
+
+## Leaderboard now auto-refreshes the instant a trade completes (2026-10-01)
+
+The owner's ask, directly following the staleness discussion above: don't just leave the leaderboard sitting on
+whatever it last fetched until someone manually closes and reopens it - refresh it the moment a trade actually
+completes. Scoped to ACCEPT only (not DECLINE/CANCEL - those never move a real coin or skin, nothing on the
+leaderboard to refresh). Two call sites, matching the two existing places a completed trade's outcome already
+gets applied locally:
+
+- `runTradeAction`'s own `acceptTrade` success branch (`src/saves.js`) - the accepter's own device.
+- `onOutgoingTradeResolved`'s `"accepted"` branch (same file) - the ORIGINAL SENDER's device, whenever it's open
+  and signed in at the moment the other side accepts (the live trades listener - see the two bugs above).
+
+Both call `Cloud.refreshLeaderboard(() => refresh())` - a forced fresh fetch, not waiting for the leaderboard
+screen to be closed and reopened. Verified live end to end: proposed a trade, accepted it for real through the
+actual INBOX UI (not a raw Function call), and switched straight from INBOX back to the LEADERBOARD sub-view
+(no close/reopen of the screen itself) - the accepter's own row appeared with the correct post-trade total
+immediately, something that previously required leaving and re-entering the whole LEADERBOARD screen to see.
+
+Also answered a second question from the same conversation, for the record: the current Cloud Function rate
+limits (`functions/lib/rateLimit.js`-backed, all server-side, all per-uid) are `proposeTrade` 3 per 5 minutes,
+`acceptTrade`/`declineTrade`/`cancelTrade` 10 per minute each, `purchase`/`useBuff`/`openBox`/`sellSkin` 20 per
+minute each, `claimThrow` 30 per minute (the highest-frequency action, matches a snowball throw's own cooldown
+rather than being the limiting factor in practice).
+
+Only client-side files touched this round (no Cloud Function or rules change), so the automated emulator suite
+doesn't exercise this - verified live in the browser instead. `index.html` bumped `saves.js` `v=35 -> 36`.
+- `src/saves.js`.
+
+## Private inventory data itself was never actually private - a modified client could always read it (2026-10-01)
+
+The owner's follow-up, after confirming the TRADE button correctly greys out for a private target: "it does work
+that a player doesnt accept trades with private inventory but the inventory isnt private at all! ... can we even
+make it that a modified client cannot read the private inventory?" Correct, and an important distinction: the
+disabled TRADE button (openInspect) and proposeTrade's own server-side refusal were real, but `skinCounts` itself
+lived on `leaderboard/{uid}` the whole time - a document `firestore.rules` makes `allow read: if true`. Firestore
+security rules have no notion of "public except this one field" - so ANY client (modified, or just a raw
+Firestore SDK call with no app at all, no sign-in even required) could always read a private player's real
+inventory directly, straight off the public document, regardless of the flag. The greyed-out button was a UI
+nicety the whole time, never an actual data boundary.
+
+Fixed by moving `skinCounts` off the public document entirely:
+
+- New `inventoryMirror/{uid}` collection, `allow read, write: if false` (Admin SDK only - same as `trades`/
+  `rateLimits`). `functions/lib/saves.js` gained `inventoryMirrorRef`/`writeInventoryMirror`, used in place of
+  `writeLeaderboardMirror(tx, uid, {coins, skinCounts})`'s old combined calls (`openBox`/`sellSkin` in
+  `economy.js`, both sides of `acceptTrade` in `trading.js`) - `coins` still mirrors to the public leaderboard
+  doc exactly as before (never gated by privacy - your rank/coins were never the private part), `skinCounts` now
+  goes to the new non-public collection instead.
+- New callable `functions/trading.js` `getTargetInventory({toUid})` - the ONLY way any client ever learns a
+  skinCounts value for any uid again. Reads the target's `privateInventory` flag server-side FIRST; returns
+  `{skinCounts: null}` unconditionally if true, never touching `inventoryMirror` at all in that case. A modified
+  client can still call this directly (nothing stops that), but the server simply never discloses private data -
+  the only real way to enforce this, since you can't stop a client from asking, only from ever being answered.
+- `firestore.rules`: `skinCounts` removed from `leaderboard/{uid}`'s allow-list entirely (a client write that
+  still includes it is now refused, confirmed by a new test).
+- Client side: `cloud.js refreshLeaderboard()` no longer reads `skinCounts` off the leaderboard doc at all (no
+  longer there to read). `saves.js targetSkinsCatalog()` changed from a synchronous cache read to a new module
+  var (`tradeTargetSkinCounts`) populated by a `Cloud.callFunction("getTargetInventory", ...)` fetch-on-open in
+  `openTradeCompose()`, guarded against a stale response landing after the compose screen closed or reopened for
+  a different target.
+
+Verified live end to end, not just via the automated suite: seeded a real public target (with real skinCounts in
+the new `inventoryMirror` collection) and a real private one, opened the trade-compose screen against the public
+target - the real inventory loaded correctly a moment after opening (the new async fetch) - and confirmed the
+private target's TRADE button stays genuinely disabled (no `data-act`, native `disabled`, "points nowhere" per
+the owner's own phrasing). Five new emulator tests cover the server side directly: `getTargetInventory` returns
+real data for a public target, refuses (`skinCounts: null`) for a private one regardless of what's actually in
+`inventoryMirror`, a client can never read or write `inventoryMirror/{uid}` directly (even their own), and a
+client write to `leaderboard/{uid}` that still includes `skinCounts` is refused. All 70 checks pass (65 + 5 new).
+
+Also handled two small asks from the same conversation:
+- Moved the OPTIONS screen's TRADING section to below VOLUME (was between ACCOUNT and VOLUME).
+- Replaced the TRADING section's old "Hides your skins and blocks trade offers..." explanatory line with a
+  second `.account-row` (same styling as Private Inventory) - "Rate Limits" + a SEE button opening a plain-text
+  popup listing the exact numbers from the rate-limits question above, deliberately in the same terms the code
+  itself uses (`claimThrow: 30 / 60s`, not "throw up to 30 snowballs a minute") - the owner's own ask, "dont
+  sugarcoat them in nice words." The now-unused `.trading-note` CSS rule was removed.
+
+`index.html` bumped `cloud.js` `v=39 -> 40`, `saves.js` `v=36 -> 38` (one bump for the privacy fix, one more for
+the OPTIONS reorder/rate-limits popup, both this same conversation).
+- `firestore.rules`, `functions/lib/saves.js`, `functions/economy.js`, `functions/trading.js`,
+  `functions/test/run.js`, `src/cloud.js`, `src/saves.js`, `index.html`.
+
+## Trade-compose preview now sorts rarest-first (2026-10-01)
+
+Small follow-up, same convention the PROJECTILES/BUFFS/CHARACTERS tabs already use (`Rarity.rank` - see that
+file's own header note: "the PROJECTILES and BUFFS tabs list the rarest first"). `targetSkinsCatalog()`/
+`mySkinsCatalog()` (src/saves.js) previously returned skins in whatever order `Collection.skinItems()` happened
+to iterate (character, then scenery, then weather, catalog order within each) - the owner's ask: legendary on
+top, same as everywhere else in the game. New shared `sortByRarityDesc()` helper, a stable sort (ties keep their
+original order) via the same index-tag trick `collection.js`'s own sorts use, since `Array.prototype.sort` isn't
+guaranteed stable in every engine. Verified live: seeded a target with one common, one rare, one epic and one
+legendary character - the compose screen's "YOU WANT" grid rendered legendary first, then epic, rare, common,
+confirmed via the tiles' own `data-id` order in the DOM. `index.html` bumped `saves.js` `v=38 -> 39`.
+- `src/saves.js`.
+
+## Cost-side guards against a many-botted-accounts attack: maxInstances + App Check scaffolding (2026-10-01)
+
+Follow-up to the rate-limits conversation above: the owner asked whether someone could overload the project's
+Firebase limits with many botted accounts (each one getting its own full rate-limit budget - `applyRateLimits`
+caps one uid's OWN call rate, nothing caps how many uids can exist), and specifically asked to do the two parts
+of the earlier recommendation that don't need a real allowlist: `maxInstances` and Firebase App Check.
+
+**`maxInstances` (fully implemented, live-tested):** new `functions/lib/scaling.js` - `PLAYER_MAX_INSTANCES` (10)
+and `ADMIN_MAX_INSTANCES` (2), picked for a 5-person invite-only group with room to spare for real use. Every
+callable in `functions/economy.js`/`functions/trading.js` now runs through
+`functions.runWith({ maxInstances: PLAYER_MAX_INSTANCES }).https.onCall(...)`; `functions/shop.js`'s
+`forceRerollShop` (admin-gated, but still reachable - and rejected - by any signed-in caller before the isAdmin
+check runs) and the scheduled `rerollShop` both use `ADMIN_MAX_INSTANCES`. This is the actual backstop
+`applyRateLimits` alone can't be: it bounds how many concurrent instances ANY single Function will ever scale to,
+regardless of how many different uids (real or Sybil) are calling it at once - once the cap is hit, further calls
+queue or get refused instead of autoscaling, and billing, without limit. All 70 emulator checks still pass with
+this wired in (the emulator doesn't meaningfully enforce instance-scaling the way production does, but confirms
+nothing about the change itself broke).
+
+**Firebase App Check (scaffolded, deliberately NOT enforced yet):** proves a call came from this real app in a
+real browser, not a script hitting the Functions HTTP endpoint directly with a stolen/forged uid - something
+`requireAuth` alone can never tell apart, since obtaining a valid Firebase Auth token for an attacker's own
+account is trivial (sign in with any Google account, exactly like the real game does). Added
+`firebase-app-check-compat.js` (same 10.14.1 as every other Firebase script here) to `index.html`, and
+`src/cloud.js` gained `APP_CHECK_SITE_KEY` (an empty string) + `initAppCheck()`, called once from `init()` right
+after the other Firebase services.
+
+This genuinely cannot be finished the way `FIREBASE_CONFIG` was - a reCAPTCHA v3 SITE KEY only exists once the
+owner registers the real production domain at https://www.google.com/recaptcha/admin, a Google-account action in
+the same category as publishing `firestore.rules` (Claude cannot do this part). Left empty, `initAppCheck()` is a
+complete no-op - confirmed live, zero change to the emulator or any existing testing (`firebase.appCheck` loads
+as a real function, nothing errors, `Economy`/`Cloud` initialize exactly as before). The remaining steps, once a
+site key exists, are listed in `APP_CHECK_SITE_KEY`'s own comment: (1) paste the real key in, (2) register this
+web app under App Check in the Firebase console with the same reCAPTCHA v3 provider, (3) ONLY THEN add
+`enforceAppCheck: true` to every callable's existing `runWith(...)` options - flipping that on before steps 1-2
+are live would reject every real call, the owner's own account included.
+
+**Explicitly NOT done, and said so plainly:** a real allowlist (gating `requireAuth`/sign-in to known emails/uids)
+and a GCP billing budget alert. The allowlist needs the owner's own list of approved accounts to implement at
+all. The billing budget alert is a Google Cloud Console / Billing setting tied to the owner's own billing
+account - no code change can create it; the owner needs to do it themselves (Cloud Console -> Billing -> Budgets
+& alerts -> create a budget on this project, with an email/alert threshold of their choosing). Both remain
+outstanding, same bucket as the other owner-manual GCP steps already tracked (production data migration, the
+real cutover, removing `localhost` from Auth's authorized domains - see the blaze-migration memory).
+
+`index.html` bumped nothing version-wise for the Functions changes (server-side, no client cache-busting needed) -
+only the new `firebase-app-check-compat.js` script tag was added, which has no `?v=` cache-bust convention
+(matches every other Firebase CDN script already there).
+- `functions/lib/scaling.js` (new), `functions/economy.js`, `functions/trading.js`, `functions/shop.js`,
+  `src/cloud.js`, `index.html`.
+
+## The real allowlist, implemented (2026-10-01)
+
+Follow-up to the cost-abuse conversation above - the owner decided: skip the App Check site key and the
+automated billing-disable Cloud Function for now (plain card-limit management on their own end instead), but
+build the actual allowlist, gated on sign-in + a fixed list of approved emails rather than relying on App Check
+alone. Also clarified something that had been an open question since the Blaze migration began: this game was
+never meant to support a never-signed-in local play mode, so nothing stays public anymore - `shopStock/current`
+and `config/minVersion` (previously left public on purpose, for that mode) are now gated the exact same way.
+
+**The six approved accounts** (all `@gmail.com`): `joatre2741`, `t4backupemail2`, `domimarzec111`, `kubamolo592`,
+`offduude`, and the admin/testing account `snowyballs759`.
+
+**`functions/lib/auth.js`**: new `ALLOWED_EMAILS` (a `Set`, case-insensitive comparison - Gmail addresses are
+case-insensitive in practice). `requireAuth` - already every callable's first line - now ALSO requires the
+caller's own Google ID token email (never anything a client can set itself) to be in that set, OR `isAdmin(uid)`
+to already say yes (a second, independent path so the owner's own account is never locked out even if that email
+ever changes). Throws a distinct `permission-denied` ("This account isn't invited to play.") rather than
+`unauthenticated` - the account IS signed in, it's just not invited; a client's own `.catch()` can tell the two
+apart.
+
+**`firestore.rules`**: new `isAllowedEmail()` function (same emails, hand-mirrored - rules can't `require()` the
+Functions file, same situation `ADMIN_UID` has always been in across multiple files here) reads
+`request.auth.token.email.lower()` directly off the real ID token. Applied everywhere a rule used to just check
+`request.auth != null`/`request.auth.uid == uid`, or was flatly public:
+- `leaderboard/{uid}` - both read (was `if true`) and write.
+- `saves/{uid}` - both read and write (was auth+uid only).
+- `trades/{tradeId}` - read (was auth+participant only).
+- `shopStock/current` - read (was `if true`).
+- `config/minVersion` - read (was `if true`).
+
+`inventoryMirror/{uid}` and `rateLimits/{uid}` needed no change - already `if false` for everyone, client or not.
+
+**Live-tested the actual failure mode this whole thing exists to prevent**: a genuinely fresh, real sign-in
+(not a uid typed into a script) whose email was simply never added to the list gets refused by `requireAuth` the
+moment it tries anything, AND by `firestore.rules` the moment it tries to read the leaderboard or shop stock
+directly - confirmed both independently, not just one or the other.
+
+**A real test-harness bug found live, not guessed**: the first attempt tried to give each test uid an email via
+`createCustomToken(uid, { email })`'s `additionalClaims` - the resulting ID token had NO email claim at all,
+confirmed live via `getIdTokenResult()`. Firebase reserves certain claim names (email included) and silently
+drops them from a custom token's additional claims - this is deliberate on Firebase's part (it's exactly the kind
+of forgeable identity claim an allowlist exists to NOT trust a client-forgeable value for), not a bug, but it
+meant every single existing test in this file started failing `requireAuth` the instant the allowlist's code
+shipped, not just the ones specifically about it. Fixed properly: `functions/test/run.js`'s `asUid()` now calls a
+new `ensureAuthUser(uid, email)` first, which gives that uid a REAL Auth user record (`admin.auth().createUser`)
+with the email set BEFORE minting its custom token - confirmed live that an ID token minted this way DOES carry
+the real email claim, since it now reflects actual account data instead of an injected, untrusted claim. Each
+test uid maps to one of the six real allowed emails (which uid gets which doesn't matter - the allowlist checks
+email membership alone, never a uid<->email pairing, since only a real Google sign-in itself ever enforces that);
+one new uid, `test-trader-not-invited`, deliberately keeps an email that was never added to the list, specifically
+to exercise the refusal path.
+
+Two existing tests had their own assumptions inverted rather than just patched around: "shopStock/current is
+readable by a signed-OUT client" and "config/minVersion is readable by a signed-OUT client" (both previously
+`public read, per firestore.rules`) now assert the opposite - a signed-out read of either is refused - matching
+the owner's own "never meant for offline play" clarification. Five new tests cover the allowlist itself directly:
+a non-invited signed-in account refused by `requireAuth`, the same account refused reading `leaderboard` and
+`shopStock` directly, an allowed account's own reads still working (the gate isn't "deny everything"), and the
+admin account passing purely via `isAdmin(uid)` regardless of its own email claim. All 75 checks pass (70 + 5).
+
+Live-verified the signed-out path still works gracefully for what it's supposed to: the game loads, renders, and
+plays entirely off the LOCAL save with zero errors even though every cloud read now fails closed immediately -
+every one of those reads already had its own `.catch()` treating "offline, or not configured" as the fallback,
+and a permission-denied falls into that exact same bucket.
+
+**One known, accepted rough edge, not fixed here**: nothing in the UI yet tells a signed-in-but-not-invited
+player WHY the shop/leaderboard never load - they just silently stay empty, the same as "offline." Not pursued
+since the game is invite-only in practice (a stranger would need the URL at all to ever reach this state) - worth
+a clearer message later if it ever actually comes up.
+
+## Character box odds retuned to 40/30/9/1 - box odds are now PER KIND (2026-10-01)
+
+The owner's ask: retune the character box's odds to 40/30/9/1 (confirmed as real relative odds, not a rescale -
+the four numbers don't need to sum to 100, since `draw()`/`oddsFor()`/`drawBox()` all normalize by whatever the
+present rarities actually add up to), confirm there will never be a 5th character (so each of the four numbers
+keeps mapping to exactly one character - no rarity tier is ever split between two items), and recompute sell
+prices to match.
+
+**`boxOdds` was a single table shared by all three box kinds** (character/scenery/weather) before this - changing
+it in place would have silently retuned scenery/weather too, which the owner never asked for. Restructured into
+PER-KIND tables instead (`economy.json` `boxOdds.character`/`.scenery`/`.weather`) so characters could move to
+40/30/9/1 while scenery/weather stay exactly as they were, 80/15/4/1, completely untouched. Updated every
+consumer to index by kind first: `src/boxes.js`'s `boxChance(kind, rarityId)` (was `boxChance(rarityId)`, reused
+by both `draw()` and `oddsFor()`) and the actual server-authoritative draw, `functions/economy.js`'s `drawBox`
+(`eco.boxOdds[kind][r.id]`, was the flat `eco.boxOdds[r.id]`) - this is the one that actually decides what a
+player gets; `boxes.js`'s own copy is purely cosmetic (reel filler cells, the displayed odds%).
+
+**Sell prices recomputed using the documented formula** (`economy.json` `_sellPriceNote`, unchanged by this):
+`avgCost = boxPrice / p_item`, `sellPrice = round(avgCost x 0.15)`, where `p_item` is each item's real draw
+chance in ITS box (`boxOdds[kind][rarity] / total-of-present-odds`, divided by however many items share that
+rarity - here, 1 each, confirmed by "no 5th character"). Character box price stayed 9999 (not asked to change).
+
+| Character | Rarity | Old odds | New odds | Old sell price | New sell price |
+|---|---|---|---|---|---|
+| black_andek | Common | 80% | 50% | 1,875 | 3,000 |
+| cool_andek | Rare | 15% | 37.5% | 9,999 | 4,000 |
+| pryk | Epic | 4% | 11.25% | 37,496 | 13,332 |
+| banan | Legendary | 1% | 1.25% | 149,985 | 119,988 |
+
+Directionally sensible either way: common and rare both got MORE likely relative to the old table (common
+50% vs 80% is actually LESS likely in absolute terms, but far more likely RELATIVE to the other three - its
+price rose since getting one now implies slightly worse luck on average than before, not better); rare got
+genuinely more common (15%→37.5%) so its price dropped sharply; epic and legendary both got more common too
+(4%→11.25%, 1%→1.25%) so both dropped - legendary by the largest absolute amount, exactly the design intent (a
+spare legendary stays worth more to trade to another player than to sell, but less of a windfall than before,
+since it's no longer quite as rare an event).
+
+Live-verified: fetched the actually-served `economy.json` fresh from the running static server (not the file on
+disk, in case of a stale cache) and confirmed `boxOdds` matches; separately re-ran `oddsFor`'s exact algorithm by
+hand against that same fetched data and got 50% / 37.5% / 11.3% / 1.3% (rounded to one decimal, matching how the
+real UI rounds) - exactly the expected percentages. All 75 emulator checks still pass; one existing test
+(`sellSkin credits the fixed sellPrice`) had its hardcoded expectation (37496) updated to match pryk's new price
+(13332) - everything else in the suite was already shape-agnostic about the actual odds/price numbers.
+`index.html` bumped `boxes.js` `v=10 -> 11`.
+- `economy.json`, `src/boxes.js`, `functions/economy.js`, `functions/test/run.js`, `index.html`.
+
+## Orange Mints removed; Mints retiered epic -> rare to take its place (2026-10-01)
+
+The owner's ask: delete Orange Mints (rare, 20% save) outright, and put "regular Mints" (the item simply named
+`Mints`, id `mints_epic`, epic, 50% save) in its place as the rare tier's save% item - reasoned explicitly because
+Stanczak Mayo already covers the epic 50%-save slot, so epic no longer needs two items with the exact same effect
+and price. Also asked to change Mints' description to "Hmm... i can't read the label." (closely echoing Orange
+Mints' own old typo'd line, "Hmmm.. I can't read the label.").
+
+**A pure reskin/retier, not a rebalance of the save mechanic itself**: Mints inherits Orange Mints' exact rare-tier
+numbers verbatim - 20% save chance, 120s duration, 60 coins - rather than keeping its old 50%/epic numbers or
+getting a freshly-computed rare-tier price. `economy.json`'s old `mints` entry (Orange Mints) was deleted outright;
+`mints_epic` was edited in place and renamed to the now-free id `mints` (name `Mints`, rarity `epic` -> `rare`,
+price `1125` -> `60`, effect `0.5` -> `0.2`, image `mints_orange.png`/`mints.png` -> just `mints.png`, the "regular"
+mints art that already existed - unused in the folder since the 2026-09-20 Orange Mints rename, see that date's
+own NOTES entry). Added an inline `_rebalanceNote` on the item, matching the convention already used on Toy Tank's
+own retune entry. `mints_orange.png` itself is left in the folder, unused, same as `mints.png` was left unused
+after the original rename - established precedent, not a new one.
+
+**Checked before touching ids**: grepped the whole repo for `mints`/`mints_epic` outside `economy.json` - zero
+hits in `functions/` or `src/`, confirming every buff's rarity/price/effect is purely data-driven and nothing
+hardcodes these specific ids. Safe to delete one id and rename the other with no code changes needed anywhere.
+
+**Shop odds, a deliberate side-effect, not something to compensate for**: the rare pool still has exactly 5 items
+(Skyr/Kaiser Roll/Mints/Triangles/Toy Tank - same count as before, just Orange Mints swapped for Mints), so rare
+odds-per-item are unchanged. The epic pool drops from 7 items to 6 (Stanczak Mayo/Skyr/Chilli Triangles/Tomato
+Juice/Guitar Pick/Burger) now that Mints has vacated it - each remaining epic item's own shop odds rise slightly
+as a natural consequence of removing a duplicate-effect item, not a rebalance pass of its own.
+
+Gave the owner's local save x99 Mints (`Economy.addBuffs("mints", 99)`) per standing practice for a
+newly-reworked item, without being asked.
+
+All 75 emulator checks still pass (none referenced `mints`/`mints_epic` by id, so none needed updating). Also
+verified live at `127.0.0.1:5501`: gave the local save x99 Mints, reloaded, and confirmed the BUFFS card renders
+correctly - `rare` rarity colour, the new description, `Save chance: 20%.`, x99, 02:00 duration, no console
+errors. No client version bump needed - `economy.json` is always fetched with its own cache-busting timestamp
+(`?t=Date.now()`), never through the `?v=` query-string convention used for `.js` files.
+- `economy.json`, `docs/FUTURE_PRICES.md`.
+- `functions/lib/auth.js`, `firestore.rules`, `functions/test/run.js`.

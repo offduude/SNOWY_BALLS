@@ -118,8 +118,14 @@ const Saves = (() => {
   }
 
   // PRIVATE INVENTORY (2026-09-29): on = other players can't see your skins from your LEADERBOARD profile, and
-  // can't propose a trade with you at all - Economy.getPrivateInventory/setPrivateInventory, purely local for
-  // now (see that function's own note on why it isn't synced to the cloud yet).
+  // can't propose a trade with you at all - Economy.getPrivateInventory/setPrivateInventory, synced to the
+  // cloud immediately via Cloud.notePrivacyChange (see that function's own note, src/cloud.js). Real, server-
+  // enforced privacy as of 2026-10-01 (functions/trading.js getTargetInventory) - not just a greyed-out button.
+  //
+  // RATE LIMITS (2026-10-01, replacing the old plain-English "Hides your skins..." note) - the owner's own ask:
+  // don't sugarcoat these, show the real server-side numbers in the same terms the code itself uses
+  // (functions/economy.js, functions/trading.js), so no player is ever surprised by one. Same row styling as
+  // Private Inventory above (.account-row), a SEE button opening showRateLimits() below instead of a toggle.
   function tradingSectionHtml() {
     if (typeof Economy === "undefined") return "";
     const on = Economy.getPrivateInventory();
@@ -127,8 +133,29 @@ const Saves = (() => {
       `<div class="opt-section"><div class="opt-head">TRADING</div>` +
       `<div class="account-row"><span>Private Inventory</span>` +
       `<button type="button" class="save-icon-btn${on ? " on" : ""}" data-act="toggle-private">${on ? "ON" : "OFF"}</button></div>` +
-      `<div class="trading-note">Hides your skins and blocks trade offers from other players.</div></div>`
+      `<div class="account-row"><span>Rate Limits</span>` +
+      `<button type="button" class="save-icon-btn" data-act="rate-limits">SEE</button></div></div>`
     );
+  }
+
+  // Plain, undecorated numbers - straight from the actual applyRateLimits(...) calls in functions/economy.js and
+  // functions/trading.js (kept in sync with those by hand; nothing generates this list automatically). Deliberately
+  // using the real callable names as they appear in code (claimThrow, not "throwing a snowball") - the owner's own
+  // ask, "dont sugarcoat them in nice words."
+  function showRateLimits() {
+    const lines = [
+      "claimThrow: 30 / 60s",
+      "useBuff: 20 / 60s",
+      "openBox: 20 / 60s",
+      "sellSkin: 20 / 60s",
+      "purchase: 20 / 60s",
+      "getTargetInventory: 20 / 60s",
+      "proposeTrade: 3 / 300s",
+      "acceptTrade: 10 / 60s",
+      "declineTrade: 10 / 60s",
+      "cancelTrade: 10 / 60s",
+    ];
+    openModal("RATE LIMITS", `<div class="modal-text">${lines.map(esc).join("<br>")}</div>`, [{ label: "OK" }]);
   }
 
   // CHANGE DESCRIPTION: edit the account's own bio line. Sanitized and capped the same way on save as everywhere else
@@ -239,16 +266,16 @@ const Saves = (() => {
     refresh();
   }
 
-  // ---------- the OPTIONS list (ACCOUNT, VOLUME) ----------
+  // ---------- the OPTIONS list (ACCOUNT, VOLUME, TRADING - 2026-10-01: TRADING moved below VOLUME, the owner's ask) ----------
   let listEl = null; // the OPTIONS list's scroll area (set by renderOptions)
 
   function renderOptions(el) {
     listEl = el;
     el.innerHTML =
       accountSectionHtml() +
-      tradingSectionHtml() +
       `<div class="opt-section"><div class="opt-head">VOLUME</div><div class="vol-row" data-vol="master"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Volume" /><span class="vol-value"></span></div>` +
-      `<div class="vol-name">Weather</div><div class="vol-row" data-vol="weather"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Weather" /><span class="vol-value"></span></div></div>`;
+      `<div class="vol-name">Weather</div><div class="vol-row" data-vol="weather"><input class="vol-slider" type="range" min="0" max="100" step="1" aria-label="Weather" /><span class="vol-value"></span></div></div>` +
+      tradingSectionHtml();
     wireVolume(el);
   }
 
@@ -283,10 +310,26 @@ const Saves = (() => {
     if (tier) btn.classList.add(tier);
   }
 
+  // Red dot on the LEADERBOARD button's own top-left corner (2026-10-01, the owner's ask) - a player shouldn't
+  // have to open LEADERBOARD -> INBOX just to find out something's waiting; this is the same "at least one
+  // pending incoming offer" check #inbox-dot already makes, just visible from the main HUD instead of only once
+  // that screen is already open. Unconditional in refresh() (unlike renderBoardContent, which only runs while
+  // LEADERBOARD is the open screen) and also driven live by Cloud.onTradesChange - see this file's own
+  // subscription near the bottom - so it reacts the instant a trade is offered, not on the next redraw.
+  function updateLeaderboardDot() {
+    const dot = document.getElementById("leaderboard-dot");
+    if (!dot) return;
+    const rows = Cloud.getTradesCache() || [];
+    const me = Cloud.getUser();
+    const pendingIncoming = me ? rows.filter((t) => t.toUid === me.uid).length : 0;
+    dot.classList.toggle("show", pendingIncoming > 0);
+  }
+
   function refresh() {
     if (listEl && listEl.dataset.kind === "options") renderOptions(listEl);
     if (boardEl && boardEl.dataset.kind === "leaderboard") renderBoardContent(); // whichever of leaderboard/INBOX is currently showing, not reset to the leaderboard
     updateLeaderboardButton();
+    updateLeaderboardDot();
   }
 
   function onClick(e) {
@@ -304,7 +347,14 @@ const Saves = (() => {
     } else if (b.dataset.act === "toggle-private") {
       if (typeof playUiClick === "function") playUiClick();
       Economy.setPrivateInventory(!Economy.getPrivateInventory());
+      // Immediate, not the generic dirty-flag-and-wait every other Economy change gets (2026-10-01 - see
+      // cloud.js notePrivacyChange's own note): this is a real enforcement gate, not a cosmetic field, so the
+      // server must learn about it right away, not whenever the next ~30s heartbeat happens to land.
+      if (typeof Cloud !== "undefined") Cloud.notePrivacyChange();
       renderOptions(listEl);
+    } else if (b.dataset.act === "rate-limits") {
+      if (typeof playUiClick === "function") playUiClick();
+      showRateLimits();
     }
   }
 
@@ -468,9 +518,42 @@ const Saves = (() => {
 
   // ACCEPT/DECLINE/CANCEL (2026-09-30) - ACCEPT gets its own confirm (real coins/skins move immediately and
   // irreversibly, same "danger" weight as SEND OFFER below); DECLINE/CANCEL just void an offer, no confirm needed.
+  //
+  // FIX (2026-10-01, a real bug: accepting a trade had ZERO effect on the accepter's own coin counter): the
+  // server's acceptTrade already does the real, atomic transfer and was always meant to be applied client-side
+  // too ("the client applies ONLY this returned value, never an optimistic local guess" - the original design)
+  // but nothing here ever actually read it. Rather than trust the response's raw totals (a blind set risks
+  // clobbering other still-local-only state, the same reason every other wired Function uses a delta), apply the
+  // exact, already-known mutation instead - same "the outcome was already known, just apply it" discipline
+  // collection.js applySoldLocally uses for sellSkin: the accepter RECEIVES `trade.offer` and GIVES
+  // `trade.request`, and both are already sitting right here in the trades cache (the INBOX row couldn't have
+  // rendered an ACCEPT button without them).
   function runTradeAction(fnName, tradeId) {
+    const trade = (Cloud.getTradesCache() || []).find((t) => t.id === tradeId);
     Cloud.callFunction(fnName, { tradeId })
-      .then(() => Cloud.refreshTrades(() => refresh()))
+      .then(() => {
+        if (fnName === "acceptTrade" && trade) {
+          const delta = trade.offer.coins - trade.request.coins;
+          if (delta !== 0) Economy.addCoins(delta);
+          trade.offer.skins.forEach((s) => Economy.addSkin(s.kind, s.id, s.qty));
+          trade.request.skins.forEach((s) => Economy.removeSkin(s.kind, s.id, s.qty));
+          // Auto-refresh the leaderboard the instant a trade actually completes (2026-10-01, the owner's ask) -
+          // an ACCEPT is the one trade outcome that moves real coins/skins between two real leaderboard rows
+          // (both of them, not just this account's own); DECLINE/CANCEL just void an offer, nothing to refresh.
+          // A forced re-fetch, not waiting for this screen to be closed and reopened (refreshLeaderboard's own
+          // normal read-on-open cadence) - see the matching call in onOutgoingTradeResolved below for the OTHER
+          // side of this same accept, whichever device happens to be looking at the leaderboard when it lands.
+          Cloud.refreshLeaderboard(() => refresh());
+        }
+        // CANCEL refunds the sender's own pre-deducted offer (see sendTradeOffer's own note) - routed through the
+        // same reported-resolution path the live listener uses for a DECLINE, so there's exactly one place that
+        // ever applies this reaction (Cloud's own de-dup guard keeps a declined-by-the-time-cancel-also-fires race
+        // from double-refunding).
+        if (fnName === "cancelTrade" && trade) {
+          Cloud.reportOutgoingTradeResolved({ id: tradeId, status: "cancelled", offer: trade.offer, request: trade.request });
+        }
+        Cloud.refreshTrades(() => refresh());
+      })
       .catch((err) => {
         openModal("TRADE", `<div class="modal-text">${esc((err && err.message) || "Something went wrong.")}</div>`, [{ label: "OK" }]);
       });
@@ -507,10 +590,17 @@ const Saves = (() => {
     const row = rows[i];
     const me = Cloud.getUser();
     const isMe = me && me.uid === uid;
-    // TRADE (2026-09-29, real as of 2026-09-30): hidden when the target has gone private - `row.privateInventory`
-    // is now actually synced both ways (cloud.js syncNow() pushes Economy.getPrivateInventory(), refreshLeaderboard
-    // reads it back), not the always-undefined placeholder it was before.
-    const tradeBtn = isMe || row.privateInventory ? "" : `<button type="button" class="save-icon-btn" data-act="trade" data-uid="${esc(uid)}">TRADE</button>`;
+    // TRADE: never shown on your own card. On someone else's, greyed out and inert (2026-10-01, the owner's ask -
+    // was hidden outright before) once they've gone private - `row.privateInventory` is synced both ways
+    // (cloud.js syncNow() pushes Economy.getPrivateInventory(), refreshLeaderboard reads it back). The real
+    // `disabled` attribute, not just a CSS look, so it genuinely can't fire `onInspectClick`'s own `data-act`
+    // handling - proposeTrade's own server-side check is still the actual enforcement (a modified client could
+    // still try to call it directly), this is the honest UI reflection of that.
+    const tradeBtn = isMe
+      ? ""
+      : row.privateInventory
+      ? `<button type="button" class="save-icon-btn" disabled>TRADE</button>`
+      : `<button type="button" class="save-icon-btn" data-act="trade" data-uid="${esc(uid)}">TRADE</button>`;
     // Coins + TRADE stacked in their own column with real spacing between them (2026-09-29 - they used to just
     // sit side by side in .pick-action's own flow with no gap, reading as cramped once TRADE was added next to
     // the coins) instead of both loose inside .pick-action.
@@ -561,20 +651,35 @@ const Saves = (() => {
   let tradeTarget = null; // { uid, name, rank } | null
   let tradeGive = { coins: 0, skins: [] }; // skins: [{kind,id}] - one of each, no stacking (kept simple; sendTradeOffer adds qty:1 per entry when sending)
   let tradeWant = { coins: 0, skins: [] };
+  // The target's real skinCounts for whichever uid tradeTarget currently points at, or null - either "still
+  // loading" or "genuinely nothing to show" (not synced yet, or refused for being private). FIX (2026-10-01, the
+  // owner's own question: "can a modified client read the private inventory?"): this used to just read
+  // row.skinCounts straight off the public leaderboard cache - moved to a fetch-on-open from the new
+  // getTargetInventory Cloud Function instead (see openTradeCompose below), which actually enforces privacy
+  // server-side rather than merely reflecting it in a greyed-out button.
+  let tradeTargetSkinCounts = null;
 
-  // "YOU WANT" browses the target's REAL inventory (2026-09-30) - reads row.skinCounts, now that
-  // cloud.js refreshLeaderboard mirrors it back into the cache. Before this, it offered the whole catalog as a
-  // stand-in (the target's inventory wasn't readable at all yet); that fallback is gone - a target whose
-  // inventory hasn't synced yet (most players, until the migration + client wiring for openBox/sellSkin/etc lands)
-  // now honestly shows "nothing to pick from" instead of pretending every skin in the game is fair game to ask
-  // for. This is also now the ONLY place another player's inventory is ever shown - the leaderboard inspect
-  // popup's own standalone preview below an account card was removed the same day, per the owner's call: another
-  // player's inventory is visible only at the moment it's actually useful (picking what to ask for), never as
-  // idle browsing.
+  // "YOU WANT" browses the target's REAL inventory (2026-09-30, moved off the public leaderboard doc 2026-10-01 -
+  // see tradeTargetSkinCounts' own note above). A target whose inventory hasn't synced yet, or who's private,
+  // honestly shows "nothing to pick from" rather than pretending every skin in the game is fair game to ask for.
+  // This is also the ONLY place another player's inventory is ever shown - the leaderboard inspect popup's own
+  // standalone preview below an account card was removed separately, per the owner's call: another player's
+  // inventory is visible only at the moment it's actually useful (picking what to ask for), never as idle
+  // browsing.
+  // Rarest first, same convention the PROJECTILES/BUFFS/CHARACTERS tabs already use (Rarity.rank - see that
+  // file's own header note) - a stable sort (ties keep their original, catalog order) via the index-tag trick
+  // those other call sites use too, since Array.prototype.sort isn't guaranteed stable in every engine. Added
+  // 2026-10-01, the owner's ask: "sort the items by rarity with legendary on top" for the trade-compose preview.
+  function sortByRarityDesc(entries) {
+    return entries
+      .map((entry, i) => ({ entry, i }))
+      .sort((a, b) => Rarity.rank(a.entry.item.rarity) !== Rarity.rank(b.entry.item.rarity) ? Rarity.rank(b.entry.item.rarity) - Rarity.rank(a.entry.item.rarity) : a.i - b.i)
+      .map((x) => x.entry);
+  }
+
   function targetSkinsCatalog() {
-    const row = tradeTarget && (Cloud.getLeaderboardCache() || []).find((r) => r.uid === tradeTarget.uid);
-    const counts = row && row.skinCounts;
-    if (!counts) return null; // not synced yet - distinct from "synced, owns nothing" (empty array)
+    const counts = tradeTargetSkinCounts;
+    if (!counts) return null; // still loading, not synced yet, or refused (private) - all look the same here
     const out = [];
     for (const kind of ["character", "scenery", "weather"]) {
       for (const item of Collection.skinItems(kind)) {
@@ -582,7 +687,15 @@ const Saves = (() => {
         if (item.rarity !== "default" && n > 0) out.push({ kind, item, n });
       }
     }
-    return out;
+    return sortByRarityDesc(out);
+  }
+
+  // The target's own real coin balance (2026-10-01, the owner's ask) - same leaderboard-cache lookup
+  // targetSkinsCatalog already makes, just for `.coins` instead of `.skinCounts`. `null` (not 0) when the row
+  // itself hasn't loaded at all yet, distinct from a real balance of zero.
+  function targetCoins() {
+    const row = tradeTarget && (Cloud.getLeaderboardCache() || []).find((r) => r.uid === tradeTarget.uid);
+    return row ? row.coins : null;
   }
 
   function mySkinsCatalog() {
@@ -592,7 +705,7 @@ const Saves = (() => {
         if (item.rarity !== "default" && Economy.getSkinCount(kind, item.id) > 0) out.push({ kind, item });
       }
     }
-    return out;
+    return sortByRarityDesc(out);
   }
 
   // `count` (the target's real owned amount) only ever shows on the WANT side - GIVE already only lists skins
@@ -623,6 +736,10 @@ const Saves = (() => {
       } else {
         grid.innerHTML = catalog.map(({ kind, item, n }) => tradeTileHtml(kind, item, state.skins.some((s) => s.kind === kind && s.id === item.id), n)).join("");
       }
+      const coins = targetCoins();
+      const balanceEl = tradeComposeEl.querySelector("#trade-want-balance");
+      balanceEl.textContent = coins === null ? "" : `They have ${formatBoardCoins(coins)} coins`;
+      tradeComposeEl.querySelector('.trade-coins-input[data-side="want"]').max = coins === null ? "" : coins;
     }
     tradeComposeEl.querySelector(`.trade-coins-input[data-side="${side}"]`).value = state.coins;
   }
@@ -634,15 +751,31 @@ const Saves = (() => {
     tradeTarget = { uid, name: rows[i].name, rank: i + 1 };
     tradeGive = { coins: 0, skins: [] };
     tradeWant = { coins: 0, skins: [] };
+    tradeTargetSkinCounts = null; // loading - see its own note above
     tradeComposeEl.querySelector("#trade-compose-title").textContent = `PROPOSE TRADE - ${rows[i].name}`;
     renderTradeSide("give");
     renderTradeSide("want");
     tradeComposeEl.classList.add("show");
+    // Fetch-on-open (2026-10-01), not a cache read - see tradeTargetSkinCounts' own note. Guarded against a
+    // stale response landing after this screen was closed or reopened for a DIFFERENT target in the meantime
+    // (tradeTarget would be null or point at a different uid by then).
+    if (typeof Cloud !== "undefined") {
+      Cloud.callFunction("getTargetInventory", { toUid: uid })
+        .then((res) => {
+          if (!tradeTarget || tradeTarget.uid !== uid) return;
+          tradeTargetSkinCounts = (res && res.skinCounts) || null;
+          renderTradeSide("want");
+        })
+        .catch(() => {
+          /* offline, or refused for some other reason - "hasn't synced yet" is an honest enough fallback */
+        });
+    }
   }
 
   function closeTradeCompose() {
     if (tradeComposeEl) tradeComposeEl.classList.remove("show");
     tradeTarget = null;
+    tradeTargetSkinCounts = null;
   }
 
   function skinLabel(kind, id) {
@@ -687,19 +820,26 @@ const Saves = (() => {
   // The actual proposeTrade call (2026-09-30) - replaces what used to be a pure mockup (SEND just closed the
   // popup, nothing was ever created). Fires after the confirm modal above closes; a follow-up modal reports
   // success or the server's own rejection reason (not enough spendable coins, target went private since the
-  // compose screen opened, an outgoing offer already exists, the rate limit, ...) - never applied optimistically,
-  // same discipline callFunction's own header comment documents for every Cloud Function call.
+  // compose screen opened, an outgoing offer already exists, the rate limit, ...).
+  //
+  // FIX (2026-10-01, the owner's own ask - "ghost coins"): a real sender-side bug, found live-testing the
+  // accept-trade fix above. The SERVER already escrows the offer the instant proposeTrade succeeds (reserved/
+  // outgoingTradeId on this player's own save) - but nothing client-side ever reflected that locally, so the
+  // sender's own coin counter stayed at its pre-trade number the whole time the offer was pending, then jumped
+  // straight to whatever the NEXT full sync happened to pull, with nothing in between ever explaining why. The
+  // owner's own fix, applied here: deduct the offer locally the INSTANT it's sent (mirroring the server's own
+  // escrow, not guessing), refund it the instant the trade resolves to anything other than accepted (see
+  // Cloud.onOutgoingTradeResolved's own subscription near the bottom of this file) - "all changes immediate."
   function sendTradeOffer() {
     const target = tradeTarget;
     closeTradeCompose(); // closes the compose screen underneath the confirm modal; tradeTarget captured above first
-    const payload = {
-      toUid: target.uid,
-      offer: { coins: tradeGive.coins, skins: tradeGive.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) },
-      request: { coins: tradeWant.coins, skins: tradeWant.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) },
-      // clientVersion is no longer set here - Cloud.callFunction now attaches the real one to every call unconditionally.
-    };
-    Cloud.callFunction("proposeTrade", payload)
-      .then(() => {
+    const offer = { coins: tradeGive.coins, skins: tradeGive.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) };
+    const request = { coins: tradeWant.coins, skins: tradeWant.skins.map((s) => ({ kind: s.kind, id: s.id, qty: 1 })) };
+    Cloud.callFunction("proposeTrade", { toUid: target.uid, offer, request })
+      .then((res) => {
+        if (offer.coins) Economy.addCoins(-offer.coins);
+        offer.skins.forEach((s) => Economy.removeSkin(s.kind, s.id, s.qty));
+        Cloud.setWatchedOutgoingTrade(res.tradeId, offer, request);
         openModal("TRADE OFFER SENT", `<div class="modal-text">Your offer is on its way to <b>${esc(target.name)}</b> - check the INBOX to see when it's answered.</div>`, [{ label: "OK" }]);
         Cloud.refreshTrades(() => refresh());
       })
@@ -740,6 +880,14 @@ const Saves = (() => {
     const side = input.dataset.side;
     let v = Math.max(0, Math.floor(Number(input.value) || 0));
     if (side === "give") v = Math.min(v, Economy.getCoins()); // can't offer more than you actually have
+    // Can't REQUEST more than the target actually has either (2026-10-01, the owner's ask) - the server already
+    // rejects this at accept time (acceptTrade's spendableCoins check), but there's no reason to let a doomed
+    // request even be typed. A still-null balance (not yet synced) leaves this uncapped client-side; the server
+    // check is the real backstop either way, this is purely a UX nicety.
+    if (side === "want") {
+      const coins = targetCoins();
+      if (coins !== null) v = Math.min(v, coins);
+    }
     input.value = v;
     (side === "give" ? tradeGive : tradeWant).coins = v;
   }
@@ -788,10 +936,36 @@ const Saves = (() => {
     );
   }
 
+  // The one place an outgoing trade's local optimistic deduction (sendTradeOffer) ever gets reversed or
+  // finalized (2026-10-01) - fed by Cloud from two different triggers that both funnel through the SAME
+  // de-duplicated signal (cloud.js reportOutgoingTradeResolved/onOutgoingTradeResolved), so there's exactly one
+  // place this reaction can ever fire, never two: the live listener noticing the OTHER player accepted/declined
+  // it, or this player's own CANCEL succeeding (see runTradeAction above), or - surviving a reload across the
+  // gap - a one-time check on load against whatever trade was still being watched when the page last closed.
+  function onOutgoingTradeResolved(info) {
+    if (info.status === "accepted") {
+      // The offer side was already deducted the instant it was sent - only the REQUEST side (whatever this
+      // player gets back, if anything) is new here.
+      if (info.request.coins) Economy.addCoins(info.request.coins);
+      info.request.skins.forEach((s) => Economy.addSkin(s.kind, s.id, s.qty));
+      // Same auto-refresh as the accepter's own side (runTradeAction above) - this player didn't click ACCEPT,
+      // but their own coins/skins just moved too, on a trade the other side completed.
+      Cloud.refreshLeaderboard(() => refresh());
+    } else {
+      // declined or cancelled - give back exactly what was pre-deducted at send time.
+      if (info.offer.coins) Economy.addCoins(info.offer.coins);
+      info.offer.skins.forEach((s) => Economy.addSkin(s.kind, s.id, s.qty));
+    }
+  }
+
   if (typeof Cloud !== "undefined") {
     Cloud.onAuthChange(() => refresh());
     Cloud.setConfirmOverwrite(confirmCloudOverwrite);
     Cloud.onOutdated(showOutdatedOverlay);
+    // Live trades (2026-10-01): fires on every push from either onSnapshot listener (cloud.js) - a trade
+    // landing, being accepted/declined elsewhere, etc. - not just whenever something else happens to redraw.
+    Cloud.onTradesChange(() => refresh());
+    Cloud.onOutgoingTradeResolved(onOutgoingTradeResolved);
   }
 
   return { renderOptions, renderLeaderboard, wireLeaderboardClick, closeInspect, onClick, refresh, openModal, closeModal };

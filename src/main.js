@@ -995,7 +995,20 @@ class MainScene extends Phaser.Scene {
     const src = Collection.projectileImage(this.projectileId);
     if (icon.getAttribute("src") !== src) icon.setAttribute("src", src);
     text.textContent = "x" + n;
-    text.style.fontSize = Math.min(8, Math.floor(60 / (n.length + 1))) + "px"; // 60px = the box minus its border, padding and the picture
+    // FIX (2026-10-01, the owner's report): this used to be a flat `min(8, floor(60/(n.length+1)))px` - fine at
+    // the file's own reference size, but a fixed px formula, so it didn't shrink/grow with --u like the rest of
+    // the HUD now does (the owner's own earlier fix for every OTHER button/counter). `getComputedStyle(...)
+    // .getPropertyValue("--u")` turned out NOT reliable here - a custom property whose own value is a calc()/min()
+    // expression can come back as that unparsed expression STRING rather than a resolved px number (confirmed live
+    // - parseFloat on it returned NaN every time), silently making a getComputedStyle-based fix a no-op. Instead,
+    // recompute --u directly in JS, mirroring index.html's own `--u: calc(min(100vw, 100dvh*16/9)/100)` formula
+    // exactly (dvh has no direct JS equivalent; innerHeight is the right analogue here - this only feeds a cosmetic
+    // font-size, not layout, so it doesn't need to be pixel-exact against mobile browser-chrome edge cases the way
+    // the CSS itself does). Both numbers scale by the same ratio they always had to --u at the reference size (8/10
+    // = 0.8u cap, 60/10 = 6u budget) - renders identically to the old formula at that size, only the behavior at a
+    // different --u actually changes.
+    const uPx = Math.min(window.innerWidth, (window.innerHeight * 16) / 9) / 100;
+    text.style.fontSize = Math.min(uPx * 0.8, Math.floor((uPx * 6) / (n.length + 1))) + "px"; // 6u budget = the box minus its border, padding and the picture
   }
 
   // The counter's background reflects the equipped projectile's rarity (economy.json rarities colour; the legendary rainbow is animated: .rainbow

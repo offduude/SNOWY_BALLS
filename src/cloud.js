@@ -192,7 +192,15 @@ const Cloud = (() => {
       // functions/trading.js, functions/shop.js) - the SDK defaults to us-central1 otherwise and would never find
       // any of them, real project or emulator alike (confirmed live: the emulator enforces this match too, not
       // just the real deployed project).
-      functions = firebase.functions("europe-central2");
+      //
+      // FIX (2026-10-02, a real bug that shipped live - caught by the owner reporting "I can't click the sign in
+      // button"): the COMPAT SDK's region argument belongs on the APP instance's own .functions(region), not the
+      // bare firebase.functions(region) global - that one only accepts no argument or an App instance, and threw
+      // "invalid-app-argument" the instant a region string was passed to it instead. init()'s own try/catch
+      // swallows exactly this kind of error silently (by design, so a Firebase outage/misconfig never crashes the
+      // game) - which is exactly why it broke everything Cloud-related with zero visible error instead of a loud
+      // one: `ready` just never became true, so signIn() (and anything else gated on `ready`) quietly no-op'd.
+      functions = app.functions("europe-central2");
       initAppCheck();
       if (USE_EMULATOR) {
         auth.useEmulator("http://127.0.0.1:9099", { disableWarnings: true });

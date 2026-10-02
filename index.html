@@ -973,22 +973,24 @@
       position: absolute;
       right: calc(var(--u) * 1);
       bottom: calc(var(--u) * 1);
-      width: calc(var(--u) * 8.4);
-      height: calc(var(--u) * 3.2);
+      width: calc(var(--u) * 9);
+      height: calc(var(--u) * 3.7);
       padding: 0;
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: calc(var(--u) * 1);
+      font-size: calc(var(--u) * 1.05);
       cursor: pointer;
       z-index: 4;
       -webkit-tap-highlight-color: transparent;
     }
 
     #boxes-btn {
-      bottom: calc(var(--u) * 4.8); /* 1u margin + 3.2u SHOP button + 0.6u gap - was a fixed-px running sum (10+32+6), now the same sum in --u */
+      /* 2026-10-02 (the owner's ask: bigger mobile tap targets) - SHOP/BOXES grew from 3.2u to 3.7u tall, so
+         this running sum (1u margin + SHOP height + 0.6u gap) moved from 4.8u to 5.4u. */
+      bottom: calc(var(--u) * 5.4);
     }
 
     #shop-btn:active,
@@ -1028,16 +1030,18 @@
       z-index: 1;
     }
 
+    /* width/height bumped (2026-10-02, the owner's ask: "hard to hit on mobile sometimes") 10.8u/3.2u -> 11.6u/3.7u
+       - everything positioned relative to these (#skins-dot/#options-dot's own top offsets) moved to match. */
     .side-btn {
-      width: calc(var(--u) * 10.8);
-      height: calc(var(--u) * 3.2);
+      width: calc(var(--u) * 11.6);
+      height: calc(var(--u) * 3.7);
       padding: 0;
       background: #8b5a2b;
       border: 2px solid #4a2f14;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Press Start 2P", monospace;
-      font-size: calc(var(--u) * 0.8);
+      font-size: calc(var(--u) * 0.85);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
@@ -1486,15 +1490,16 @@
       text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
     }
 
-    /* BUFFS button: under the projectile counter, same right-edge stack (LEADERBOARD 1u-3.8u, the counter
-       4.4u-6.6u, this 7.2u-10u - was a fixed-px running sum (10-38/44-66/72-100), now the same sum in --u; see
-       #ammo-box/.hud-stat's own note for the middle link in this chain). */
+    /* BUFFS button: under the projectile counter, same right-edge stack (LEADERBOARD 1u-4.3u, the counter
+       4.9u-7.1u, this 7.7u-11u - heights bumped 2026-10-02, the owner's ask: "hard to hit on mobile sometimes",
+       2.8u -> 3.3u for both buttons, the counter between them left at its own 2.2u; see #ammo-box/.hud-stat's
+       own note for the middle link in this chain). */
     #buffs-btn {
       position: absolute;
-      top: calc(var(--u) * 7.2);
+      top: calc(var(--u) * 7.7);
       right: calc(var(--u) * 1);
       width: calc(var(--u) * 9.6); /* as wide as the projectile counter above it (the mute button that shared this row is gone) */
-      height: calc(var(--u) * 2.8);
+      height: calc(var(--u) * 3.3);
       z-index: 5;
       transition: opacity 0.25s ease;
     }
@@ -1505,7 +1510,7 @@
       top: calc(var(--u) * 1);
       right: calc(var(--u) * 1);
       width: calc(var(--u) * 9.6);
-      height: calc(var(--u) * 2.8);
+      height: calc(var(--u) * 3.3);
       font-size: calc(var(--u) * 0.7); /* "LEADERBOARD" is a touch too wide for the stack's usual 0.8u */
       z-index: 5;
       transition: opacity 0.25s ease;
@@ -1571,7 +1576,7 @@
       z-index: 2;
     }
 
-    #ammo-box { top: calc(var(--u) * 4.4); transition: opacity 0.2s ease; } /* 1u margin + 2.8u buttons + 0.6u gap - see #leaderboard-btn/#buffs-btn's own note on this same chain */
+    #ammo-box { top: calc(var(--u) * 4.9); transition: opacity 0.2s ease; } /* 1u margin + 3.3u LEADERBOARD + 0.6u gap - see #leaderboard-btn/#buffs-btn's own note on this same chain */
 
     #game-container.boxes-open #ammo-box {
       pointer-events: none;
@@ -1672,15 +1677,16 @@
       z-index: 6;
     }
 
+    /* SHOP/BOXES grew 8.4u/3.2u -> 9u/3.7u (2026-10-02, bigger mobile tap targets) - both dots recomputed to match. */
     #shop-dot {
-      right: calc(var(--u) * 8.6); /* dot centered on the LEFT edge: button 1u margin + 8.4u wide, minus half the dot */
-      bottom: calc(var(--u) * 3.2); /* vertically centered on the button's top edge (1u margin + 3.2u tall) */
+      right: calc(var(--u) * 9.2); /* dot centered on the LEFT edge: button 1u margin + 9u wide, minus half the dot */
+      bottom: calc(var(--u) * 3.7); /* vertically centered on the button's top edge (the button's own height) */
     }
 
     /* Same idea, one button up (BOXES sits above SHOP - see #boxes-btn). */
     #boxes-dot {
-      right: calc(var(--u) * 8.6);
-      bottom: calc(var(--u) * 8); /* boxes-btn's own top edge: 4.8u margin + 3.2u tall */
+      right: calc(var(--u) * 9.2);
+      bottom: calc(var(--u) * 9.1); /* boxes-btn's own top edge: 5.4u margin + 3.7u tall */
     }
 
     #game-container.boxes-open #shop-dot {
@@ -1693,25 +1699,26 @@
       top: calc(var(--u) * -0.8);
     }
 
-    /* The same dot on the top-right corner of the SKINS button (the second button: 3.2u tall buttons, 0.8u gap -> it starts 4u down). */
+    /* .side-btn grew 3.2u -> 3.7u tall (2026-10-02, bigger mobile tap targets) - the second button (gap 0.8u
+       unchanged) now starts 4.5u down, not 4u. */
     #skins-dot {
       right: calc(var(--u) * -0.8);
-      top: calc(var(--u) * 3.2);
+      top: calc(var(--u) * 4.5);
     }
 
-    /* Same dot on the top-right corner of the OPTIONS button (the third: 7.2u down, 2 x (3.2 + 0.8)) - a reminder to sign in,
+    /* Same dot on the top-right corner of the OPTIONS button (the third: 9u down, 2 x (3.7 + 0.8)) - a reminder to sign in,
        not a "something new" notice: it stays on for as long as the player is signed out, see saves.js accountSectionHtml
        and collection.js's updateOptionsDot (2026-09-23). */
     #options-dot {
       right: calc(var(--u) * -0.8);
-      top: calc(var(--u) * 7.2);
+      top: calc(var(--u) * 9);
     }
 
-    /* Same dot on the top-left corner of the BUFFS button (button: 1u from the right edge, 9.6u wide, 7.2u from the
-       top - it swapped places with LEADERBOARD, this dot has to follow it there). */
+    /* Same dot on the top-left corner of the BUFFS button (button: 1u from the right edge, 9.6u wide, 7.7u from the
+       top since the 2026-10-02 height bump - it swapped places with LEADERBOARD, this dot has to follow it there). */
     #buffs-dot {
       right: calc(var(--u) * 9.8); /* 1 + 9.6 - half the dot */
-      top: calc(var(--u) * 6.4); /* 7.2 - half the dot */
+      top: calc(var(--u) * 6.9); /* 7.7 - half the dot */
     }
 
     #game-container.boxes-open #buffs-dot {
@@ -1770,8 +1777,10 @@
     #coin-counter {
       position: absolute;
       right: calc(var(--u) * 1);
-      bottom: calc(var(--u) * 8.6); /* 1u margin + 3.2u SHOP button + 0.6u gap + 3.2u BOXES button + 0.6u gap */
-      width: calc(var(--u) * 8.4);
+      /* 2026-10-02: SHOP/BOXES grew 3.2u -> 3.7u tall (and 8.4u -> 9u wide, matched below), so this running sum
+         moved from 8.6u to 9.6u. */
+      bottom: calc(var(--u) * 9.6);
+      width: calc(var(--u) * 9);
       height: calc(var(--u) * 2.2);
       box-sizing: border-box;
       display: flex;
@@ -2625,7 +2634,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check-compat.js"></script>
-  <script src="src/version.js?v=339"></script>
+  <script src="src/version.js?v=340"></script>
   <script src="src/economy.js?v=50"></script>
   <script>
     // The grand cleansing screen: only if this load threw an existing save away (see Economy). Covers the game in black right away,

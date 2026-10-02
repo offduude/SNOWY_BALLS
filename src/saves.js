@@ -148,7 +148,7 @@ const Saves = (() => {
       "useBuff: 20 / 60s",
       "openBox: 20 / 60s",
       "sellSkin: 20 / 60s",
-      "purchase: 20 / 60s",
+      "purchase: 40 / 60s",
       "getTargetInventory: 20 / 60s",
       "proposeTrade: 3 / 300s",
       "acceptTrade: 10 / 60s",

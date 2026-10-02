@@ -61,7 +61,11 @@ exports.purchase = functions.region("europe-central2").runWith({ maxInstances: P
     if (isAdmin(uid)) save.coins = ADMIN_COINS; // forced on every read, not a skip-the-check branch - see lib/auth.js's own note
     const tradeGuard = await readIncomingTradeGuard(tx, uid, null); // read now - see lib/tradeGuard.js's own note on why this can't wait until after the spend below
 
-    await applyRateLimits(tx, [{ uid, key: "purchase", limit: 20, windowMs: 60000 }]);
+    // 40/60s (2026-10-02, doubled from 20 - the owner's own report: buying several items in a row through the
+    // real UI sometimes hit this). Every other call here is one action = one real economy change; "buying
+    // everything" in the shop is a legitimate, deliberate burst of several back-to-back purchase calls, not
+    // abuse, so this one key gets more headroom than the rest.
+    await applyRateLimits(tx, [{ uid, key: "purchase", limit: 40, windowMs: 60000 }]);
 
     if (!isAdmin(uid)) {
       const buffMax = eco.eco.shop.buffMax;
